@@ -10,4 +10,4 @@ display, injected as real gamepad events through a Shizuku user service. See REA
   belongs in `inject/InjectorService.kt` + `jni/sidepad_native.c`, never in the app process.
 - All overlay windows must stay `FLAG_NOT_FOCUSABLE`: focus on the second display would steal
   the injected key events from the top-screen game.
-- Durable notes (design, status, handoffs) go in the Obsidian vault `Claude/thor-sidepad/`.
+- Durable notes (design, status, handoffs) live outside this repo; the README and DEVELOPMENT.md are the only docs here.

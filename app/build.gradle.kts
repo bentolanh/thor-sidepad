@@ -29,7 +29,7 @@ android {
     // spaces in this repo's path). Its output dir is registered as a jniLibs source.
     sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("native/jniLibs"))
 
-    // The release key lives outside the repo and outside Dropbox, in
+    // The release key lives outside the repo, in
     // ~/Library/Application Support/thor-sidepad/keystore.properties (storeFile, storePassword,
     // keyAlias, keyPassword). Without that file a release build falls back to the debug key.
     val keystoreProps = Properties().apply {
