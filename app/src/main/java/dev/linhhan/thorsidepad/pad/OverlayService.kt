@@ -34,6 +34,29 @@ class OverlayService : Service() {
     private var engine: PadEngine? = null
     private var watching = false
     private var gpioPath: String? = null
+    private var targets: List<TargetChoice> = emptyList()   // controllers seen at the last probe
+
+    /**
+     * Lists the gamepad nodes and re-resolves the chosen controller by name, since a node number
+     * changes when the Thor switches controller style or a Bluetooth pad reconnects.
+     */
+    private fun refreshTargets(svc: IInjector) {
+        try {
+            val devs = JSONObject(svc.probe()).getJSONArray("devices")
+            val found = ArrayList<TargetChoice>()
+            for (i in 0 until devs.length()) {
+                val d = devs.getJSONObject(i)
+                if (d.optBoolean("gamepad", false)) found.add(TargetChoice(d.getString("name"), d.getString("path")))
+            }
+            targets = found
+            val byName = found.firstOrNull { it.name == prefs.physicalName }
+            val chosen = byName ?: found.firstOrNull { it.path == prefs.physicalPath } ?: found.firstOrNull()
+            if (chosen != null) {
+                if (prefs.physicalName.isEmpty() || byName == null) prefs.physicalName = chosen.name
+                if (prefs.physicalPath != chosen.path) { prefs.physicalPath = chosen.path; watching = false; try { svc.stopWatch() } catch (_: Exception) {} }
+            }
+        } catch (e: Exception) { Log.w(TAG, "probe failed", e) }
+    }
     private val main = Handler(Looper.getMainLooper())
 
     private val chordListener = object : IInjectorListener.Stub() {
@@ -81,14 +104,15 @@ class OverlayService : Service() {
         }
     }
 
-    /** Opens the configured target (Thor controller node or a virtual pad). Returns an error or "". */
+    /** Opens the configured target (a controller node or a virtual pad). Returns an error or "". */
     private fun openTarget(svc: IInjector): String {
+        refreshTargets(svc)
         return if (prefs.targetMode == Prefs.MODE_VIRTUAL) {
             val abs = Catalog.virtualAbs
             svc.openVirtual("Thor SidePad", Catalog.virtualKeys,
                 abs.map { it.first }.toIntArray(), abs.map { it.second }.toIntArray(), abs.map { it.third }.toIntArray())
         } else {
-            if (prefs.physicalPath.isBlank()) "No controller selected. Open Thor SidePad and pick the Thor controller."
+            if (prefs.physicalPath.isBlank()) "No controller found. Pull down and pick one once a controller is connected."
             else svc.openPhysical(prefs.physicalPath)
         }
     }
@@ -164,8 +188,20 @@ class OverlayService : Service() {
 
     private fun showPanel() {
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
-        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity, prefs.backdrop, ov.blurSupported)
+        Injector.current()?.let { refreshTargets(it) }
+        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity, prefs.backdrop, ov.blurSupported,
+            targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL, prefs.chordEnabled)
         ov.showPanel(state, object : PanelActions {
+            override fun setTarget(choice: TargetChoice?) {
+                if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
+                else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }
+                if (visible) { hide(); show() }   // the target itself changes, so the injector must reopen
+                showPanel()
+            }
+            override fun setChord(on: Boolean) {
+                prefs.chordEnabled = on
+                if (on) ensureChord() else { watching = false; try { Injector.current()?.stopWatch() } catch (_: Exception) {} }
+            }
             override fun togglePad() { ov.removePanel(); toggle() }
             override fun editLayout() { ov.removePanel(); edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad() }

@@ -10,10 +10,15 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 
 - A Shizuku user service runs as the shell user, which on the Thor can open the controller's
   `/dev/input/event*` node and `/dev/uinput`.
-- **Same-controller mode** writes key events straight into the Thor's own controller node, so
-  games keep seeing one pad. Limited to buttons that controller physically has.
-- **Virtual pad mode** creates a separate uinput gamepad "Thor SidePad". Some games and
-  emulators will treat it as a second player, so the same-controller mode is the default.
+- **Presses go to** a controller of your choice, picked in the pull-down panel: the Thor's own
+  controller (default), any other gamepad Android sees such as a Bluetooth pad, or a separate
+  virtual pad "Thor SidePad" that shows up as a second player. Writing into a real controller's
+  node means games keep seeing one pad; it is limited to buttons that controller advertises.
+  Controllers are remembered by name and re-found each time the pad shows, because node
+  numbers change when the Thor switches controller style or a Bluetooth pad reconnects.
+- **Thor controller style** (Control Center: Standard / Xbox / Ban): only the device name
+  changes ("Odin Controller" vs "Xbox Wireless Controller"); buttons and axes are the same, so
+  the pad keeps working, re-finding the controller by name or falling back to the first gamepad.
 - **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
   map to Android `BUTTON_C` / `BUTTON_Z`. They work in both modes. (The Thor kernel stamps
   every uinput pad with AYN's vendor/product ids, so stock `BUTTON_1..` codes are unmapped.)
@@ -62,6 +67,14 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 | `app/src/main/java/.../inject/` | `InjectorService` (runs under Shizuku), `Injector` (client), `Codes` catalogue |
 | `app/src/main/java/.../pad/` | layout model, press planning, overlay windows, editor, foreground service, QS tile |
 | `app/src/main/java/.../MainActivity.kt` | permissions, target/device/display choice, test buttons |
+
+## The app screen vs the panel
+
+The app on the main screen is setup only: permissions (Shizuku, draw over apps,
+notifications), which display hosts the pad, start at boot, and a Start button. Everything
+about the pad itself is in the pull-down panel on the pad's screen: target controller, show /
+hide, edit layout, shield, backdrop, opacity, the Select + Start chord, the Thor Control
+Center shortcut, stop.
 
 ## Starting Shizuku from a computer
 

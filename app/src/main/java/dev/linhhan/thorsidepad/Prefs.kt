@@ -10,9 +10,15 @@ class Prefs(ctx: Context) {
         get() = sp.getString("targetMode", MODE_PHYSICAL) ?: MODE_PHYSICAL
         set(v) = sp.edit().putString("targetMode", v).apply()
 
+    /** Last resolved node of the chosen controller; re-resolved from [physicalName] whenever the pad shows. */
     var physicalPath: String
         get() = sp.getString("physicalPath", "") ?: ""
         set(v) = sp.edit().putString("physicalPath", v).apply()
+
+    /** The chosen controller by name, because event node numbers change when a device re-enumerates. */
+    var physicalName: String
+        get() = sp.getString("physicalName", "") ?: ""
+        set(v) = sp.edit().putString("physicalName", v).apply()
 
     /** -1 = first non-default display. */
     var displayId: Int

@@ -8,12 +8,20 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 
 /** What the panel shows. */
-data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float, val backdrop: String, val blurSupported: Boolean)
+/** One controller the pad can write into. */
+data class TargetChoice(val name: String, val path: String)
+
+data class PanelState(
+    val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float,
+    val backdrop: String, val blurSupported: Boolean,
+    val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean, val chord: Boolean,
+)
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
 interface PanelActions {
@@ -23,6 +31,8 @@ interface PanelActions {
     fun setGestures(on: Boolean)
     fun setOpacity(value: Float)
     fun setBackdrop(value: String)
+    fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
+    fun setChord(on: Boolean)
     fun openThorControlCenter()
     fun stopService()
     fun close()
@@ -61,6 +71,19 @@ object ControlPanel {
         }
 
         card.addView(label("Thor SidePad", 20f))
+        card.addView(label("Presses go to", 14f))
+        for (t in state.targets) {
+            val active = !state.virtual && t.name == state.targetName
+            card.addView(Button(themed).apply {
+                text = (if (active) "●  " else "") + t.name; isAllCaps = false; isEnabled = !active
+                setOnClickListener { actions.setTarget(t) }
+            })
+        }
+        card.addView(Button(themed).apply {
+            text = (if (state.virtual) "●  " else "") + "Virtual pad (shows up as a 2nd player)"; isAllCaps = false; isEnabled = !state.virtual
+            setOnClickListener { actions.setTarget(null) }
+        })
+        if (state.targets.isEmpty()) card.addView(label("No controller found. Is Shizuku running?", 12f))
         card.addView(row(
             btn(if (state.padVisible) "Hide pad" else "Show pad") { actions.togglePad() },
             btn("Edit layout") { actions.editLayout() },
@@ -87,13 +110,15 @@ object ControlPanel {
                 override fun onStopTrackingTouch(sb: SeekBar) { actions.setOpacity(sb.progress / 100f) }
             })
         })
+        card.addView(sw("Hold Select + Start on the controller to show / hide the pad", state.chord) { actions.setChord(it) })
         card.addView(row(
             btn("Thor Control Center") { actions.openThorControlCenter() },
             btn("Stop SidePad") { actions.stopService() },
         ))
         card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f))
 
-        root.addView(card, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        val scroll = ScrollView(themed).apply { addView(card); isClickable = true }
+        root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
         return root
     }
 }

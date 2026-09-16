@@ -9,53 +9,23 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView style="@style/SectionHeader" android:text="1. Permissions" />
+        <TextView style="@style/SectionHeader" android:text="Permissions" />
         <TextView android:id="@+id/shizukuStatus" style="@style/StatusLine" />
         <Button android:id="@+id/btnShizuku" style="@style/Row" android:text="Grant Shizuku access" />
         <TextView android:id="@+id/overlayStatus" style="@style/StatusLine" />
         <Button android:id="@+id/btnOverlay" style="@style/Row" android:text="Allow drawing over other apps" />
+        <TextView android:id="@+id/notifStatus" style="@style/StatusLine" />
+        <Button android:id="@+id/btnNotif" style="@style/Row" android:text="Allow notifications" />
 
-        <TextView style="@style/SectionHeader" android:text="2. Where button presses go" />
-        <RadioGroup android:id="@+id/modeGroup" android:layout_width="match_parent" android:layout_height="wrap_content">
-            <RadioButton android:id="@+id/modePhysical" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Same controller as the Thor's own buttons (games see one pad)" />
-            <RadioButton android:id="@+id/modeVirtual" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Separate virtual pad (games may see a second pad)" />
-        </RadioGroup>
-        <TextView style="@style/StatusLine" android:text="Thor controller device (used for the same-controller mode and the Select+Start chord):" />
-        <Spinner android:id="@+id/deviceSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
-        <Button android:id="@+id/btnRefresh" style="@style/Row" android:text="Refresh devices" />
-        <TextView android:id="@+id/probeStatus" style="@style/StatusLine" />
-
-        <TextView style="@style/SectionHeader" android:text="3. Screen" />
+        <TextView style="@style/SectionHeader" android:text="Settings" />
+        <TextView style="@style/StatusLine" android:text="Screen for the pad" />
         <Spinner android:id="@+id/displaySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
-        <TextView style="@style/StatusLine" android:text="Button opacity (the shield itself is invisible)" />
-        <SeekBar android:id="@+id/opacity" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
-        <Switch android:id="@+id/shieldSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Shield: block touches to the app behind the pad (off = only the buttons are covered)" />
-        <Switch android:id="@+id/gestureSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Swipe in from the left edge = Back (pull down always opens the SidePad panel, pull up always shows or hides the pad)" />
         <Switch android:id="@+id/bootSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Start in the background at boot (the pull-down panel is then always available)" />
-        <Switch android:id="@+id/chordSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Hold Select + Start on the Thor to show/hide the pad" />
+            android:text="Start in the background at boot" />
 
-        <TextView style="@style/SectionHeader" android:text="4. Pad" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <Button android:id="@+id/btnShow" style="@style/Half" android:text="Show pad" />
-            <Button android:id="@+id/btnHide" style="@style/Half" android:text="Hide pad" />
-        </LinearLayout>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <Button android:id="@+id/btnEdit" style="@style/Half" android:text="Edit layout" />
-            <Button android:id="@+id/btnStart" style="@style/Half" android:text="Run in background" />
-            <Button android:id="@+id/btnStop" style="@style/Half" android:text="Stop service" />
-        </LinearLayout>
-        <TextView style="@style/StatusLine" android:text="On the pad's screen: pull down from the top edge to open the SidePad panel (show/hide, edit layout, shield, opacity, Thor Control Center, stop). Editing: tap a button to select, drag to move, pinch to resize, Add / Delete / − / + in the toolbar. A Quick Settings tile named Thor SidePad also toggles the pad." />
-
-        <TextView style="@style/SectionHeader" android:text="5. Test (open a gamepad tester on the top screen first)" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <Button android:id="@+id/btnTestA" style="@style/Half" android:text="Send A" />
-            <Button android:id="@+id/btnTestM1" style="@style/Half" android:text="Send M1 (BUTTON_C)" />
-        </LinearLayout>
+        <TextView style="@style/SectionHeader" android:text="Run" />
+        <TextView android:id="@+id/serviceStatus" style="@style/StatusLine" />
+        <Button android:id="@+id/btnStart" style="@style/Row" android:text="Start SidePad" />
+        <TextView style="@style/StatusLine" android:text="Everything else is on the pad's screen: pull down from its top edge for the SidePad panel (which controller receives the presses, shield, backdrop, opacity, edit layout, stop), pull up from its bottom edge to show or hide the pad. The Quick Settings tile toggles the pad too." />
     </LinearLayout>
 </ScrollView>
