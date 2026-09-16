@@ -320,7 +320,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             hint.text = if (PresetStore.isBuiltin(active))
                 "Editing \"$active\" (built-in). Save will ask for a name and keep your copy. Tap to select; drag to move; pinch to resize."
             else
-                "Editing \"$active\". Save writes your changes into it. Tap to select; drag to move; pinch to resize."
+                "Editing \"$active\". Save updates it or makes a new one. Tap to select; drag to move; pinch to resize."
         }
         refreshHint()
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
@@ -343,8 +343,16 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                     removeAll(); onSaved(working, name)
                 }
             } else {
-                PresetStore.upsert(app, Preset(active, "Your preset", working.copy(), false))
-                removeAll(); onSaved(working, active)
+                // Editing one of the user's own presets: write into it, or keep it and start a new one.
+                showChoice("Save", listOf("Update \"$active\"", "Save as a new preset")) { pick ->
+                    if (pick == 0) {
+                        PresetStore.upsert(app, Preset(active, "Your preset", working.copy(), false))
+                        removeAll(); onSaved(working, active)
+                    } else askName(PresetStore.nextName(app)) { name ->
+                        PresetStore.upsert(app, Preset(name, "Your preset", working.copy(), false))
+                        removeAll(); onSaved(working, name)
+                    }
+                }
             }
         }
         editor.onSelectionChanged = { i -> val has = i >= 0; smaller.isEnabled = has; bigger.isEnabled = has; delete.isEnabled = has }
