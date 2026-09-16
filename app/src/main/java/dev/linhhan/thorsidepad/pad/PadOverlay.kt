@@ -149,7 +149,20 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     val isPanelShowing get() = panel != null
 
-    fun tearDown() { removeAll(); removeCatchers(); removePanel() }
+    private var guide: View? = null
+
+    /** The gesture guide over the whole pad screen; tap to dismiss. */
+    fun showGuide(onDismissed: () -> Unit) {
+        removeGuide()
+        val v = GuideView(ctx) { removeGuide(); onDismissed() }
+        val lp = fullScreenParams("SidePad guide")
+        lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
+        wm.addView(v, lp); guide = v
+    }
+
+    fun removeGuide() { guide?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; guide = null }
+
+    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide() }
 
     /** Whether the compositor can blur what is behind a window (needed for the frosted backdrop). */
     val blurSupported: Boolean get() = try { wm.isCrossWindowBlurEnabled } catch (_: Throwable) { false }

@@ -26,6 +26,6 @@
         <TextView style="@style/SectionHeader" android:text="Run" />
         <TextView android:id="@+id/serviceStatus" style="@style/StatusLine" />
         <Button android:id="@+id/btnStart" style="@style/Row" android:text="Start SidePad" />
-        <TextView style="@style/StatusLine" android:text="Everything else is on the pad's screen: pull down from its top edge for the SidePad panel (which controller receives the presses, shield, backdrop, opacity, edit layout, stop), pull up from its bottom edge to show or hide the pad. The Quick Settings tile toggles the pad too." />
+        <Button android:id="@+id/btnGuide" style="@style/Row" android:text="Show the gesture guide on the pad's screen" />
     </LinearLayout>
 </ScrollView>

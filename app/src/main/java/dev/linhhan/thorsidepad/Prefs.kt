@@ -44,6 +44,10 @@ class Prefs(ctx: Context) {
         get() = sp.getString("backdrop", BACKDROP_CLEAR) ?: BACKDROP_CLEAR
         set(v) = sp.edit().putString("backdrop", v).apply()
 
+    var guideShown: Boolean
+        get() = sp.getBoolean("guideShown", false)
+        set(v) = sp.edit().putBoolean("guideShown", v).apply()
+
     var startAtBoot: Boolean
         get() = sp.getBoolean("startAtBoot", true)
         set(v) = sp.edit().putBoolean("startAtBoot", v).apply()

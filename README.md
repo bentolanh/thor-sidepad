@@ -72,6 +72,12 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 | `app/src/main/java/.../pad/` | layout model, press planning, overlay windows, editor, foreground service, QS tile |
 | `app/src/main/java/.../MainActivity.kt` | permissions, target/device/display choice, test buttons |
 
+## First start
+
+The first time the service starts, a one-screen guide covers the pad's screen: an arrow at
+the top edge (pull down for the panel) and one at the bottom edge (pull up to show or hide
+the pad); any tap dismisses it. The app has a button to show it again.
+
 ## The app screen vs the panel
 
 The app on the main screen is setup only: permissions (Shizuku, draw over apps,

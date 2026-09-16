@@ -121,7 +121,8 @@ class OverlayService : Service() {
             ACTION_STOP -> { hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
             ACTION_FOCUS_TOP -> returnFocusToTopScreen()
-            else -> ensureCatcher()
+            ACTION_GUIDE -> showGuide()
+            else -> { ensureCatcher(); if (!prefs.guideShown) showGuide() }
         }
         return START_STICKY
     }
@@ -226,6 +227,13 @@ class OverlayService : Service() {
     }
 
     /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
+    /** The gesture guide on the pad's screen; shown once on the first start, and on request. */
+    private fun showGuide() {
+        val ov = try { overlayOrCreate() } catch (e: Exception) { return }
+        ov.removePanel()
+        ov.showGuide { prefs.guideShown = true }
+    }
+
     private fun showPanel(keepPage: Boolean = false) {
         if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
@@ -326,6 +334,7 @@ class OverlayService : Service() {
         const val ACTION_STOP = "dev.linhhan.thorsidepad.STOP"
         const val ACTION_PANEL = "dev.linhhan.thorsidepad.PANEL"
         const val ACTION_FOCUS_TOP = "dev.linhhan.thorsidepad.FOCUS_TOP"
+        const val ACTION_GUIDE = "dev.linhhan.thorsidepad.GUIDE"
         const val ACTION_START = "dev.linhhan.thorsidepad.START"
 
         @Volatile var running = false

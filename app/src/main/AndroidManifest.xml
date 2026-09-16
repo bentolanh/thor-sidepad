@@ -37,6 +37,7 @@
                 <action android:name="dev.linhhan.thorsidepad.STOP" />
                 <action android:name="dev.linhhan.thorsidepad.PANEL" />
                 <action android:name="dev.linhhan.thorsidepad.START" />
+                <action android:name="dev.linhhan.thorsidepad.GUIDE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

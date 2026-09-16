@@ -59,9 +59,9 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnStart).setOnClickListener {
             OverlayService.send(this, OverlayService.ACTION_START)
-            Toast.makeText(this, "SidePad is running. On the second screen: pull down for its panel, pull up to show the pad.", Toast.LENGTH_LONG).show()
             refreshStatus()
         }
+        findViewById<Button>(R.id.btnGuide).setOnClickListener { OverlayService.send(this, OverlayService.ACTION_GUIDE) }
 
         val boot = findViewById<Switch>(R.id.bootSwitch)
         boot.isChecked = prefs.startAtBoot
