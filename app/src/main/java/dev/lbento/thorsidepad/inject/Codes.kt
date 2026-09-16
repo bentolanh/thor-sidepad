@@ -34,13 +34,25 @@ object Stick {
     const val RIGHT = -2
 }
 
-/** Pseudo-codes for pad buttons that act on the pad itself instead of the game. */
+/** Pseudo-codes for pad buttons that act on the pad or the device instead of the game. */
 object Action {
-    const val SHIELD = -3   // toggle shield / islands mode
+    const val SHIELD = -3       // toggle shield / islands mode
+    const val HOME_TOP = -13    // Home on the main screen
+    const val HOME_2ND = -14    // Home on the pad's screen (the Thor's own Home key)
+    const val BACK_TOP = -15    // Back on the main screen
+    const val BACK_2ND = -16    // Back on the pad's screen
+}
+
+/** Pseudo-codes for sliders that set a device level, 0..1. */
+object Slider {
+    const val BRIGHT_TOP = -10
+    const val BRIGHT_2ND = -11
+    const val VOLUME = -12
 }
 
 fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
-fun isActionCode(code: Int) = code == Action.SHIELD
+fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND
+fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME
 
 object Btn {
     const val A = 0x130          // BTN_SOUTH
@@ -74,6 +86,7 @@ data class PadCode(val code: Int, val label: String, val androidName: String) {
     val isExtra get() = code == Btn.C || code == Btn.Z
     val isStick get() = isStickCode(code)
     val isAction get() = isActionCode(code)
+    val isSlider get() = isSliderCode(code)
 }
 
 object Catalog {
@@ -104,7 +117,21 @@ object Catalog {
         PadCode(Stick.LEFT, "LS", "left stick, AXIS_X / AXIS_Y"),
         PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
         PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
+        PadCode(Action.HOME_TOP, "HOME", "Home on the main screen"),
+        PadCode(Action.HOME_2ND, "HOME", "Home on this screen"),
+        PadCode(Action.BACK_TOP, "BACK", "Back on the main screen"),
+        PadCode(Action.BACK_2ND, "BACK", "Back on this screen"),
+        PadCode(Slider.BRIGHT_TOP, "☀", "brightness slider, main screen"),
+        PadCode(Slider.BRIGHT_2ND, "☀", "brightness slider, this screen"),
+        PadCode(Slider.VOLUME, "♪", "volume slider"),
     )
+
+    /** Small tag drawn under a Home/Back/slider element: which screen it acts on. */
+    fun screenTag(code: Int): String? = when (code) {
+        Action.HOME_TOP, Action.BACK_TOP, Slider.BRIGHT_TOP -> "top"
+        Action.HOME_2ND, Action.BACK_2ND, Slider.BRIGHT_2ND -> "2nd"
+        else -> null
+    }
 
     fun byCode(code: Int): PadCode = all.firstOrNull { it.code == code } ?: PadCode(code, "0x%x".format(code), "KEY_$code")
 

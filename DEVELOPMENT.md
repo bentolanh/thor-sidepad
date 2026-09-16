@@ -30,6 +30,15 @@ the app.
   backdrop changes. With the shield on but the pad hidden, the panel carries the shield's
   backdrop itself.
 
+- **Device controls.** Slider elements (brightness per display, media volume) and Home/Back
+  buttons per screen are pad elements with negative pseudo-codes. Brightness goes through
+  the hidden per-display `DisplayManager.setBrightness`, callable from the shell-uid user
+  service because the shell holds `CONTROL_DISPLAY_BRIGHTNESS`; volume through `AudioManager`
+  in that service; Back per screen through `input -d <display> keyevent 4`; Home on the main
+  screen through the launcher intent on display 0, Home on the pad's screen through the
+  Thor's own Home key (routed to the last-touched screen). AYN's `secondary_screen_volume_level`
+  setting moves no audio stream on the Thor, so there is a single volume slider.
+
 ## Layout
 
 | Path | What |

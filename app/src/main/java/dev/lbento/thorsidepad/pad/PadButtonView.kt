@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
 import android.view.View
+import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.isActionCode
 
@@ -22,7 +23,11 @@ class PadButtonView(
 
     override fun onDraw(c: Canvas) {
         val r = width / 2f
-        if (isActionCode(code)) painter.drawShieldToggle(c, r, r, r, false) else painter.draw(c, r, r, r, label, enabled, down)
+        when {
+            code == Action.SHIELD -> painter.drawShieldToggle(c, r, r, r, false)
+            isActionCode(code) -> painter.drawSysButton(c, r, r, r, label, Catalog.screenTag(code), down)
+            else -> painter.draw(c, r, r, r, label, enabled, down)
+        }
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {

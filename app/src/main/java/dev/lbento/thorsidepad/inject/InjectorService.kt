@@ -14,8 +14,46 @@ import kotlin.system.exitProcess
  */
 class InjectorService() : IInjector.Stub() {
 
+    private var context: Context? = null
+
     @Suppress("unused")
-    constructor(context: Context) : this()
+    constructor(context: Context) : this() { this.context = context }
+
+    // ---- device levels. The shell user holds CONTROL_DISPLAY_BRIGHTNESS, and DisplayManager's
+    // per-display setBrightness/getBrightness are hidden but callable from this process.
+    private fun displayManager(): Any? = context?.getSystemService(Context.DISPLAY_SERVICE)
+
+    override fun getBrightness(displayId: Int): Float = try {
+        val dm = displayManager() ?: return -1f
+        val m = dm.javaClass.getMethod("getBrightness", Int::class.javaPrimitiveType)
+        (m.invoke(dm, displayId) as Float)
+    } catch (e: Throwable) { Log.w(TAG, "getBrightness", e); -1f }
+
+    override fun setBrightness(displayId: Int, level: Float) {
+        try {
+            val dm = displayManager() ?: return
+            val m = dm.javaClass.getMethod("setBrightness", Int::class.javaPrimitiveType, Float::class.javaPrimitiveType)
+            m.invoke(dm, displayId, level.coerceIn(0f, 1f))
+        } catch (e: Throwable) { Log.w(TAG, "setBrightness", e) }
+    }
+
+    private fun audio(): android.media.AudioManager? = context?.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+
+    override fun getVolume(): Float = try {
+        val am = audio() ?: return -1f
+        val s = android.media.AudioManager.STREAM_MUSIC
+        val min = am.getStreamMinVolume(s); val max = am.getStreamMaxVolume(s)
+        (am.getStreamVolume(s) - min).toFloat() / (max - min).coerceAtLeast(1)
+    } catch (e: Throwable) { Log.w(TAG, "getVolume", e); -1f }
+
+    override fun setVolume(level: Float) {
+        try {
+            val am = audio() ?: return
+            val s = android.media.AudioManager.STREAM_MUSIC
+            val min = am.getStreamMinVolume(s); val max = am.getStreamMaxVolume(s)
+            am.setStreamVolume(s, (min + level.coerceIn(0f, 1f) * (max - min) + 0.5f).toInt(), 0)
+        } catch (e: Throwable) { Log.w(TAG, "setVolume", e) }
+    }
 
     private var fd = -1
     private var virtual = false

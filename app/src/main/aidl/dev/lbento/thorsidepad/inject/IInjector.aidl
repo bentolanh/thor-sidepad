@@ -28,4 +28,10 @@ interface IInjector {
 
     // Run a shell command as the shell user; returns combined output.
     String shell(String cmd) = 12;
+
+    // Device levels, 0..1. Brightness per display through the display service; volume = media stream.
+    float getBrightness(int displayId) = 13;
+    void setBrightness(int displayId, float level) = 14;
+    float getVolume() = 15;
+    void setVolume(float level) = 16;
 }

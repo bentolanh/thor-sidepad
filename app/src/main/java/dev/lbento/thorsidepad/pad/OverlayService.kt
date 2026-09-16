@@ -224,8 +224,9 @@ class OverlayService : Service() {
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
+                readLevels(svc)
                 ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                    onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
+                    onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l -> onSlider(c, l) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
@@ -294,11 +295,47 @@ class OverlayService : Service() {
         }, 1200)
     }
 
-    /** Buttons that act on the pad itself. */
+    /** Buttons that act on the pad or the device. Home/Back go through the shell user or the Thor's own key. */
     private fun onAction(code: Int) {
+        val ov = overlay
         when (code) {
             dev.lbento.thorsidepad.inject.Action.SHIELD -> { prefs.shield = !prefs.shield; rebuildPad() }
+            dev.lbento.thorsidepad.inject.Action.HOME_TOP -> shellAsync("am start --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME")
+            dev.lbento.thorsidepad.inject.Action.HOME_2ND -> Injector.current()?.let { svc -> try { svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60) } catch (_: Exception) {} }
+            dev.lbento.thorsidepad.inject.Action.BACK_TOP -> shellAsync("input -d 0 keyevent 4")
+            dev.lbento.thorsidepad.inject.Action.BACK_2ND -> shellAsync("input -d ${ov?.displayId ?: 0} keyevent 4")
         }
+    }
+
+    private fun shellAsync(cmd: String) {
+        val svc = Injector.current()
+        if (svc == null) { toast("Shizuku not ready"); return }
+        Thread { try { svc.shell(cmd) } catch (e: Exception) { Log.w(TAG, "shell failed", e) } }.start()
+    }
+
+    /** Current device levels for the sliders, read once when the pad shows. */
+    private val levels = HashMap<Int, Float>()
+    private fun readLevels(svc: IInjector) {
+        try {
+            val d = overlay?.displayId ?: 0
+            svc.getBrightness(0).let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP] = it }
+            svc.getBrightness(d).let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.BRIGHT_2ND] = it }
+            svc.getVolume().let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] = it }
+        } catch (e: Exception) { Log.w(TAG, "levels", e) }
+    }
+
+    /** A slider moved: apply the level on a worker so the drag stays smooth. */
+    private fun onSlider(code: Int, level: Float) {
+        val svc = Injector.current() ?: return
+        Thread {
+            try {
+                when (code) {
+                    dev.lbento.thorsidepad.inject.Slider.VOLUME -> svc.setVolume(level)
+                    dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP -> svc.setBrightness(0, level)
+                    dev.lbento.thorsidepad.inject.Slider.BRIGHT_2ND -> svc.setBrightness(overlay?.displayId ?: 0, level)
+                }
+            } catch (e: Exception) { Log.w(TAG, "slider failed", e) }
+        }.start()
     }
 
     /** Re-lays the pad windows with the current looks, keeping the injector target open. */
@@ -306,8 +343,9 @@ class OverlayService : Service() {
         val eng = engine; val ov = overlay
         if (!visible || eng == null || ov == null) { if (visible) show(); return }
         try {
+            Injector.current()?.let { readLevels(it) }
             ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
+                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l -> onSlider(c, l) })
             if (prefs.shield) ov.removeCatchers() else ensureCatcher()
         } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
     }

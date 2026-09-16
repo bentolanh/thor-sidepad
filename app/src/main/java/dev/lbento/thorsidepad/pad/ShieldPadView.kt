@@ -6,7 +6,9 @@ import android.graphics.Paint
 import android.view.MotionEvent
 import android.view.View
 import dev.lbento.thorsidepad.inject.Catalog
+import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
+import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -37,7 +39,10 @@ class ShieldPadView(
     private val shieldOn: Boolean = true,
     opacity: Float = 1f,
     backdropColor: Int = 0,
+    private val levels: MutableMap<Int, Float> = HashMap(),     // slider code -> current 0..1
+    private val onSlider: (Int, Float) -> Unit = { _, _ -> },
 ) : View(ctx) {
+    private val sliderBy = HashMap<Int, Int>()       // pointerId -> slider index it is dragging
     var opacity: Float = opacity
         set(v) { field = v; invalidate() }
     var backdropColor: Int = backdropColor
@@ -59,7 +64,12 @@ class ShieldPadView(
     private fun hit(x: Float, y: Float): Int {
         for (i in layout.buttons.indices.reversed()) {
             val b = layout.buttons[i]
-            if (hypot(x - b.cx * width, y - b.cy * height) <= b.size * short() / 2f) return i
+            val r = b.size * short() / 2f
+            if (isSliderCode(b.code)) {
+                // A slider is a narrow bar; only the bar and a little around it count.
+                val cx = b.cx * width; val cy = b.cy * height
+                if (abs(x - cx) <= r * 0.45f && y >= cy - r && y <= cy + r * 0.7f) return i
+            } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1
     }
@@ -74,8 +84,12 @@ class ShieldPadView(
             if (isStickCode(b.code)) {
                 val k = knob[i]
                 painter.drawStick(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), k?.get(0) ?: 0f, k?.get(1) ?: 0f)
-            } else if (isActionCode(b.code)) {
+            } else if (b.code == Action.SHIELD) {
                 painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, shieldOn)
+            } else if (isActionCode(b.code)) {
+                painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
+            } else if (isSliderCode(b.code)) {
+                painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), levels[b.code] ?: 0.5f, sliderBy.containsValue(i))
             } else {
                 painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0)
             }
@@ -95,6 +109,15 @@ class ShieldPadView(
         if (len > 1f) { dx /= len; dy /= len }
         knob[i] = floatArrayOf(dx, dy)
         engine.stick(b.code, dx, dy)
+    }
+
+    private fun slide(i: Int, y: Float) {
+        val b = layout.buttons[i]
+        val r = b.size * short() / 2f
+        val top = b.cy * height - r * 0.9f; val bottom = b.cy * height + r * 0.55f
+        val lv = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
+        levels[b.code] = lv
+        onSlider(b.code, lv)
     }
 
     private fun releaseStick(pid: Int) {
@@ -145,6 +168,7 @@ class ShieldPadView(
                     if (edge == EdgeGesture.PULL_DOWN && onPullDown != null && swipes.size == 1) onPullDown.onPullStart()
                 }
                 else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
+                else if (i >= 0 && isSliderCode(layout.buttons[i].code)) { sliderBy[pid] = i; slide(i, y) }
                 else { tracked.add(pid); if (i >= 0) press(i, pid) }
                 invalidate()
             }
@@ -152,6 +176,7 @@ class ShieldPadView(
                 for (idx in 0 until e.pointerCount) {
                     val pid = e.getPointerId(idx)
                     stickBy[pid]?.let { si -> steer(si, e.getX(idx), e.getY(idx)); invalidate() }
+                    sliderBy[pid]?.let { si -> slide(si, e.getY(idx)); invalidate() }
                     swipes[pid]?.let { s -> if (s.edge == EdgeGesture.PULL_DOWN) onPullDown?.onPullMove(e.getY(idx) - s.y0) }
                 }
                 // A finger keeps being tracked while it crosses gaps, so it can slide A -> B.
@@ -168,6 +193,7 @@ class ShieldPadView(
                 val pid = e.getPointerId(idx)
                 release(pid, fireAction = pressedBy[pid]?.let { it == hit(e.getX(idx), e.getY(idx)) } == true)
                 releaseStick(pid)
+                sliderBy.remove(pid)
                 tracked.remove(pid)
                 swipes.remove(pid)?.let { s ->
                     val dx = e.getX(idx) - s.x0; val dy = e.getY(idx) - s.y0
@@ -186,6 +212,7 @@ class ShieldPadView(
                 if (swipes.values.any { it.edge == EdgeGesture.PULL_DOWN }) onPullDown?.onPullEnd(false)
                 pressedBy.keys.toList().forEach { release(it) }
                 stickBy.keys.toList().forEach { releaseStick(it) }
+                sliderBy.clear()
                 tracked.clear()
                 swipes.clear()
                 invalidate()

@@ -21,6 +21,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.isActionCode
+import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -244,14 +245,15 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     var pullTracker: PullListener? = null
 
     fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean,
-                 backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
+                 backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit,
+                 levels: MutableMap<Int, Float> = HashMap(), onSlider: (Int, Float) -> Unit = { _, _ -> }) {
         val old = ArrayList(views)
         views.clear()
         shieldView = null; shieldParams = null
         if (shield) {
             val frosted = backdrop == "frosted" && blurSupported
             val color = backdropColor(backdrop)
-            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color)
+            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {
@@ -270,13 +272,16 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             val enabled = engine.enabled(b.code)
             val v: View = when {
                 isStickCode(b.code) -> StickView(ctx, b.code, enabled, engine)
+                isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
             }
             v.alpha = opacity
-            val lp = WindowManager.LayoutParams(px, px, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+            // Sliders are tall and narrow; everything else is square.
+            val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else px
+            val lp = WindowManager.LayoutParams(w, px, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
-            lp.x = (b.cx * width - px / 2f).roundToInt()
+            lp.x = (b.cx * width - w / 2f).roundToInt()
             lp.y = (b.cy * height - px / 2f).roundToInt()
             lp.title = "SidePad ${Catalog.byCode(b.code).label}"
             add(v, lp)
@@ -317,7 +322,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         refreshHint()
         btn("Add") { showChoice("Add a button or stick", Catalog.all.map { "${it.label}   (${it.androidName})" }) { pos ->
             val code = Catalog.all[pos].code
-            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code)) 0.28f else 0.15f))
+            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }

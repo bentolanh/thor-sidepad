@@ -51,6 +51,9 @@ Everything happens on the bottom screen.
   <img src="docs/pad-frosted.png" width="300" alt="The same pad over the frosted backdrop">
 - **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
   drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
+- **Device controls on the pad.** Add lists more than buttons: brightness sliders for each
+  screen, a volume slider, and Home and Back buttons for either screen, so the things you
+  would reach for the Thor's own keys or the Control Center for are one tap from the game.
   Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
   changes as a preset of your own.
 - **Where presses go.** The panel's Controller page lists the Thor's own controller, any
