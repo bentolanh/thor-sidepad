@@ -299,7 +299,15 @@ class OverlayService : Service() {
         val ov = try { overlayOrCreate() } catch (e: Exception) { guideStep = 0; return }
         guideStep = step
         ov.removePanel()
-        ov.showGuide(step, onGesture = { g -> onGuideGesture(g) }, onSkip = { finishGuide() })
+        // Step 1 pulls the real panel down over the guide, finger-tracked like the shade.
+        val pull = if (step == 1) object : PullListener {
+            override fun onPullStart() { openPanel(dragged = true) }
+            override fun onPullMove(dy: Float) { ov.dragPanel(dy) }
+            override fun onPullEnd(commit: Boolean) {
+                if (commit) { ov.removeGuide(); guideStep = 2; ov.endPanelDrag(true) } else ov.endPanelDrag(false)
+            }
+        } else null
+        ov.showGuide(step, onGesture = { g -> onGuideGesture(g) }, onSkip = { finishGuide() }, pull = pull)
     }
 
     private fun finishGuide() {

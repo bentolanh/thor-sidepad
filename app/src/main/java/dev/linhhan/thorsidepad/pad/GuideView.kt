@@ -22,6 +22,7 @@ class GuideView(
     private val step: Int,
     private val onGesture: (EdgeGesture) -> Unit,
     private val onSkip: () -> Unit,
+    private val pull: PullListener? = null,     // step 1: the panel follows the finger like the shade
 ) : View(ctx) {
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2E7DFF.toInt() }
@@ -105,8 +106,12 @@ class GuideView(
                     e.y > height - zone -> EdgeGesture.PULL_UP
                     else -> null
                 }
+                if (edge == EdgeGesture.PULL_DOWN && wantsDown) pull?.onPullStart()
             }
-            MotionEvent.ACTION_MOVE -> if (edge != null) { dragY = e.y - y0; invalidate() }
+            MotionEvent.ACTION_MOVE -> if (edge != null) {
+                dragY = e.y - y0; invalidate()
+                if (edge == EdgeGesture.PULL_DOWN && wantsDown) pull?.onPullMove(dragY)
+            }
             MotionEvent.ACTION_UP -> {
                 val dx = e.x - x0; val dy = e.y - y0
                 val need = min(width, height) * ShieldPadView.SWIPE_LEN
@@ -117,12 +122,13 @@ class GuideView(
                 val s = skipRect()
                 if (isEnd) { if (tap) onSkip(); return true }
                 when {
+                    g == EdgeGesture.PULL_DOWN && wantsDown && pull != null -> pull.onPullEnd(dy > need && abs(dx) < dy)
                     g == EdgeGesture.PULL_DOWN && wantsDown && dy > need && abs(dx) < dy && fast -> onGesture(g)
                     g == EdgeGesture.PULL_UP && wantsUp && -dy > need && abs(dx) < -dy && fast -> onGesture(g)
                     tap && e.x in s[0]..s[2] && e.y in s[1]..s[3] -> onSkip()
                 }
             }
-            MotionEvent.ACTION_CANCEL -> { dragY = 0f; edge = null; invalidate() }
+            MotionEvent.ACTION_CANCEL -> { if (edge == EdgeGesture.PULL_DOWN && wantsDown) pull?.onPullEnd(false); dragY = 0f; edge = null; invalidate() }
         }
         return true
     }

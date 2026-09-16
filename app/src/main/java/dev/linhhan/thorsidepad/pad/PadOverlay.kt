@@ -219,9 +219,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private var guide: View? = null
 
     /** One step of the interactive guide over the whole pad screen. */
-    fun showGuide(step: Int, onGesture: (EdgeGesture) -> Unit, onSkip: () -> Unit) {
+    fun showGuide(step: Int, onGesture: (EdgeGesture) -> Unit, onSkip: () -> Unit, pull: PullListener? = null) {
         removeGuide()
-        val v = GuideView(ctx, step, onGesture, onSkip)
+        val v = GuideView(ctx, step, onGesture, onSkip, pull)
         val lp = fullScreenParams("SidePad guide")
         lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
         wm.addView(v, lp); guide = v
