@@ -9,23 +9,46 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView style="@style/SectionHeader" android:text="Permissions" />
-        <TextView android:id="@+id/shizukuStatus" style="@style/StatusLine" />
-        <Button android:id="@+id/btnShizuku" style="@style/Row" android:text="Grant Shizuku access" />
-        <TextView android:id="@+id/overlayStatus" style="@style/StatusLine" />
-        <Button android:id="@+id/btnOverlay" style="@style/Row" android:text="Allow drawing over other apps" />
-        <TextView android:id="@+id/notifStatus" style="@style/StatusLine" />
-        <Button android:id="@+id/btnNotif" style="@style/Row" android:text="Allow notifications" />
+        <TextView style="@style/StatusLine" android:text="Set up in order. Each step unlocks the next." android:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <!-- Step 1: Shizuku -->
+        <LinearLayout android:id="@+id/step1" style="@style/StepCard">
+            <TextView android:id="@+id/step1Title" style="@style/StepTitle" android:text="1  Shizuku" />
+            <TextView android:id="@+id/step1Status" style="@style/StatusLine" />
+            <TextView android:id="@+id/step1Help" style="@style/StepHelp" />
+            <Button android:id="@+id/step1Button" style="@style/Row" />
+        </LinearLayout>
+
+        <!-- Step 2: overlay -->
+        <LinearLayout android:id="@+id/step2" style="@style/StepCard">
+            <TextView android:id="@+id/step2Title" style="@style/StepTitle" android:text="2  Draw over other apps" />
+            <TextView android:id="@+id/step2Status" style="@style/StatusLine" />
+            <TextView style="@style/StepHelp" android:text="The pad and its panel are windows drawn over whatever is on the second screen. Android asks you to allow this once." />
+            <Button android:id="@+id/step2Button" style="@style/Row" android:text="Allow drawing over other apps" />
+        </LinearLayout>
+
+        <!-- Step 3: notifications (optional) -->
+        <LinearLayout android:id="@+id/step3" style="@style/StepCard">
+            <TextView android:id="@+id/step3Title" style="@style/StepTitle" android:text="3  Notifications (optional)" />
+            <TextView android:id="@+id/step3Status" style="@style/StatusLine" />
+            <TextView style="@style/StepHelp" android:text="SidePad runs in the background with a notification. Allowing it gives you Show, Edit and Stop buttons there. The pad works without it." />
+            <Button android:id="@+id/step3Button" style="@style/Row" android:text="Allow notifications" />
+        </LinearLayout>
+
+        <!-- Step 4: run -->
+        <LinearLayout android:id="@+id/step4" style="@style/StepCard">
+            <TextView android:id="@+id/step4Title" style="@style/StepTitle" android:text="4  Start SidePad" />
+            <TextView android:id="@+id/serviceStatus" style="@style/StatusLine" />
+            <TextView style="@style/StepHelp" android:text="The first start opens a short guide on the second screen. Everything else lives there: pull down from its top edge for the SidePad panel, pull up from its bottom edge to show or hide the pad." />
+            <Button android:id="@+id/btnStart" style="@style/Row" android:text="Start SidePad" />
+            <Button android:id="@+id/btnGuide" style="@style/Row" android:text="Show the guide again" />
+        </LinearLayout>
 
         <TextView style="@style/SectionHeader" android:text="Settings" />
         <TextView style="@style/StatusLine" android:text="Screen for the pad" />
         <Spinner android:id="@+id/displaySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
         <Switch android:id="@+id/bootSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Start in the background at boot" />
-
-        <TextView style="@style/SectionHeader" android:text="Run" />
-        <TextView android:id="@+id/serviceStatus" style="@style/StatusLine" />
-        <Button android:id="@+id/btnStart" style="@style/Row" android:text="Start SidePad" />
-        <Button android:id="@+id/btnGuide" style="@style/Row" android:text="Show the gesture guide on the pad's screen" />
+        <TextView style="@style/StepHelp" android:text="Shizuku itself stops when the Thor reboots. In the Shizuku app, turn on “Start on boot (wireless debugging)” so both come back on their own; otherwise start Shizuku again from its app or from a computer with adb." />
     </LinearLayout>
 </ScrollView>

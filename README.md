@@ -86,11 +86,15 @@ showing. "Skip the guide" ends it early. The app has a button to run it again.
 
 ## The app screen vs the panel
 
-The app on the main screen is setup only: permissions (Shizuku, draw over apps,
-notifications), which display hosts the pad, start at boot, and a Start button. Everything
+The app on the main screen is setup only, as an ordered checklist where each step unlocks
+the next: 1 Shizuku (three states with their own action: not installed → Install from the
+store, installed but not running → Open Shizuku with a short explanation of Wireless
+debugging and pairing, running → Grant SidePad access), 2 draw over other apps, 3
+notifications (marked optional: they add Show / Edit / Stop to the notification), 4 Start,
+plus which display hosts the pad and start at boot. It also says that Shizuku stops at
+reboot and points at Shizuku's own "Start on boot (wireless debugging)" option. Everything
 about the pad itself is in the pull-down panel on the pad's screen: target controller, show /
-hide, edit layout, shield, backdrop, opacity, the Select + Start chord, the Thor Control
-Center shortcut, stop.
+hide, edit layout, shield, backdrop, transparency, stop.
 
 ## Starting Shizuku from a computer
 
