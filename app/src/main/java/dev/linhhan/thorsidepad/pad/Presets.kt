@@ -14,6 +14,7 @@ object PresetStore {
         Preset("Left hand", "You hold the left side. A/B/X/Y, right stick, R1/R2, Start, M1/M2 sit on the left half.", PadLayout.leftHand(), true),
         Preset("Right hand", "You hold the right side. D-pad, left stick, L1/L2, Select, M1/M2 sit on the right half.", PadLayout.rightHand(), true),
         Preset("Face buttons", "A/B/X/Y on the left, shoulders in the corners, M1/M2 and Select/Start on the right.", PadLayout.faceButtons(), true),
+        // Every built-in carries a SHLD button; delete it in the editor if you do not want it.
     )
 
     private fun sp(ctx: Context) = ctx.applicationContext.getSharedPreferences("sidepad", Context.MODE_PRIVATE)

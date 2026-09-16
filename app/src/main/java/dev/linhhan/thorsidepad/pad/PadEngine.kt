@@ -9,6 +9,8 @@ import dev.linhhan.thorsidepad.inject.Catalog
 import dev.linhhan.thorsidepad.inject.Ev
 import dev.linhhan.thorsidepad.inject.IInjector
 import dev.linhhan.thorsidepad.inject.Stick
+import dev.linhhan.thorsidepad.inject.isActionCode
+import dev.linhhan.thorsidepad.inject.isStickCode
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
@@ -84,7 +86,11 @@ class PadEngine(private val injector: IInjector, val caps: Caps) {
     fun stickPlan(code: Int): StickPlan? = sticks.getOrPut(code) { stickPlanFor(code, caps) }
 
     /** Whether the current target can express this element at all. */
-    fun enabled(code: Int): Boolean = if (code < 0) stickPlan(code) != null else plan(code).isNotEmpty()
+    fun enabled(code: Int): Boolean = when {
+        isActionCode(code) -> true
+        isStickCode(code) -> stickPlan(code) != null
+        else -> plan(code).isNotEmpty()
+    }
 
     /** Moves a virtual stick; nx/ny are -1..1, y positive = down like a real pad. */
     fun stick(code: Int, nx: Float, ny: Float) {

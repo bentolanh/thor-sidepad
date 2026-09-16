@@ -20,6 +20,8 @@ import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.linhhan.thorsidepad.inject.Catalog
+import dev.linhhan.thorsidepad.inject.isActionCode
+import dev.linhhan.thorsidepad.inject.isStickCode
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -40,7 +42,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private val themed: Context = ContextThemeWrapper(ctx, android.R.style.Theme_DeviceDefault_DayNight)
     private val wm: WindowManager = ctx.getSystemService(WindowManager::class.java)
     private val views = ArrayList<View>()          // pad windows (play or edit)
-    private var catcher: View? = null
+    private val catchers = ArrayList<View>()
     private var panel: View? = null
 
     /** Called after the one focusable window (the name dialog) closes, so focus can be handed back to the top screen. */
@@ -75,18 +77,20 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT).also { it.title = title }
 
-    /** The thin pull-down strip on the top edge. Idempotent. */
-    fun showCatcher(onPullDown: () -> Unit) {
-        if (catcher != null) return
-        val v = EdgeCatcherView(ctx, onPullDown)
-        val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.HEIGHT_PX,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
-        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        lp.title = "SidePad catcher"
-        wm.addView(v, lp); catcher = v
+    /** Thin strips on the top (pull down = panel) and bottom (pull up = show pad) edges. Idempotent. */
+    fun showCatchers(onPullDown: () -> Unit, onPullUp: () -> Unit) {
+        if (catchers.isNotEmpty()) return
+        for ((down, cb) in listOf(true to onPullDown, false to onPullUp)) {
+            val v = EdgeCatcherView(ctx, down, cb)
+            val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.HEIGHT_PX,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+            lp.gravity = (if (down) Gravity.TOP else Gravity.BOTTOM) or Gravity.CENTER_HORIZONTAL
+            lp.title = if (down) "SidePad catcher top" else "SidePad catcher bottom"
+            wm.addView(v, lp); catchers.add(v)
+        }
     }
 
-    fun removeCatcher() { catcher?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; catcher = null }
+    fun removeCatchers() { catchers.forEach { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; catchers.clear() }
 
     fun showPanel(state: PanelState, actions: PanelActions) {
         removePanel()
@@ -98,12 +102,13 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     val isPanelShowing get() = panel != null
 
-    fun tearDown() { removeAll(); removeCatcher(); removePanel() }
+    fun tearDown() { removeAll(); removeCatchers(); removePanel() }
 
-    fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean, gestures: Boolean, onGesture: (EdgeGesture) -> Unit) {
+    fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean, gestures: Boolean,
+                 onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
         removeAll()
         if (shield) {
-            val v = ShieldPadView(ctx, layout, engine, gestures, onGesture)
+            val v = ShieldPadView(ctx, layout, engine, gestures, onGesture, onAction, shieldOn = true)
             v.alpha = opacity
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
@@ -115,7 +120,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         for (b in layout.buttons) {
             val px = (b.size * short).roundToInt().coerceAtLeast(48)
             val enabled = engine.enabled(b.code)
-            val v: View = if (b.code < 0) StickView(ctx, b.code, enabled, engine) else PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
+            val v: View = when {
+                isStickCode(b.code) -> StickView(ctx, b.code, enabled, engine)
+                isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
+                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
+            }
             v.alpha = opacity
             val lp = WindowManager.LayoutParams(px, px, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
@@ -159,7 +168,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         refreshHint()
         btn("Add") { showChoice("Add a button or stick", Catalog.all.map { "${it.label}   (${it.androidName})" }) { pos ->
             val code = Catalog.all[pos].code
-            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (code < 0) 0.28f else 0.15f))
+            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code)) 0.28f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }

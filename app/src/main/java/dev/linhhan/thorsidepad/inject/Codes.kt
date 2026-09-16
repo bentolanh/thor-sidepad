@@ -34,6 +34,14 @@ object Stick {
     const val RIGHT = -2
 }
 
+/** Pseudo-codes for pad buttons that act on the pad itself instead of the game. */
+object Action {
+    const val SHIELD = -3   // toggle shield / islands mode
+}
+
+fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
+fun isActionCode(code: Int) = code == Action.SHIELD
+
 object Btn {
     const val A = 0x130          // BTN_SOUTH
     const val B = 0x131          // BTN_EAST
@@ -64,7 +72,8 @@ data class PadCode(val code: Int, val label: String, val androidName: String) {
     val isDpad get() = code in Btn.DPAD_UP..Btn.DPAD_RIGHT
     val isTrigger get() = code == Btn.TL2 || code == Btn.TR2
     val isExtra get() = code == Btn.C || code == Btn.Z
-    val isStick get() = code < 0
+    val isStick get() = isStickCode(code)
+    val isAction get() = isActionCode(code)
 }
 
 object Catalog {
@@ -94,12 +103,13 @@ object Catalog {
         PadCode(Btn.Z, "M2", "BUTTON_Z"),
         PadCode(Stick.LEFT, "LS", "left stick, AXIS_X / AXIS_Y"),
         PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
+        PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
     )
 
     fun byCode(code: Int): PadCode = all.firstOrNull { it.code == code } ?: PadCode(code, "0x%x".format(code), "KEY_$code")
 
     /** Every key the virtual pad declares: the whole button catalogue. */
-    val virtualKeys: IntArray = all.filter { !it.isStick }.map { it.code }.toIntArray()
+    val virtualKeys: IntArray = all.filter { it.code >= 0 }.map { it.code }.toIntArray()
 
     /** Axes the virtual pad declares, laid out like the Thor's own controller: X/Y left stick, Z/RZ right stick, GAS/BRAKE triggers. */
     val virtualAbs = listOf(

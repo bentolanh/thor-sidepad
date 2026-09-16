@@ -25,10 +25,13 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   show/hide, edit layout, shield, edge swipes, opacity, a button for the Thor Control Center
   (it presses the AYN key), stop. While the pad is hidden a thin strip stays parked on the top
   edge so the pull-down still works; with start-at-boot on, it is always there.
-- **Pull up from the bottom edge** presses the Thor's Home key and **swipe in from the left**
-  its Back key, both through the controller's input node. The Thor routes them to the screen
-  last touched, which is the pad's, so they act on the second screen: pull-up returns it to
-  its home app.
+- **Pull up from the bottom edge** shows or hides the pad. While hidden, thin strips stay on
+  the top and bottom edges, so both pulls keep working. **Swipe in from the left** presses the
+  Thor's Back key through the controller's input node (switchable in the panel).
+- **SHLD button.** Every built-in preset carries a small SHLD button that toggles shield mode
+  from the pad itself; lit blue while the shield is on. Delete it in the editor if unwanted.
+- **Opacity** applies to the buttons only. The shield itself is invisible; only its three
+  edge pills are drawn.
 - The top screen keeps input focus while the pad is used.
 - Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
 - **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the

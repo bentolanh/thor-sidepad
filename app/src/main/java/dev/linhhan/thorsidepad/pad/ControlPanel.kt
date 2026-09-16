@@ -65,8 +65,8 @@ object ControlPanel {
             btn("Edit layout") { actions.editLayout() },
         ))
         card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
-        card.addView(sw("Edge swipes: pull up = Home on this screen, from left = Back", state.gestures) { actions.setGestures(it) })
-        card.addView(label("Opacity", 14f))
+        card.addView(sw("Swipe in from the left edge = Back", state.gestures) { actions.setGestures(it) })
+        card.addView(label("Button opacity (the shield itself is invisible)", 14f))
         card.addView(SeekBar(themed).apply {
             max = 100; progress = (state.opacity * 100).toInt()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -79,7 +79,7 @@ object ControlPanel {
             btn("Thor Control Center") { actions.openThorControlCenter() },
             btn("Stop SidePad") { actions.stopService() },
         ))
-        card.addView(label("Tap outside to close. Pull down from the top edge to open this panel any time.", 12f))
+        card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f))
 
         root.addView(card, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
         return root

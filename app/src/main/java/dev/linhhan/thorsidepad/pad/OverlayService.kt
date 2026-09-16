@@ -103,9 +103,10 @@ class OverlayService : Service() {
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
-                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures) { g -> onGesture(g) }
-                // The shield catches pull-down itself; islands mode still needs the strip.
-                if (prefs.shield) ov.removeCatcher() else ensureCatcher()
+                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures,
+                    onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
+                // The shield catches the edge pulls itself; islands mode still needs the strips.
+                if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
                 updateNotification()
                 ensureChord()
@@ -137,9 +138,16 @@ class OverlayService : Service() {
         Thread { try { svc.shell("am start --display 0 -n $packageName/.FocusHandoffActivity") } catch (e: Exception) { Log.w(TAG, "focus handoff failed", e) } }.start()
     }
 
-    /** Keeps the pull-down strip on the pad's screen whenever the pad is not covering it. */
+    /** Keeps the edge strips on the pad's screen whenever the shield is not covering it. */
     private fun ensureCatcher() {
-        try { overlayOrCreate().showCatcher { showPanel() } } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
+        try { overlayOrCreate().showCatchers(onPullDown = { showPanel() }, onPullUp = { toggle() }) } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
+    }
+
+    /** Buttons that act on the pad itself. */
+    private fun onAction(code: Int) {
+        when (code) {
+            dev.linhhan.thorsidepad.inject.Action.SHIELD -> { prefs.shield = !prefs.shield; hide(); show() }
+        }
     }
 
     private fun showPanel() {
@@ -180,21 +188,22 @@ class OverlayService : Service() {
     }
 
     /**
-     * Pull-down opens our panel. Pull-up and left-edge press the Thor's own Home and Back keys
-     * through the controller node. The Thor routes those to the screen last touched, which is
-     * the pad's, so pull-up goes Home on the second screen.
+     * Pull-down opens our panel, pull-up shows or hides the pad. Left-edge presses the Thor's
+     * own Back key through the controller node, which the Thor routes to the last-touched screen.
      */
     private fun onGesture(g: EdgeGesture) {
         Log.i(TAG, "gesture $g")
-        if (g == EdgeGesture.PULL_DOWN) { showPanel(); return }
-        val svc = Injector.current() ?: return
-        try {
-            val err = when (g) {
-                EdgeGesture.PULL_UP -> svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60)
-                else -> svc.pressKeyOn(prefs.physicalPath, Key.BACK, 60)
+        when (g) {
+            EdgeGesture.PULL_DOWN -> showPanel()
+            EdgeGesture.PULL_UP -> toggle()
+            EdgeGesture.LEFT_EDGE -> {
+                val svc = Injector.current() ?: return
+                try {
+                    val err = svc.pressKeyOn(prefs.physicalPath, Key.BACK, 60)
+                    if (err.isNotEmpty()) toast(err)
+                } catch (e: Exception) { Log.w(TAG, "gesture failed", e) }
             }
-            if (err.isNotEmpty()) toast(err)
-        } catch (e: Exception) { Log.w(TAG, "gesture failed", e) }
+        }
     }
 
     /** The node named "gpio-keys", where the AYN key lives; found once per service life. */
@@ -231,7 +240,7 @@ class OverlayService : Service() {
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_pad)
             .setContentTitle("Thor SidePad")
-            .setContentText(if (visible) "Pad is on the second screen" else "Pad hidden. Pull down from the top edge, or hold Select+Start.")
+            .setContentText(if (visible) "Pad is on the second screen. Pull up from the bottom edge to hide it." else "Pad hidden. Pull up from the bottom edge to show it, pull down for the panel.")
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, if (visible) "Hide" else "Show", pending(ACTION_TOGGLE)).build())

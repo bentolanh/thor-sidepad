@@ -29,12 +29,12 @@
 
         <TextView style="@style/SectionHeader" android:text="3. Screen" />
         <Spinner android:id="@+id/displaySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
-        <TextView style="@style/StatusLine" android:text="Opacity" />
+        <TextView style="@style/StatusLine" android:text="Button opacity (the shield itself is invisible)" />
         <SeekBar android:id="@+id/opacity" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
         <Switch android:id="@+id/shieldSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Shield: block touches to the app behind the pad (off = only the buttons are covered)" />
         <Switch android:id="@+id/gestureSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Edge swipes on the shield: pull up = Home on the second screen, from left edge = Back (pull down always opens the SidePad panel)" />
+            android:text="Swipe in from the left edge = Back (pull down always opens the SidePad panel, pull up always shows or hides the pad)" />
         <Switch android:id="@+id/bootSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Start in the background at boot (the pull-down panel is then always available)" />
         <Switch android:id="@+id/chordSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"

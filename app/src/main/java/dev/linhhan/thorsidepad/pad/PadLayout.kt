@@ -1,6 +1,7 @@
 package dev.linhhan.thorsidepad.pad
 
 import dev.linhhan.thorsidepad.inject.Btn
+import dev.linhhan.thorsidepad.inject.Action
 import dev.linhhan.thorsidepad.inject.Stick
 import org.json.JSONArray
 import org.json.JSONObject
@@ -54,6 +55,7 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             PadButton(Stick.RIGHT, 0.22f, 0.80f, 0.28f),
             PadButton(Btn.C, 0.45f, 0.62f, 0.11f),
             PadButton(Btn.Z, 0.45f, 0.82f, 0.11f),
+            PadButton(Action.SHIELD, 0.46f, 0.40f, 0.10f),
         ))
 
         /** Mirror image: right hand on the Thor, the left-side controls on the RIGHT half of the screen. */
@@ -68,6 +70,7 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             PadButton(Stick.LEFT, 0.78f, 0.80f, 0.28f),
             PadButton(Btn.C, 0.55f, 0.62f, 0.11f),
             PadButton(Btn.Z, 0.55f, 0.82f, 0.11f),
+            PadButton(Action.SHIELD, 0.54f, 0.40f, 0.10f),
         ))
 
         /** The original set: a face diamond on the left, shoulders in the corners, extras and Start/Select on the right. */
@@ -82,6 +85,7 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             PadButton(Btn.Z, 0.86f, 0.40f, 0.15f),
             PadButton(Btn.SELECT, 0.62f, 0.82f, 0.12f),
             PadButton(Btn.START, 0.82f, 0.82f, 0.12f),
+            PadButton(Action.SHIELD, 0.50f, 0.12f, 0.10f),
         ))
     }
 }

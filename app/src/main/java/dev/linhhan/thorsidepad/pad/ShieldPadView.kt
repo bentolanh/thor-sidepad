@@ -6,6 +6,8 @@ import android.graphics.Paint
 import android.view.MotionEvent
 import android.view.View
 import dev.linhhan.thorsidepad.inject.Catalog
+import dev.linhhan.thorsidepad.inject.isActionCode
+import dev.linhhan.thorsidepad.inject.isStickCode
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
@@ -21,8 +23,10 @@ class ShieldPadView(
     ctx: Context,
     private val layout: PadLayout,
     private val engine: PadEngine,
-    private val gesturesEnabled: Boolean,
+    private val gesturesEnabled: Boolean,     // left-edge Back; pull-down and pull-up are always on
     private val onGesture: (EdgeGesture) -> Unit,
+    private val onAction: (Int) -> Unit,
+    private val shieldOn: Boolean = true,
 ) : View(ctx) {
 
     private val painter = ButtonPainter()
@@ -50,20 +54,20 @@ class ShieldPadView(
         layout.buttons.forEachIndexed { i, b ->
             val r = b.size * short() / 2f
             val label = Catalog.byCode(b.code).label
-            if (b.code < 0) {
+            if (isStickCode(b.code)) {
                 val k = knob[i]
                 painter.drawStick(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), k?.get(0) ?: 0f, k?.get(1) ?: 0f)
+            } else if (isActionCode(b.code)) {
+                painter.draw(c, b.cx * width, b.cy * height, r, label, true, shieldOn || (pressCount[i] ?: 0) > 0)
             } else {
                 painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0)
             }
         }
-        // Small pills marking the gesture edges: top always (our panel), others when enabled.
+        // Small pills marking the gesture edges: top (panel) and bottom (hide) always, left when Back is on.
         val w = width * 0.18f; val h = 8f
         c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
-        if (gesturesEnabled) {
-            c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
-            c.drawRoundRect(10f, (height - w) / 2, 10f + h, (height + w) / 2, h, h, hint)
-        }
+        c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
+        if (gesturesEnabled) c.drawRoundRect(10f, (height - w) / 2, 10f + h, (height + w) / 2, h, h, hint)
     }
 
     private fun steer(i: Int, x: Float, y: Float) {
@@ -86,22 +90,28 @@ class ShieldPadView(
         pressedBy[pid] = i
         val n = (pressCount[i] ?: 0) + 1
         pressCount[i] = n
-        if (n == 1) engine.press(layout.buttons[i].code)
+        val code = layout.buttons[i].code
+        if (n == 1 && !isActionCode(code)) engine.press(code)
     }
 
-    private fun release(pid: Int) {
+    /** Action buttons fire on release, only if the finger is still on them. */
+    private fun release(pid: Int, fireAction: Boolean = false) {
         val i = pressedBy.remove(pid) ?: return
         val n = (pressCount[i] ?: 1) - 1
         pressCount[i] = n
-        if (n <= 0) { pressCount.remove(i); engine.release(layout.buttons[i].code) }
+        val code = layout.buttons[i].code
+        if (n <= 0) {
+            pressCount.remove(i)
+            if (isActionCode(code)) { if (fireAction) onAction(code) } else engine.release(code)
+        }
     }
 
     private fun edgeAt(x: Float, y: Float): EdgeGesture? {
         val zone = short() * EDGE_ZONE
         return when {
-            y < zone -> EdgeGesture.PULL_DOWN            // always: it opens our own panel
+            y < zone -> EdgeGesture.PULL_DOWN            // always: opens our panel
+            y > height - zone -> EdgeGesture.PULL_UP     // always: hides the pad
             !gesturesEnabled -> null
-            y > height - zone -> EdgeGesture.PULL_UP
             x < zone -> EdgeGesture.LEFT_EDGE
             else -> null
         }
@@ -116,7 +126,7 @@ class ShieldPadView(
                 val i = hit(x, y)
                 val edge = if (i < 0) edgeAt(x, y) else null
                 if (edge != null) swipes[pid] = Swipe(edge, x, y, e.eventTime)
-                else if (i >= 0 && layout.buttons[i].code < 0) { stickBy[pid] = i; steer(i, x, y) }
+                else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
                 else { tracked.add(pid); if (i >= 0) press(i, pid) }
                 invalidate()
             }
@@ -137,7 +147,7 @@ class ShieldPadView(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val idx = e.actionIndex
                 val pid = e.getPointerId(idx)
-                release(pid)
+                release(pid, fireAction = pressedBy[pid]?.let { it == hit(e.getX(idx), e.getY(idx)) } == true)
                 releaseStick(pid)
                 tracked.remove(pid)
                 swipes.remove(pid)?.let { s ->

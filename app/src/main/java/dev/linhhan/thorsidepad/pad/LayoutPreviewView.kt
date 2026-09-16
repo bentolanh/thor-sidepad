@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import dev.linhhan.thorsidepad.inject.Catalog
+import dev.linhhan.thorsidepad.inject.isStickCode
 import kotlin.math.min
 
 /** A miniature of a layout, drawn at the pad screen's aspect ratio. */
@@ -25,7 +26,7 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
         for (b in layout.buttons) {
             val r = b.size * short / 2f
             val label = Catalog.byCode(b.code).label
-            if (b.code < 0) painter.drawStick(c, b.cx * width, b.cy * height, r, label, true, 0f, 0f)
+            if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, r, label, true, 0f, 0f)
             else painter.draw(c, b.cx * width, b.cy * height, r, label, true, false)
         }
     }
