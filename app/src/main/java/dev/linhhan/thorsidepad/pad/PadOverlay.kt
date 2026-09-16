@@ -166,22 +166,37 @@ class PadOverlay(app: Context, val displayId: Int) {
 
     private fun sel(editor: EditPadView): PadButton? = editor.layout.buttons.getOrNull(editor.selected)
 
-    /** A second full-screen window with the catalogue; tapping an entry adds it and closes the picker. */
+    /** The catalogue picker: a card over a scrim. Pick an entry, or Cancel / tap outside to back out. */
     private fun showPicker(onPick: (Int) -> Unit) {
+        val root = FrameLayout(themed)
+        root.setBackgroundColor(0x99000000.toInt())
+        var window: View? = null
+        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        root.setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) dismiss(); true }
+
+        val card = LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xF0181818.toInt())
+            isClickable = true
+        }
+        val header = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 8, 8, 8) }
+        header.addView(TextView(themed).apply { text = "Add a button"; setTextColor(Color.WHITE); textSize = 18f },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+        header.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } })
+        card.addView(header)
+
         val list = ListView(themed)
         val labels = Catalog.all.map { "${it.label}   (${it.androidName})" }
         list.adapter = ArrayAdapter(themed, android.R.layout.simple_list_item_1, labels)
-        list.setBackgroundColor(0xF0181818.toInt())
-        var window: View? = null
-        list.setOnItemClickListener { _, _, pos, _ ->
-            window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) }
-            onPick(Catalog.all[pos].code)
-        }
+        list.setOnItemClickListener { _, _, pos, _ -> dismiss(); onPick(Catalog.all[pos].code) }
+        card.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), (height * 0.85f).roundToInt(), Gravity.CENTER))
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad picker"
-        window = list
-        add(list, lp)
+        window = root
+        add(root, lp)
     }
 
     companion object {
