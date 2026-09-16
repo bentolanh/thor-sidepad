@@ -321,8 +321,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 "Editing \"$active\". Save writes your changes into it. Tap to select; drag to move; pinch to resize."
         }
         refreshHint()
-        btn("Add") { showChoice("Add a button or stick", Catalog.all.map { "${it.label}   (${it.androidName})" }) { pos ->
-            val code = Catalog.all[pos].code
+        btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
+            val code = Catalog.groups[g].second[pos].code
             working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
@@ -458,6 +458,58 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     }
 
     /** A list chooser: a card over a scrim. Pick an entry, or Cancel / tap outside to back out. */
+    /** A picker with a row of page tabs above the list; [onPick] gets (page, position). */
+    private fun showGroupedChoice(title: String, groups: List<Pair<String, List<String>>>, onPick: (Int, Int) -> Unit) {
+        val root = FrameLayout(themed)
+        root.setBackgroundColor(0x99000000.toInt())
+        var window: View? = null
+        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        root.setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) dismiss(); true }
+
+        val card = LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xF0181818.toInt())
+            isClickable = true
+        }
+        val header = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 8, 8, 8) }
+        header.addView(TextView(themed).apply { text = title; setTextColor(Color.WHITE); textSize = 18f },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+        header.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } })
+        card.addView(header)
+
+        val tabs = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(16, 0, 16, 0) }
+        val list = ListView(themed)
+        val tabButtons = ArrayList<TextView>()
+        var current = 0
+        fun select(i: Int) {
+            current = i
+            tabButtons.forEachIndexed { j, b ->
+                b.setTextColor(if (j == i) 0xFF64B5F6.toInt() else 0xFFB0B0B0.toInt())
+                b.setBackgroundColor(if (j == i) 0xFF2A2A2A.toInt() else Color.TRANSPARENT)
+            }
+            list.adapter = ArrayAdapter(themed, android.R.layout.simple_list_item_1, groups[i].second)
+        }
+        groups.forEachIndexed { i, g ->
+            val b = TextView(themed).apply {
+                text = g.first; textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 22, 0, 22)
+                setOnClickListener { select(i) }
+            }
+            tabButtons.add(b)
+            tabs.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        card.addView(tabs)
+        list.setOnItemClickListener { _, _, pos, _ -> dismiss(); onPick(current, pos) }
+        card.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        select(0)
+
+        root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), (height * 0.85f).roundToInt(), Gravity.CENTER))
+        val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+        lp.title = "SidePad picker"
+        window = root
+        add(root, lp)
+    }
+
     private fun showChoice(title: String, labels: List<String>, onPick: (Int) -> Unit) {
         val root = FrameLayout(themed)
         root.setBackgroundColor(0x99000000.toInt())

@@ -30,7 +30,8 @@ the app.
   backdrop changes. With the shield on but the pad hidden, the panel carries the shield's
   backdrop itself.
 
-- **Device controls.** Slider elements (brightness and volume per display) and Home/Back
+- **Device controls.** Slider elements (brightness and volume per display, plus a brightness
+  slider that sets both displays) and Home/Back
   buttons per screen are pad elements with negative pseudo-codes. Brightness goes through
   the hidden per-display `DisplayManager.setBrightness`, callable from the shell-uid user
   service because the shell holds `CONTROL_DISPLAY_BRIGHTNESS`; the main volume through
