@@ -23,12 +23,9 @@ class InjectorService() : IInjector.Stub() {
     private var abs: Map<Int, IntArray> = emptyMap()   // code -> [min, max]
     private val lock = Any()
 
-    @Volatile private var watchThread: Thread? = null
-    @Volatile private var watching = false
 
     override fun destroy() {
         closeTarget()
-        stopWatch()
         exitProcess(0)
     }
 
@@ -128,42 +125,6 @@ class InjectorService() : IInjector.Stub() {
         }
     }
 
-    override fun watchChord(path: String, codes: IntArray, holdMs: Int, listener: IInjectorListener): String {
-        stopWatch()
-        val rfd = Native.openDevice(path, false)
-        if (rfd < 0) return "open $path: ${Native.strerror(rfd)}"
-        watching = true
-        val t = Thread({
-            val wanted = codes.toSet()
-            val held = HashSet<Int>()
-            var allSince = -1L
-            var fired = false
-            try {
-                while (watching) {
-                    val ev = Native.readEvent(rfd, 100)
-                    if (ev != null) {
-                        if (ev[0] == -1) { Log.w(TAG, "chord read error ${Native.strerror(ev[1])}"); break }
-                        if (ev[0] == Ev.KEY && ev[1] in wanted) {
-                            if (ev[2] != 0) held.add(ev[1]) else held.remove(ev[1])
-                        }
-                    }
-                    val now = System.currentTimeMillis()
-                    if (held.size == wanted.size) {
-                        if (allSince < 0) allSince = now
-                        if (!fired && now - allSince >= holdMs) {
-                            fired = true
-                            try { listener.onChord() } catch (e: Exception) { Log.w(TAG, "listener gone", e); break }
-                        }
-                    } else { allSince = -1; fired = false }
-                }
-            } finally { Native.closeDevice(rfd) }
-        }, "sidepad-chord")
-        t.isDaemon = true
-        watchThread = t
-        t.start()
-        return ""
-    }
-
     override fun pressKeyOn(path: String, code: Int, holdMs: Int): String {
         val f = Native.openDevice(path, true)
         if (f < 0) return "open $path: ${Native.strerror(f)}"
@@ -188,12 +149,6 @@ class InjectorService() : IInjector.Stub() {
         Log.i(TAG, "shell[$cmd] -> ${out.trim().take(200)}")
         out
     } catch (e: Exception) { Log.w(TAG, "shell failed", e); "error: ${e.message}" }
-
-    override fun stopWatch() {
-        watching = false
-        watchThread?.let { t -> try { t.join(500) } catch (_: InterruptedException) {} }
-        watchThread = null
-    }
 
     companion object {
         private const val TAG = "SidePadInjector"

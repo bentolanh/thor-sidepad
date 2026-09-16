@@ -17,9 +17,9 @@ import android.widget.TextView
 data class TargetChoice(val name: String, val path: String)
 
 data class PanelState(
-    val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float,
+    val padVisible: Boolean, val shield: Boolean, val opacity: Float,
     val backdrop: String, val blurSupported: Boolean,
-    val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean, val chord: Boolean,
+    val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean,
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -27,11 +27,9 @@ interface PanelActions {
     fun togglePad()
     fun editLayout()
     fun setShield(on: Boolean)
-    fun setGestures(on: Boolean)
     fun setOpacity(value: Float)
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
-    fun setChord(on: Boolean)
     fun openThorControlCenter()
     fun stopService()
     fun close()
@@ -95,8 +93,6 @@ object ControlPanel {
                 val target = if (state.virtual) "Virtual pad (2nd player)" else state.targetName.ifEmpty { "no controller found" }
                 card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
-                card.addView(sw("Swipe in from the left edge = Back", state.gestures) { actions.setGestures(it) })
-                card.addView(sw("Hold Select + Start on the controller to show / hide the pad", state.chord) { actions.setChord(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))
                 card.addView(row(*choices.map { (key, name) -> btn(name, key != state.backdrop) { actions.setBackdrop(key) } }.toTypedArray()))

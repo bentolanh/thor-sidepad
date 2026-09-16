@@ -15,24 +15,21 @@ import android.widget.Toast
 import dev.linhhan.thorsidepad.MainActivity
 import dev.linhhan.thorsidepad.Prefs
 import dev.linhhan.thorsidepad.R
-import dev.linhhan.thorsidepad.inject.Btn
 import dev.linhhan.thorsidepad.inject.Catalog
 import dev.linhhan.thorsidepad.inject.IInjector
-import dev.linhhan.thorsidepad.inject.IInjectorListener
 import dev.linhhan.thorsidepad.inject.Injector
 import dev.linhhan.thorsidepad.inject.Key
 import org.json.JSONObject
 
 /**
  * Foreground service that keeps the pad alive: holds the injector connection, the overlay
- * windows, and the physical-button chord watcher that toggles the pad.
+ * windows, and the edge strips that keep the pull gestures available.
  */
 class OverlayService : Service() {
 
     private lateinit var prefs: Prefs
     private var overlay: PadOverlay? = null
     private var engine: PadEngine? = null
-    private var watching = false
     private var gpioPath: String? = null
     private var targets: List<TargetChoice> = emptyList()   // controllers seen at the last probe
 
@@ -53,15 +50,11 @@ class OverlayService : Service() {
             val chosen = byName ?: found.firstOrNull { it.path == prefs.physicalPath } ?: found.firstOrNull()
             if (chosen != null) {
                 if (prefs.physicalName.isEmpty() || byName == null) prefs.physicalName = chosen.name
-                if (prefs.physicalPath != chosen.path) { prefs.physicalPath = chosen.path; watching = false; try { svc.stopWatch() } catch (_: Exception) {} }
+                if (prefs.physicalPath != chosen.path) prefs.physicalPath = chosen.path
             }
         } catch (e: Exception) { Log.w(TAG, "probe failed", e) }
     }
     private val main = Handler(Looper.getMainLooper())
-
-    private val chordListener = object : IInjectorListener.Stub() {
-        override fun onChord() { main.post { toggle() } }
-    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -80,7 +73,7 @@ class OverlayService : Service() {
             ACTION_EDIT -> edit()
             ACTION_STOP -> { hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
-            else -> { ensureCatcher(); ensureChord() }
+            else -> ensureCatcher()
         }
         return START_STICKY
     }
@@ -88,7 +81,6 @@ class OverlayService : Service() {
     override fun onDestroy() {
         hide()
         overlay?.tearDown()
-        try { Injector.current()?.stopWatch() } catch (_: Exception) {}
         running = false
         visible = false
         super.onDestroy()
@@ -127,13 +119,12 @@ class OverlayService : Service() {
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
-                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures, prefs.backdrop,
+                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
                     onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
                 updateNotification()
-                ensureChord()
             } catch (e: Exception) {
                 Log.e(TAG, "show failed", e)
                 toast("Could not show pad: ${e.message}")
@@ -180,7 +171,7 @@ class OverlayService : Service() {
         if (!visible || eng == null || ov == null) { if (visible) show(); return }
         try {
             ov.removePanel()
-            ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures, prefs.backdrop,
+            ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
                 onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
             if (prefs.shield) ov.removeCatchers() else ensureCatcher()
         } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
@@ -191,8 +182,8 @@ class OverlayService : Service() {
         if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
         Injector.current()?.let { refreshTargets(it) }
-        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity, prefs.backdrop, ov.blurSupported,
-            targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL, prefs.chordEnabled)
+        val state = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
+            targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL)
         ov.showPanel(state, object : PanelActions {
             override fun setTarget(choice: TargetChoice?) {
                 if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
@@ -200,14 +191,9 @@ class OverlayService : Service() {
                 if (visible) { hide(); show() }   // the target itself changes, so the injector must reopen
                 showPanel(keepPage = true)
             }
-            override fun setChord(on: Boolean) {
-                prefs.chordEnabled = on
-                if (on) ensureChord() else { watching = false; try { Injector.current()?.stopWatch() } catch (_: Exception) {} }
-            }
             override fun togglePad() { ov.removePanel(); toggle() }
             override fun editLayout() { ov.removePanel(); edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad(); showPanel(keepPage = true) }
-            override fun setGestures(on: Boolean) { prefs.gestures = on; rebuildPad() }
             override fun setOpacity(value: Float) { prefs.opacity = value; rebuildPad() }
             override fun setBackdrop(value: String) { prefs.backdrop = value; rebuildPad(); showPanel(keepPage = true) }
             override fun openThorControlCenter() {
@@ -238,22 +224,11 @@ class OverlayService : Service() {
         }
     }
 
-    /**
-     * Pull-down opens our panel, pull-up shows or hides the pad. Left-edge presses the Thor's
-     * own Back key through the controller node, which the Thor routes to the last-touched screen.
-     */
+    /** Pull-down opens our panel, pull-up shows or hides the pad. */
     private fun onGesture(g: EdgeGesture) {
-        Log.i(TAG, "gesture $g")
         when (g) {
             EdgeGesture.PULL_DOWN -> showPanel()
             EdgeGesture.PULL_UP -> toggle()
-            EdgeGesture.LEFT_EDGE -> {
-                val svc = Injector.current() ?: return
-                try {
-                    val err = svc.pressKeyOn(prefs.physicalPath, Key.BACK, 60)
-                    if (err.isNotEmpty()) toast(err)
-                } catch (e: Exception) { Log.w(TAG, "gesture failed", e) }
-            }
         }
     }
 
@@ -266,16 +241,6 @@ class OverlayService : Service() {
             if (d.optString("name") == "gpio-keys") { gpioPath = d.getString("path"); return gpioPath }
         }
         return null
-    }
-
-    /** Select + Start held together toggles the pad, read straight from the controller node. */
-    private fun ensureChord() {
-        if (!prefs.chordEnabled || prefs.physicalPath.isBlank() || watching) return
-        Injector.connect(this) { svc ->
-            if (svc == null) return@connect
-            val err = svc.watchChord(prefs.physicalPath, intArrayOf(Btn.SELECT, Btn.START), CHORD_HOLD_MS, chordListener)
-            if (err.isEmpty()) watching = true else Log.w(TAG, "chord watch: $err")
-        }
     }
 
     private fun toast(msg: String) = main.post { Toast.makeText(this, msg, Toast.LENGTH_LONG).show() }
@@ -308,7 +273,6 @@ class OverlayService : Service() {
         private const val TAG = "SidePadService"
         private const val CHANNEL = "sidepad"
         private const val NOTIF_ID = 1
-        private const val CHORD_HOLD_MS = 600
 
         const val ACTION_SHOW = "dev.linhhan.thorsidepad.SHOW"
         const val ACTION_HIDE = "dev.linhhan.thorsidepad.HIDE"

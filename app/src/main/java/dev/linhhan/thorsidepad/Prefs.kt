@@ -29,19 +29,10 @@ class Prefs(ctx: Context) {
         get() = sp.getFloat("opacity", 0.75f)
         set(v) = sp.edit().putFloat("opacity", v).apply()
 
-    var chordEnabled: Boolean
-        get() = sp.getBoolean("chordEnabled", true)
-        set(v) = sp.edit().putBoolean("chordEnabled", v).apply()
-
     /** Shield: one full-screen window, nothing behind it is touchable. Off = one window per button. */
     var shield: Boolean
         get() = sp.getBoolean("shield", true)
         set(v) = sp.edit().putBoolean("shield", v).apply()
-
-    /** Edge swipes on the shield: pull up = Home, left edge = Back. (Pull down always opens our panel.) */
-    var gestures: Boolean
-        get() = sp.getBoolean("gestures", true)
-        set(v) = sp.edit().putBoolean("gestures", v).apply()
 
     /** Name of the preset the pad's layout came from. Save in the editor writes back into it. */
     var activePreset: String

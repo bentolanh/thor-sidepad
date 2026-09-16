@@ -27,14 +27,14 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   button to the next, and edge swipes become gestures. Islands mode (one small window per
   button) is the alternative when the app under the pad should stay usable.
 - **Pull down from the top edge** of the second screen opens SidePad's own control panel: one
-  quick-settings page (show/hide, edit layout, shield, left-edge Back, Select + Start chord,
-  backdrop, opacity, Thor Control Center, stop) plus a Controller page, opened from its
+  quick-settings page (show/hide, edit layout, shield, backdrop, opacity, Thor Control Center,
+  stop) plus a Controller page, opened from its
   "Controller: …" row, where presses are routed. While the pad is hidden thin strips stay
   parked on the top and bottom edges so the pulls still work; with start-at-boot on, they are
   always there.
 - **Pull up from the bottom edge** shows or hides the pad. While hidden, thin strips stay on
-  the top and bottom edges, so both pulls keep working. **Swipe in from the left** presses the
-  Thor's Back key through the controller's input node (switchable in the panel).
+  the top and bottom edges, so both pulls keep working. The app never listens to controller
+  buttons, so it cannot interfere with a key mapper.
 - **Shield toggle.** Every built-in preset carries a small shield-shaped toggle that switches
   shield mode from the pad itself: filled with a tick while on, outlined while off. Delete it in
   the editor if unwanted. Switching rebuilds only the windows, not the injector, and the new
@@ -44,7 +44,7 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   Thor does; elsewhere a heavy dim). **Opacity** applies to the buttons only, never to the
   backdrop.
 - The top screen keeps input focus while the pad is used.
-- Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
+- Show/hide: pull up on the pad's screen, the Quick Settings tile, or the notification.
 - **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the
   controller's own stick axes (X/Y, and Z/RZ for the right stick as the Thor reports it), so in
   same-controller mode a virtual stick is the same stick the game already reads.

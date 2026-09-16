@@ -111,7 +111,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * Shows the pad in play mode. The previous pad windows are removed only after the new ones
      * are up, so switching shield/islands or changing looks does not flash the screen.
      */
-    fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean, gestures: Boolean,
+    fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean,
                  backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
         val old = ArrayList(views)
         views.clear()
@@ -123,7 +123,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 "frosted" -> if (frosted) 0x55000000 else 0xB0000000.toInt()   // no blur: fall back to a heavier dim
                 else -> 0
             }
-            val v = ShieldPadView(ctx, layout, engine, gestures, onGesture, onAction, shieldOn = true, opacity = opacity, backdropColor = color)
+            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, shieldOn = true, opacity = opacity, backdropColor = color)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {

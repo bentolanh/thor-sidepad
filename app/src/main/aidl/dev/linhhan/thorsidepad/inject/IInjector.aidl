@@ -1,7 +1,5 @@
 package dev.linhhan.thorsidepad.inject;
 
-import dev.linhhan.thorsidepad.inject.IInjectorListener;
-
 interface IInjector {
     // Shizuku convention: this transaction code asks the user service to exit.
     void destroy() = 16777114;
@@ -23,10 +21,6 @@ interface IInjector {
 
     void key(int code, boolean down) = 7;
     void abs(int code, int value) = 8;
-
-    // Watch a controller node for all `codes` held together for holdMs; fires listener.onChord().
-    String watchChord(String path, in int[] codes, int holdMs, IInjectorListener listener) = 9;
-    void stopWatch() = 10;
 
     // Press and release one key on any input node (e.g. the AYN key on gpio-keys). "" or error.
     String pressKeyOn(String path, int code, int holdMs) = 11;

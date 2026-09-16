@@ -12,18 +12,18 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
 
-enum class EdgeGesture { PULL_DOWN, PULL_UP, LEFT_EDGE }
+enum class EdgeGesture { PULL_DOWN, PULL_UP }
 
 /**
  * Shield mode: one full-screen window that owns every touch on the display. Buttons are drawn
  * on it, fingers can slide from one button to the next, and touches between buttons go
- * nowhere, so the app underneath cannot be poked by accident. Edge swipes become gestures.
+ * nowhere, so the app underneath cannot be poked by accident. Pull-down opens the panel and
+ * pull-up hides the pad.
  */
 class ShieldPadView(
     ctx: Context,
     private val layout: PadLayout,
     private val engine: PadEngine,
-    private val gesturesEnabled: Boolean,     // left-edge Back; pull-down and pull-up are always on
     private val onGesture: (EdgeGesture) -> Unit,
     private val onAction: (Int) -> Unit,
     private val shieldOn: Boolean = true,
@@ -68,11 +68,10 @@ class ShieldPadView(
                 painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0)
             }
         }
-        // Small pills marking the gesture edges: top (panel) and bottom (hide) always, left when Back is on.
+        // Small pills marking the gesture edges: top (panel) and bottom (hide).
         val w = width * 0.18f; val h = 8f
         c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
         c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
-        if (gesturesEnabled) c.drawRoundRect(10f, (height - w) / 2, 10f + h, (height + w) / 2, h, h, hint)
         c.restoreToCount(layer)
     }
 
@@ -115,10 +114,8 @@ class ShieldPadView(
     private fun edgeAt(x: Float, y: Float): EdgeGesture? {
         val zone = short() * EDGE_ZONE
         return when {
-            y < zone -> EdgeGesture.PULL_DOWN            // always: opens our panel
-            y > height - zone -> EdgeGesture.PULL_UP     // always: hides the pad
-            !gesturesEnabled -> null
-            x < zone -> EdgeGesture.LEFT_EDGE
+            y < zone -> EdgeGesture.PULL_DOWN            // opens our panel
+            y > height - zone -> EdgeGesture.PULL_UP     // hides the pad
             else -> null
         }
     }
@@ -163,7 +160,6 @@ class ShieldPadView(
                     val ok = when (s.edge) {
                         EdgeGesture.PULL_DOWN -> dy > need && abs(dx) < dy
                         EdgeGesture.PULL_UP -> -dy > need && abs(dx) < -dy
-                        EdgeGesture.LEFT_EDGE -> dx > need && abs(dy) < dx
                     }
                     if (ok && fast) onGesture(s.edge)
                 }
