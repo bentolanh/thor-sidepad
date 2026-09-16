@@ -13,29 +13,30 @@ import org.json.JSONObject
  */
 data class PadButton(var code: Int, var cx: Float, var cy: Float, var size: Float)
 
-class PadLayout(val buttons: MutableList<PadButton>) {
+class PadLayout(val buttons: MutableList<PadButton>, var style: String = Glyphs.XBOX) {
 
     fun toJson(): String {
         val arr = JSONArray()
         buttons.forEach { b ->
             arr.put(JSONObject().put("code", b.code).put("cx", b.cx.toDouble()).put("cy", b.cy.toDouble()).put("size", b.size.toDouble()))
         }
-        return JSONObject().put("version", 1).put("buttons", arr).toString()
+        return JSONObject().put("version", 1).put("style", style).put("buttons", arr).toString()
     }
 
-    fun copy(): PadLayout = PadLayout(buttons.map { it.copy() }.toMutableList())
+    fun copy(): PadLayout = PadLayout(buttons.map { it.copy() }.toMutableList(), style)
 
     companion object {
         fun fromJson(json: String?): PadLayout {
             if (json.isNullOrBlank()) return default()
             return try {
-                val arr = JSONObject(json).getJSONArray("buttons")
+                val root = JSONObject(json)
+                val arr = root.getJSONArray("buttons")
                 val list = ArrayList<PadButton>()
                 for (i in 0 until arr.length()) {
                     val o = arr.getJSONObject(i)
                     list.add(PadButton(o.getInt("code"), o.getDouble("cx").toFloat(), o.getDouble("cy").toFloat(), o.getDouble("size").toFloat()))
                 }
-                PadLayout(list)
+                PadLayout(list, root.optString("style", Glyphs.XBOX).takeIf { s -> Glyphs.styles.any { it.first == s } } ?: Glyphs.XBOX)
             } catch (e: Exception) { default() }
         }
 

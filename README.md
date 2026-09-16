@@ -59,6 +59,8 @@ Everything happens on the bottom screen.
   from the game.
   Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
   changes as a preset of your own.
+- **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation
+  or Nintendo way. Only the labels change; A is still A to the game.
 - **Keep your presets.** The app screen has Export and Import under Presets. Export writes
   your presets and the current layout to a file you choose; Import reads one back. Do this
   before uninstalling, and to carry layouts to another device.

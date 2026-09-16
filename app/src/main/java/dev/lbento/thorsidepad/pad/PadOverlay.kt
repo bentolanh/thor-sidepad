@@ -276,7 +276,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isDpadCode(b.code) -> DpadView(ctx, enabled, engine)
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
-                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
+                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style)
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
@@ -332,9 +332,13 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val bigger = btn("+") { sel(editor)?.let { it.size = (it.size + 0.02f).coerceAtMost(0.6f); editor.invalidate() } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
         btn("Presets") { showPresets(active,
-            onUse = { p -> active = p.name; working.buttons.clear(); working.buttons.addAll(p.layout.buttons.map { it.copy() }); editor.selected = -1; editor.invalidate(); refreshHint() },
-            onDeletedActive = { active = PresetStore.builtins[0].name; working.buttons.clear(); working.buttons.addAll(PresetStore.builtins[0].layout.buttons.map { it.copy() }); editor.selected = -1; editor.invalidate(); refreshHint() })
+            onUse = { p -> active = p.name; working.buttons.clear(); working.buttons.addAll(p.layout.buttons.map { it.copy() }); working.style = p.layout.style; editor.selected = -1; editor.invalidate(); refreshHint() },
+            onDeletedActive = { active = PresetStore.builtins[0].name; working.buttons.clear(); working.buttons.addAll(PresetStore.builtins[0].layout.buttons.map { it.copy() }); working.style = PresetStore.builtins[0].layout.style; editor.selected = -1; editor.invalidate(); refreshHint() })
         }
+        // Per-preset button glyphs: the presses stay the same, the labels read like that console's pad.
+        btn("Glyphs") { showChoice("Button glyphs for this preset", Glyphs.styles.map { (key, name) -> (if (key == working.style) "●  " else "") + name }) { pos ->
+            working.style = Glyphs.styles[pos].first; editor.invalidate()
+        } }
         btn("Cancel") { removeAll(); onCancel() }
         btn("Save") {
             if (PresetStore.isBuiltin(active)) {

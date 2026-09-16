@@ -29,13 +29,13 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
         val short = min(width, height).toFloat()
         for (b in layout.buttons) {
             val r = b.size * short / 2f
-            val label = Catalog.byCode(b.code).label
+            val label = Glyphs.label(b.code, layout.style)
             if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, r, true, 0)
             else if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, r, label, true, 0f, 0f)
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, true)
             else if (isActionCode(b.code)) painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), false)
             else if (isSliderCode(b.code)) painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), 0.6f, false)
-            else painter.draw(c, b.cx * width, b.cy * height, r, label, true, false)
+            else painter.draw(c, b.cx * width, b.cy * height, r, label, true, false, labelColor = Glyphs.color(b.code, layout.style))
         }
     }
 }

@@ -83,7 +83,7 @@ class ShieldPadView(
         val layer = c.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), (opacity.coerceIn(0f, 1f) * 255).toInt())
         layout.buttons.forEachIndexed { i, b ->
             val r = b.size * short() / 2f
-            val label = Catalog.byCode(b.code).label
+            val label = Glyphs.label(b.code, layout.style)
             if (isDpadCode(b.code)) {
                 painter.drawDpad(c, b.cx * width, b.cy * height, r, engine.enabled(b.code), dpadMask[i] ?: 0)
             } else if (isStickCode(b.code)) {
@@ -96,7 +96,7 @@ class ShieldPadView(
             } else if (isSliderCode(b.code)) {
                 painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), levels[b.code] ?: 0.5f, sliderBy.containsValue(i))
             } else {
-                painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0)
+                painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0, labelColor = Glyphs.color(b.code, layout.style))
             }
         }
         // Small pills marking the gesture edges: top (panel) and bottom (hide).

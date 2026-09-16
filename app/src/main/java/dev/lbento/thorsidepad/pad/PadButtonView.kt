@@ -15,10 +15,12 @@ class PadButtonView(
     private val enabled: Boolean,
     private val onPress: (Int) -> Unit,
     private val onRelease: (Int) -> Unit,
+    style: String = Glyphs.XBOX,
 ) : View(ctx) {
 
     private var down = false
-    private val label = Catalog.byCode(code).label
+    private val label = Glyphs.label(code, style)
+    private val labelColor = Glyphs.color(code, style)
     private val painter = ButtonPainter()
 
     override fun onDraw(c: Canvas) {
@@ -26,7 +28,7 @@ class PadButtonView(
         when {
             code == Action.SHIELD -> painter.drawShieldToggle(c, r, r, r, false)
             isActionCode(code) -> painter.drawSysButton(c, r, r, r, label, Catalog.screenTag(code), down)
-            else -> painter.draw(c, r, r, r, label, enabled, down)
+            else -> painter.draw(c, r, r, r, label, enabled, down, labelColor = labelColor)
         }
     }
 

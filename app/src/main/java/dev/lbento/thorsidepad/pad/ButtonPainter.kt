@@ -127,7 +127,7 @@ class ButtonPainter {
         tri(cx + d + a * 0.6f, cy, cx + d - a * 0.6f, cy - a, cx + d - a * 0.6f, cy + a)
     }
 
-    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false) {
+    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE) {
         ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         ring.pathEffect = if (enabled) null else dash
@@ -138,7 +138,9 @@ class ButtonPainter {
         }
         c.drawCircle(cx, cy, r * 0.92f, fill)
         c.drawCircle(cx, cy, r * 0.92f, ring)
-        text.textSize = if (label.length > 2) r * 0.5f else r * 0.8f
+        text.textSize = if (label.length > 4) r * 0.42f else if (label.length > 2) r * 0.5f else r * 0.8f
+        text.color = if (down) Color.WHITE else labelColor
         c.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text)
+        text.color = Color.WHITE
     }
 }
