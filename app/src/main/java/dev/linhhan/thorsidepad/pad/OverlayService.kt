@@ -227,11 +227,40 @@ class OverlayService : Service() {
     }
 
     /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
-    /** The gesture guide on the pad's screen; shown once on the first start, and on request. */
+    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (hide), 3 pull up (show)
+
+    /** Starts the interactive guide: the pad is shown first so every step acts on the real thing. */
     private fun showGuide() {
-        val ov = try { overlayOrCreate() } catch (e: Exception) { return }
+        guideStep = 1
+        if (!visible) { show(); main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 1500) } else showGuideStep(1)
+    }
+
+    private fun showGuideStep(step: Int) {
+        val ov = try { overlayOrCreate() } catch (e: Exception) { guideStep = 0; return }
+        guideStep = step
         ov.removePanel()
-        ov.showGuide { prefs.guideShown = true }
+        ov.showGuide(step, onGesture = { g -> onGuideGesture(g) }, onSkip = { finishGuide() })
+    }
+
+    private fun finishGuide() {
+        guideStep = 0
+        prefs.guideShown = true
+        overlay?.removeGuide()
+    }
+
+    /** Each step performs the real action, then the next step appears when that action is over. */
+    private fun onGuideGesture(g: EdgeGesture) {
+        val ov = overlay ?: return
+        when {
+            guideStep == 1 && g == EdgeGesture.PULL_DOWN -> { ov.removeGuide(); guideStep = 2; showPanel() }   // step 2 resumes when the panel closes
+            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); main.postDelayed({ showGuideStep(3) }, 400) }
+            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); finishGuide() }
+        }
+    }
+
+    /** Called whenever the panel goes away, so a guide waiting on it can continue. */
+    private fun panelClosed() {
+        if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 300)
     }
 
     private fun showPanel(keepPage: Boolean = false) {
@@ -245,7 +274,7 @@ class OverlayService : Service() {
                 if (visible) reopenTarget("target chosen")   // reopens the injector; the windows stay
                 ov.updatePanel(panelState(ov))
             }
-            override fun togglePad() { ov.removePanel(); padDirty = false; toggle() }
+            override fun togglePad() { ov.removePanel(); padDirty = false; toggle(); panelClosed() }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
@@ -258,7 +287,7 @@ class OverlayService : Service() {
                 // Started by the shell user (a service may not launch activities itself), on the pad's screen.
                 Thread { try { svc.shell("am start --display ${ov.displayId} -n $packageName/.MainActivity") } catch (e: Exception) { Log.w(TAG, "open app failed", e) } }.start()
             }
-            override fun close() { ov.removePanel(); applyDirty() }
+            override fun close() { ov.removePanel(); applyDirty(); panelClosed() }
         })
     }
 
