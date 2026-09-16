@@ -3,6 +3,8 @@
 Play one-handed on the AYN Thor. SidePad puts controller buttons on the bottom screen, and
 the game on the top screen reads them as presses on the Thor's own controller.
 
+<p align="center"><img src="docs/pad.png" width="420" alt="The pad on the Thor's bottom screen: A/B/X/Y, a right stick, R1/R2, Start, M1/M2 and the shield button, over a dark backdrop"></p>
+
 ## What it is for
 
 - **One-handed play.** Holding a drink, or just resting the other arm. The buttons your free
@@ -45,6 +47,8 @@ Everything happens on the bottom screen.
 - **Playing in a dark room.** With the shield on, choose a backdrop: Dim, Dark for a plain
   black bottom screen, or Frosted to blur whatever is behind the pad. The transparency slider
   makes the buttons more see-through.
+
+  <img src="docs/pad-frosted.png" width="300" alt="The same pad over the frosted backdrop">
 - **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
   drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
   Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
