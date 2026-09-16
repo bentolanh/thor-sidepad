@@ -78,10 +78,10 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 ## First start
 
 SidePad starts with the pad hidden: only the two edge strips are there. The first time it
-starts, an interactive guide brings the pad up in its most legible look (shield on, frosted
-backdrop, opaque buttons) and waits for the real gestures: pull down (the panel really opens
-over the shield; close it and the pad tucks away), pull up (the pad comes back), pull up
-again (it hides), then an end screen. Everything is put back afterwards, including whether the pad was
+starts, an interactive guide runs with the shield on (frosted backdrop, opaque buttons) but
+the pad hidden, and waits for the real gestures: pull down (the panel really opens; close it
+to continue), pull up (the pad appears, shielded), pull up again (it hides), then an end
+screen. Everything is put back afterwards, including whether the pad was
 showing. "Skip the guide" ends it early. The app has a button to run it again.
 
 ## The app screen vs the panel

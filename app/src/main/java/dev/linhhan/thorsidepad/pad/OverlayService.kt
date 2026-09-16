@@ -262,22 +262,24 @@ class OverlayService : Service() {
     private var savedVisible = false
 
     /**
-     * Starts the interactive guide with the pad up in its most legible look (shield on, frosted
-     * backdrop, fully opaque buttons), so the panel in step 1 is seen over the shield. Everything
-     * is put back when the guide ends.
+     * Starts the interactive guide: SidePad running, shield on (with a frosted backdrop and fully
+     * opaque buttons, the most legible look) but the pad hidden, so step 2 has something to show.
+     * Everything is put back when the guide ends.
      */
     private fun showGuide() {
         if (saved == null) { saved = Triple(prefs.shield, prefs.backdrop, prefs.opacity); savedVisible = visible }
+        Log.i(TAG, "guide start: saved=$saved visible=$savedVisible")
         prefs.shield = true; prefs.backdrop = Prefs.BACKDROP_FROSTED; prefs.opacity = 1f
         guideStep = 1
-        if (visible) rebuildPad() else show()
-        main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 1500)
+        if (visible) hide() else ensureCatcher()
+        main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 600)
     }
 
     /** Puts the pad's look and visibility back to what they were before the guide. */
     private fun restoreAfterGuide() {
         val s = saved ?: return
         saved = null
+        Log.i(TAG, "guide end: restoring $s visible=$savedVisible")
         prefs.shield = s.first; prefs.backdrop = s.second; prefs.opacity = s.third
         if (savedVisible && !visible) show() else if (!savedVisible && visible) hide() else if (visible) rebuildPad()
     }
@@ -306,12 +308,9 @@ class OverlayService : Service() {
         }
     }
 
-    /** Called whenever the panel goes away. In the guide, the pad then hides so step 2 can bring it back. */
+    /** Called whenever the panel goes away, so a guide waiting on it can continue. */
     private fun panelClosed() {
-        if (guideStep == 2) {
-            main.postDelayed({ if (guideStep == 2) hide() }, 400)
-            main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 1400)
-        }
+        if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 1000)
     }
 
     private fun showPanel(keepPage: Boolean = false) = openPanel(dragged = false, keepPage = keepPage)

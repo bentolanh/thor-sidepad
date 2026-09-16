@@ -15,7 +15,7 @@ import kotlin.math.min
  * An interactive guide over the pad's screen. Each step asks for one real gesture and waits
  * for it; the service then performs the real action. A tap on "Skip" ends the guide.
  *
- * Steps: 1 pull down (panel; the pad then hides), 2 pull up (show the pad), 3 pull up (hide it), 4 end screen.
+ * Steps: 1 pull down (panel), 2 pull up (show the pad), 3 pull up (hide it), 4 end screen. The pad is hidden at the start.
  */
 class GuideView(
     ctx: Context,
@@ -53,9 +53,9 @@ class GuideView(
     private fun skipRect(): FloatArray { val w = width.toFloat(); val y = labelY(); return floatArrayOf(w * 0.5f - 130f, y + 20f, w * 0.5f + 130f, y + 90f) }
 
     override fun onDraw(c: Canvas) {
-        // Light while the pad is up (steps 1 and 3) so the frosted pad stays visible; dark while it is
-        // hidden (step 2 and the end screen) so the app behind does not distract.
-        c.drawColor(if (step == 2 || step == 4) 0xE0101418.toInt() else 0x50101418)
+        // Light while the pad is up (step 3) so the frosted pad stays visible; dark while it is hidden
+        // (steps 1, 2 and the end screen) so the app behind does not distract.
+        c.drawColor(if (step == 3) 0x50101418 else 0xE0101418.toInt())
         val w = width.toFloat(); val h = height.toFloat()
         val r = min(w, h) * 0.06f
         title.textSize = r * 0.75f; text.textSize = r * 0.55f
