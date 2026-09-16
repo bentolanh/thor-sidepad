@@ -29,9 +29,9 @@ class Prefs(ctx: Context) {
         get() = sp.getFloat("opacity", 0.75f)
         set(v) = sp.edit().putFloat("opacity", v).apply()
 
-    /** Shield: one full-screen window, nothing behind it is touchable. Off = one window per button. */
+    /** Shield: one full-screen window, nothing behind it is touchable. Off = one window per button. Off at every start. */
     var shield: Boolean
-        get() = sp.getBoolean("shield", true)
+        get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()
 
     /** Name of the preset the pad's layout came from. Save in the editor writes back into it. */

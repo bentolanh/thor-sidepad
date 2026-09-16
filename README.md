@@ -24,8 +24,9 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 - **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
   map to Android `BUTTON_C` / `BUTTON_Z`. They work in both modes. (The Thor kernel stamps
   every uinput pad with AYN's vendor/product ids, so stock `BUTTON_1..` codes are unmapped.)
-- **Shield mode (default)**: one full-screen non-focusable overlay on the second display owns
-  every touch. Nothing behind the pad can be tapped by accident, a thumb can slide from one
+- **Shield mode**: one full-screen non-focusable overlay on the second display owns every
+  touch. SidePad always starts with the shield off; turn it on per session from the panel or
+  the on-pad toggle. Nothing behind the pad can be tapped by accident, a thumb can slide from one
   button to the next, and edge swipes become gestures. Islands mode (one small window per
   button) is the alternative when the app under the pad should stay usable.
 - **Pull down from the top edge** of the second screen opens SidePad's own control panel: one
@@ -74,12 +75,11 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 
 ## First start
 
-The first time the service starts, an interactive five-step guide covers the pad's screen
-and waits for the real gestures, with a short "Good" beat after each: pull down (the panel
-really opens; close it to continue), pull up (the pad really hides), pull up again (it comes
-back), tap the highlighted shield button (the shield really turns off and the text explains
-what changed), tap it again (back on). "Skip the guide" ends it. The app has a button to run
-it again, which starts SidePad and shows the pad first if needed.
+The first time the service starts, an interactive three-step guide covers the pad's screen
+and waits for the real gestures: pull down (the panel really opens; close it to continue),
+pull up (the pad really hides), pull up again (it comes back), with a one-second pause
+between steps. "Skip the guide" ends it. The app has a button to run it again, which starts
+SidePad and shows the pad first if needed.
 
 ## The app screen vs the panel
 
