@@ -66,7 +66,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 
     private fun add(v: View, lp: WindowManager.LayoutParams) {
+        lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
         wm.addView(v, lp); views.add(v)
+    }
+
+    /** Removes the previous pad windows once the new ones have had two frames to draw, so nothing goes blank. */
+    private fun retireAfterDraw(anchor: View, old: List<View>) {
+        if (old.isEmpty()) return
+        anchor.post { anchor.post { old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} } } }
     }
 
     fun removeAll() {
@@ -90,6 +97,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = (if (down) Gravity.TOP else Gravity.BOTTOM) or Gravity.CENTER_HORIZONTAL
             lp.title = if (down) "SidePad catcher top" else "SidePad catcher bottom"
+            lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
             wm.addView(v, lp); catchers.add(v)
         }
     }
@@ -99,7 +107,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     fun showPanel(state: PanelState, actions: PanelActions) {
         removePanel()
         val h = ControlPanel.build(themed, state, actions, (height * 0.82f).roundToInt())
-        wm.addView(h.root, fullScreenParams("SidePad panel")); panel = h.root; panelUpdate = h.update
+        val lp = fullScreenParams("SidePad panel")
+        lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
+        wm.addView(h.root, lp); panel = h.root; panelUpdate = h.update
     }
 
     /** Re-renders the open panel with new state; the window stays, so nothing flashes. */
@@ -166,7 +176,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             lp.title = "SidePad shield"
             add(v, lp)
             shieldView = v; shieldParams = lp
-            old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
+            retireAfterDraw(v, old)
             return
         }
         val short = min(width, height)
@@ -186,7 +196,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             lp.title = "SidePad ${Catalog.byCode(b.code).label}"
             add(v, lp)
         }
-        old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
+        views.lastOrNull()?.let { retireAfterDraw(it, old) } ?: old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
     }
 
     /**
@@ -350,6 +360,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             PixelFormat.TRANSLUCENT)
         lp.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         lp.title = "SidePad name"
+        lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
         window = root
         add(root, lp)
         field.requestFocus()

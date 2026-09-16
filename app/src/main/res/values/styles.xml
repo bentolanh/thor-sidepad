@@ -22,4 +22,9 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_weight">1</item>
     </style>
+    <!-- Overlay windows snap in and out; the default fade reads as a flash on the pad's screen. -->
+    <style name="NoWindowAnimation">
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
+    </style>
 </resources>
