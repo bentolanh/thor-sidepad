@@ -46,6 +46,27 @@ class InjectorService() : IInjector.Stub() {
         (am.getStreamVolume(s) - min).toFloat() / (max - min).coerceAtLeast(1)
     } catch (e: Throwable) { Log.w(TAG, "getVolume", e); -1f }
 
+    /**
+     * The Thor's second-screen volume. AYN's own slider writes only the system setting
+     * secondary_screen_volume_level (0..15); a running AYN process maps it to the
+     * persist.sys.audio.value gain that AudioFlinger applies to apps on the second screen.
+     */
+    override fun getVolume2nd(): Float = try {
+        val out = sh("settings get system secondary_screen_volume_level")
+        out.trim().toIntOrNull()?.let { it.coerceIn(0, 15) / 15f } ?: -1f
+    } catch (e: Throwable) { Log.w(TAG, "getVolume2nd", e); -1f }
+
+    override fun setVolume2nd(level: Float) {
+        try {
+            val idx = (level.coerceIn(0f, 1f) * 15f + 0.5f).toInt()
+            sh("settings put system secondary_screen_volume_level $idx")
+        } catch (e: Throwable) { Log.w(TAG, "setVolume2nd", e) }
+    }
+
+    private fun sh(cmd: String): String =
+        ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true).start()
+            .inputStream.bufferedReader().readText()
+
     override fun setVolume(level: Float) {
         try {
             val am = audio() ?: return

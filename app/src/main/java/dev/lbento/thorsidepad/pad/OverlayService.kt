@@ -321,6 +321,7 @@ class OverlayService : Service() {
             svc.getBrightness(0).let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP] = it }
             svc.getBrightness(d).let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.BRIGHT_2ND] = it }
             svc.getVolume().let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] = it }
+            svc.getVolume2nd().let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND] = it }
         } catch (e: Exception) { Log.w(TAG, "levels", e) }
     }
 
@@ -331,6 +332,7 @@ class OverlayService : Service() {
             try {
                 when (code) {
                     dev.lbento.thorsidepad.inject.Slider.VOLUME -> svc.setVolume(level)
+                    dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND -> svc.setVolume2nd(level)
                     dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP -> svc.setBrightness(0, level)
                     dev.lbento.thorsidepad.inject.Slider.BRIGHT_2ND -> svc.setBrightness(overlay?.displayId ?: 0, level)
                 }

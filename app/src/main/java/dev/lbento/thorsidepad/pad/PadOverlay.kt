@@ -277,9 +277,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
             }
             v.alpha = opacity
-            // Sliders are tall and narrow; everything else is square.
+            // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
             val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else px
-            val lp = WindowManager.LayoutParams(w, px, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+            val h = if (isSliderCode(b.code)) (px * 1.2f).roundToInt() else px
+            val lp = WindowManager.LayoutParams(w, h, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
             lp.x = (b.cx * width - w / 2f).roundToInt()
             lp.y = (b.cy * height - px / 2f).roundToInt()

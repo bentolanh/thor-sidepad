@@ -48,11 +48,12 @@ object Slider {
     const val BRIGHT_TOP = -10
     const val BRIGHT_2ND = -11
     const val VOLUME = -12
+    const val VOLUME_2ND = -17   // the Thor's second-screen volume: the media stream's "hdmi" device level
 }
 
 fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
 fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND
-fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME
+fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME || code == Slider.VOLUME_2ND
 
 object Btn {
     const val A = 0x130          // BTN_SOUTH
@@ -123,13 +124,14 @@ object Catalog {
         PadCode(Action.BACK_2ND, "BACK", "Back on this screen"),
         PadCode(Slider.BRIGHT_TOP, "☀", "brightness slider, main screen"),
         PadCode(Slider.BRIGHT_2ND, "☀", "brightness slider, this screen"),
-        PadCode(Slider.VOLUME, "♪", "volume slider"),
+        PadCode(Slider.VOLUME, "♪", "volume slider, main screen"),
+        PadCode(Slider.VOLUME_2ND, "♪", "volume slider, this screen"),
     )
 
     /** Small tag drawn under a Home/Back/slider element: which screen it acts on. */
     fun screenTag(code: Int): String? = when (code) {
-        Action.HOME_TOP, Action.BACK_TOP, Slider.BRIGHT_TOP -> "top"
-        Action.HOME_2ND, Action.BACK_2ND, Slider.BRIGHT_2ND -> "2nd"
+        Action.HOME_TOP, Action.BACK_TOP, Slider.BRIGHT_TOP, Slider.VOLUME -> "top"
+        Action.HOME_2ND, Action.BACK_2ND, Slider.BRIGHT_2ND, Slider.VOLUME_2ND -> "2nd"
         else -> null
     }
 

@@ -34,4 +34,7 @@ interface IInjector {
     void setBrightness(int displayId, float level) = 14;
     float getVolume() = 15;
     void setVolume(float level) = 16;
+    // The Thor's second-screen volume (the media stream's hdmi device), set the way AYN's panel does.
+    float getVolume2nd() = 17;
+    void setVolume2nd(float level) = 18;
 }

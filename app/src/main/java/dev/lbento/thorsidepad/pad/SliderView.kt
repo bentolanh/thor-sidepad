@@ -11,13 +11,15 @@ class SliderView(ctx: Context, val code: Int, private var level: Float, private 
     private val painter = ButtonPainter()
     private var active = false
 
+    // The window is half an element wide and 1.2 elements tall: r is the element's half size,
+    // the track sits in the top 2r and the symbol and screen tag hang below it.
     override fun onDraw(c: Canvas) {
-        val r = height / 2f
+        val r = width.toFloat()
         painter.drawSlider(c, width / 2f, r, r, Catalog.byCode(code).label, Catalog.screenTag(code), level, active)
     }
 
     private fun slide(y: Float) {
-        val r = height / 2f; val cy = height / 2f
+        val r = width.toFloat(); val cy = r
         val top = cy - r * 0.9f; val bottom = cy + r * 0.55f
         level = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
         onSlider(code, level); invalidate()
