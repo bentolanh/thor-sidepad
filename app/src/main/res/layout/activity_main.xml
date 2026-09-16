@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView style="@style/SectionHeader" android:text="1. Permissions" />
+        <TextView android:id="@+id/shizukuStatus" style="@style/StatusLine" />
+        <Button android:id="@+id/btnShizuku" style="@style/Row" android:text="Grant Shizuku access" />
+        <TextView android:id="@+id/overlayStatus" style="@style/StatusLine" />
+        <Button android:id="@+id/btnOverlay" style="@style/Row" android:text="Allow drawing over other apps" />
+
+        <TextView style="@style/SectionHeader" android:text="2. Where button presses go" />
+        <RadioGroup android:id="@+id/modeGroup" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <RadioButton android:id="@+id/modePhysical" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Same controller as the Thor's own buttons (games see one pad)" />
+            <RadioButton android:id="@+id/modeVirtual" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Separate virtual pad (adds M1–M4; games may see a second pad)" />
+        </RadioGroup>
+        <TextView style="@style/StatusLine" android:text="Thor controller device (used for the same-controller mode and the Select+Start chord):" />
+        <Spinner android:id="@+id/deviceSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <Button android:id="@+id/btnRefresh" style="@style/Row" android:text="Refresh devices" />
+        <TextView android:id="@+id/probeStatus" style="@style/StatusLine" />
+
+        <TextView style="@style/SectionHeader" android:text="3. Screen" />
+        <Spinner android:id="@+id/displaySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <TextView style="@style/StatusLine" android:text="Opacity" />
+        <SeekBar android:id="@+id/opacity" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
+        <Switch android:id="@+id/chordSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Hold Select + Start on the Thor to show/hide the pad" />
+
+        <TextView style="@style/SectionHeader" android:text="4. Pad" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Button android:id="@+id/btnShow" style="@style/Half" android:text="Show pad" />
+            <Button android:id="@+id/btnHide" style="@style/Half" android:text="Hide pad" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Button android:id="@+id/btnEdit" style="@style/Half" android:text="Edit layout" />
+            <Button android:id="@+id/btnStop" style="@style/Half" android:text="Stop service" />
+        </LinearLayout>
+        <TextView style="@style/StatusLine" android:text="A Quick Settings tile named Thor SidePad is also available: add it from the notification shade editor." />
+
+        <TextView style="@style/SectionHeader" android:text="5. Test (open a gamepad tester on the top screen first)" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Button android:id="@+id/btnTestA" style="@style/Half" android:text="Send A" />
+            <Button android:id="@+id/btnTestM1" style="@style/Half" android:text="Send M1 (BUTTON_1)" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
