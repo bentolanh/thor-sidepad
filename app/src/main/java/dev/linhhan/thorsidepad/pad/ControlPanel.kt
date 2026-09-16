@@ -116,6 +116,7 @@ object ControlPanel {
                 card.addView(row(*choices.map { (key, name) -> btn(name, key != state.backdrop) { actions.setBackdrop(key) } }.toTypedArray()))
                 if (!state.blurSupported) card.addView(label("* This device cannot blur behind windows; Frosted falls back to a heavy dim.", 11f, grey))
                 card.addView(label("Button opacity", 14f, grey))
+                // Kept well away from both screen edges so the thumb never sits in the system back-gesture zone.
                 card.addView(SeekBar(themed).apply {
                     max = 100; progress = (state.opacity * 100).toInt()
                     setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -123,6 +124,8 @@ object ControlPanel {
                         override fun onStartTrackingTouch(sb: SeekBar) {}
                         override fun onStopTrackingTouch(sb: SeekBar) { actions.setOpacity(sb.progress / 100f) }
                     })
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    marginStart = 140; marginEnd = 140
                 })
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
             } else {
