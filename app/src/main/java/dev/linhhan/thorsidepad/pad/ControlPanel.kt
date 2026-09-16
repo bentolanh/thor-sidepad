@@ -12,6 +12,7 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import android.view.View
 
 /** One controller the pad can write into. `name` is the kernel name; `label` is what the user sees. */
 data class TargetChoice(val name: String, val path: String) {
@@ -59,14 +60,17 @@ object ControlPanel {
     /** Remembered so a re-render after a setting change stays on the same page. */
     var page: Page = Page.MAIN
 
-    /** The built panel window and a way to re-render its contents in place with a new state. */
-    class Handle(val root: FrameLayout, val update: (PanelState) -> Unit)
+    /** The built panel window: the scrim and the sheet (animated separately) plus an in-place re-render. */
+    class Handle(val root: FrameLayout, val scrim: View, val sheet: View, val update: (PanelState) -> Unit)
 
     fun build(themed: Context, initial: PanelState, actions: PanelActions, maxHeightPx: Int): Handle {
         var state = initial
         val root = FrameLayout(themed)
-        root.setBackgroundColor(0x88000000.toInt())
-        root.setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_DOWN) actions.close(); true }
+        val scrim = View(themed).apply {
+            setBackgroundColor(0x88000000.toInt())
+            setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_DOWN) actions.close(); true }
+        }
+        root.addView(scrim, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         val card = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
@@ -148,6 +152,6 @@ object ControlPanel {
 
         val scroll = ScrollView(themed).apply { addView(card) }
         root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx, Gravity.TOP))
-        return Handle(root) { s -> state = s; render() }
+        return Handle(root, scrim, scroll) { s -> state = s; render() }
     }
 }

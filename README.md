@@ -29,7 +29,9 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   the on-pad toggle. Nothing behind the pad can be tapped by accident, a thumb can slide from one
   button to the next, and edge swipes become gestures. Islands mode (one small window per
   button) is the alternative when the app under the pad should stay usable.
-- **Pull down from the top edge** of the second screen opens SidePad's own control panel: one
+- **Pull down from the top edge** of the second screen opens SidePad's own control panel, which
+  follows the finger down like the notification shade and settles open, or springs back if the
+  pull was too short; it slides away on close. The panel is one
   quick-settings page (controller, show/hide, edit layout, shield, backdrop, opacity, stop)
   plus a Controller page, opened from its
   "Controller: …" row, where presses are routed. While the pad is hidden thin strips stay
@@ -76,12 +78,11 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 ## First start
 
 SidePad starts with the pad hidden: only the two edge strips are there. The first time it
-starts, an interactive three-step guide covers the pad's screen and waits for the real
-gestures: pull down (the panel really opens; close it to continue), pull up (the pad really
-appears), pull up again (it hides), with a one-second pause between steps. During the guide
-the pad wears its most legible look (shield on, frosted backdrop, opaque buttons) and
-everything is put back afterwards. "Skip the guide" ends it. The app has a button to run it
-again.
+starts, an interactive guide brings the pad up in its most legible look (shield on, frosted
+backdrop, opaque buttons) and waits for the real gestures: pull down (the panel really opens
+over the shield; close it to continue), pull up (the pad hides), pull up again (it comes
+back), then an end screen. Everything is put back afterwards, including whether the pad was
+showing. "Skip the guide" ends it early. The app has a button to run it again.
 
 ## The app screen vs the panel
 

@@ -45,6 +45,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private val catchers = ArrayList<View>()
     private var panel: View? = null
     private var panelUpdate: ((PanelState) -> Unit)? = null
+    private var panelSheet: View? = null
+    private var panelScrim: View? = null
+    private var panelHeight = 0
     private var shieldView: ShieldPadView? = null
     private var shieldParams: WindowManager.LayoutParams? = null
 
@@ -89,10 +92,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT).also { it.title = title }
 
     /** Thin strips on the top (pull down = panel) and bottom (pull up = show pad) edges. Idempotent. */
-    fun showCatchers(onPullDown: () -> Unit, onPullUp: () -> Unit) {
+    fun showCatchers(onPullDown: () -> Unit, onPullUp: () -> Unit, tracker: PullListener? = null) {
         if (catchers.isNotEmpty()) return
         for ((down, cb) in listOf(true to onPullDown, false to onPullUp)) {
-            val v = EdgeCatcherView(ctx, down, cb)
+            val v = EdgeCatcherView(ctx, down, cb, if (down) tracker else null)
             val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.HEIGHT_PX,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = (if (down) Gravity.TOP else Gravity.BOTTOM) or Gravity.CENTER_HORIZONTAL
@@ -104,18 +107,54 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun removeCatchers() { catchers.forEach { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; catchers.clear() }
 
-    fun showPanel(state: PanelState, actions: PanelActions) {
-        removePanel()
-        val h = ControlPanel.build(themed, state, actions, (height * 0.82f).roundToInt())
+    /**
+     * Opens the panel like the notification shade. With [dragged] the sheet starts tucked above
+     * the screen and follows the finger through [dragPanel] until [endPanelDrag]; otherwise it
+     * slides in on its own.
+     */
+    fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false) {
+        removePanel(animated = false)
+        panelHeight = (height * 0.82f).roundToInt()
+        val h = ControlPanel.build(themed, state, actions, panelHeight)
         val lp = fullScreenParams("SidePad panel")
         lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
-        wm.addView(h.root, lp); panel = h.root; panelUpdate = h.update
+        h.sheet.translationY = -panelHeight.toFloat()
+        h.scrim.alpha = 0f
+        wm.addView(h.root, lp); panel = h.root; panelUpdate = h.update; panelSheet = h.sheet; panelScrim = h.scrim
+        if (!dragged) settlePanel(open = true)
+    }
+
+    /** Finger progress while pulling the shade down: [dy] pixels from where the pull began. */
+    fun dragPanel(dy: Float) {
+        val sheet = panelSheet ?: return
+        val y = (dy - panelHeight).coerceIn(-panelHeight.toFloat(), 0f)
+        sheet.translationY = y
+        panelScrim?.alpha = (1f + y / panelHeight).coerceIn(0f, 1f)
+    }
+
+    /** Finger lifted: settle open, or spring back up and go away. */
+    fun endPanelDrag(commit: Boolean) { if (commit) settlePanel(open = true) else removePanel(animated = true) }
+
+    private fun settlePanel(open: Boolean, then: (() -> Unit)? = null) {
+        val sheet = panelSheet ?: return
+        val target = if (open) 0f else -panelHeight.toFloat()
+        sheet.animate().translationY(target).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(1.8f)).withEndAction { then?.invoke() }.start()
+        panelScrim?.animate()?.alpha(if (open) 1f else 0f)?.setDuration(220)?.start()
     }
 
     /** Re-renders the open panel with new state; the window stays, so nothing flashes. */
     fun updatePanel(state: PanelState) { panelUpdate?.invoke(state) }
 
-    fun removePanel() { panel?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; panel = null; panelUpdate = null }
+    fun removePanel(animated: Boolean = true) {
+        val root = panel ?: return
+        panel = null; panelUpdate = null
+        val sheet = panelSheet; panelSheet = null; panelScrim = null
+        fun drop() { try { wm.removeViewImmediate(root) } catch (_: Exception) {} }
+        if (animated && sheet != null) {
+            sheet.animate().translationY(-panelHeight.toFloat()).setDuration(180).setInterpolator(android.view.animation.AccelerateInterpolator()).withEndAction { drop() }.start()
+            (root as? android.widget.FrameLayout)?.getChildAt(0)?.animate()?.alpha(0f)?.setDuration(180)?.start()
+        } else drop()
+    }
 
     private fun backdropColor(backdrop: String): Int {
         val frosted = backdrop == "frosted" && blurSupported
@@ -173,6 +212,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * Shows the pad in play mode. The previous pad windows are removed only after the new ones
      * are up, so switching shield/islands or changing looks does not flash the screen.
      */
+    /** Set by the service: the shade-style pull that opens the panel. */
+    var pullTracker: PullListener? = null
+
     fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean,
                  backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
         val old = ArrayList(views)
@@ -181,7 +223,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         if (shield) {
             val frosted = backdrop == "frosted" && blurSupported
             val color = backdropColor(backdrop)
-            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, shieldOn = true, opacity = opacity, backdropColor = color)
+            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {

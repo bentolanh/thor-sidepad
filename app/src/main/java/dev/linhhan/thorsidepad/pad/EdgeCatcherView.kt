@@ -11,7 +11,7 @@ import android.view.View
  * is hidden (or in islands mode). A pull that starts on it fires; anything else is ignored, so
  * the app underneath keeps almost all of its edge. Top = open the panel, bottom = show the pad.
  */
-class EdgeCatcherView(ctx: Context, private val pullDown: Boolean, private val onPull: () -> Unit) : View(ctx) {
+class EdgeCatcherView(ctx: Context, private val pullDown: Boolean, private val onPull: () -> Unit, private val tracker: PullListener? = null) : View(ctx) {
     private val hint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x66FFFFFF }
     private var y0 = 0f
     private var t0 = 0L
@@ -25,14 +25,15 @@ class EdgeCatcherView(ctx: Context, private val pullDown: Boolean, private val o
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { y0 = e.y; t0 = e.eventTime; armed = true }
-            // Fire on finger-up so the panel never appears under a finger that is still moving.
+            MotionEvent.ACTION_DOWN -> { y0 = e.y; t0 = e.eventTime; armed = true; if (pullDown) tracker?.onPullStart() }
+            MotionEvent.ACTION_MOVE -> if (pullDown && armed) tracker?.onPullMove(e.y - y0)
             MotionEvent.ACTION_UP -> {
                 val travel = if (pullDown) e.y - y0 else y0 - e.y
-                if (armed && travel > PULL_PX) onPull()
+                if (pullDown && tracker != null) tracker.onPullEnd(armed && travel > PULL_PX)
+                else if (armed && travel > PULL_PX) onPull()
                 armed = false
             }
-            MotionEvent.ACTION_CANCEL -> armed = false
+            MotionEvent.ACTION_CANCEL -> { if (pullDown) tracker?.onPullEnd(false); armed = false }
         }
         return true
     }

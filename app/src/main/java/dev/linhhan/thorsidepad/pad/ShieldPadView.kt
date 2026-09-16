@@ -14,6 +14,13 @@ import kotlin.math.min
 
 enum class EdgeGesture { PULL_DOWN, PULL_UP }
 
+/** Finger-tracked pull from the top edge, so the panel can follow it like the notification shade. */
+interface PullListener {
+    fun onPullStart()
+    fun onPullMove(dy: Float)
+    fun onPullEnd(commit: Boolean)
+}
+
 /**
  * Shield mode: one full-screen window that owns every touch on the display. Buttons are drawn
  * on it, fingers can slide from one button to the next, and touches between buttons go
@@ -26,6 +33,7 @@ class ShieldPadView(
     private val engine: PadEngine,
     private val onGesture: (EdgeGesture) -> Unit,
     private val onAction: (Int) -> Unit,
+    private val onPullDown: PullListener? = null,
     private val shieldOn: Boolean = true,
     opacity: Float = 1f,
     backdropColor: Int = 0,
@@ -132,7 +140,10 @@ class ShieldPadView(
                 val x = e.getX(idx); val y = e.getY(idx)
                 val i = hit(x, y)
                 val edge = if (i < 0) edgeAt(x, y) else null
-                if (edge != null) swipes[pid] = Swipe(edge, x, y, e.eventTime)
+                if (edge != null) {
+                    swipes[pid] = Swipe(edge, x, y, e.eventTime)
+                    if (edge == EdgeGesture.PULL_DOWN && onPullDown != null && swipes.size == 1) onPullDown.onPullStart()
+                }
                 else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
                 else { tracked.add(pid); if (i >= 0) press(i, pid) }
                 invalidate()
@@ -141,6 +152,7 @@ class ShieldPadView(
                 for (idx in 0 until e.pointerCount) {
                     val pid = e.getPointerId(idx)
                     stickBy[pid]?.let { si -> steer(si, e.getX(idx), e.getY(idx)); invalidate() }
+                    swipes[pid]?.let { s -> if (s.edge == EdgeGesture.PULL_DOWN) onPullDown?.onPullMove(e.getY(idx) - s.y0) }
                 }
                 // A finger keeps being tracked while it crosses gaps, so it can slide A -> B.
                 for (idx in 0 until e.pointerCount) {
@@ -165,11 +177,13 @@ class ShieldPadView(
                         EdgeGesture.PULL_DOWN -> dy > need && abs(dx) < dy
                         EdgeGesture.PULL_UP -> -dy > need && abs(dx) < -dy
                     }
-                    if (ok && fast) onGesture(s.edge)
+                    if (s.edge == EdgeGesture.PULL_DOWN && onPullDown != null) onPullDown.onPullEnd(ok)   // the shade needs no speed
+                    else if (ok && fast) onGesture(s.edge)
                 }
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
+                if (swipes.values.any { it.edge == EdgeGesture.PULL_DOWN }) onPullDown?.onPullEnd(false)
                 pressedBy.keys.toList().forEach { release(it) }
                 stickBy.keys.toList().forEach { releaseStick(it) }
                 tracked.clear()

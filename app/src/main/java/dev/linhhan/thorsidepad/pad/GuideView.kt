@@ -15,7 +15,7 @@ import kotlin.math.min
  * An interactive guide over the pad's screen. Each step asks for one real gesture and waits
  * for it; the service then performs the real action. A tap on "Skip" ends the guide.
  *
- * Steps: 1 pull down (panel), 2 pull up (show the pad), 3 pull up (hide it again).
+ * Steps: 1 pull down (panel), 2 pull up (hide the pad), 3 pull up (show it again), 4 end screen.
  */
 class GuideView(
     ctx: Context,
@@ -37,6 +37,7 @@ class GuideView(
 
     private val wantsDown get() = step == 1
     private val wantsUp get() = step == 2 || step == 3
+    private val isEnd get() = step == 4
 
     private fun arrow(c: Canvas, cx: Float, fromY: Float, toY: Float, r: Float, dotOffset: Float) {
         stroke.strokeWidth = r * 0.16f
@@ -52,9 +53,9 @@ class GuideView(
     private fun skipRect(): FloatArray { val w = width.toFloat(); val y = labelY(); return floatArrayOf(w * 0.5f - 130f, y + 20f, w * 0.5f + 130f, y + 90f) }
 
     override fun onDraw(c: Canvas) {
-        // Dark while the pad is hidden (the app behind must not distract); light once the pad is up,
-        // so the frosted pad and its buttons stay clearly visible under the instructions.
-        c.drawColor(if (step == 3) 0x50101418 else 0xE0101418.toInt())
+        // The pad is up (shield on, frosted) for most of the guide: keep the scrim light so it stays
+        // visible. Only step 3, where the pad is hidden, darkens the app behind.
+        c.drawColor(if (step == 3) 0xE0101418.toInt() else 0x50101418)
         val w = width.toFloat(); val h = height.toFloat()
         val r = min(w, h) * 0.06f
         title.textSize = r * 0.75f; text.textSize = r * 0.55f
@@ -62,6 +63,16 @@ class GuideView(
         c.drawRoundRect((w - pw) / 2, 10f, (w + pw) / 2, 10f + ph, ph, ph, pill)
         c.drawRoundRect((w - pw) / 2, h - 10f - ph, (w + pw) / 2, h - 10f, ph, ph, pill)
 
+        if (isEnd) {
+            c.drawText("You're all set", w / 2, h * 0.34f, title)
+            c.drawText("Pull down from the top edge: the SidePad panel", w / 2, h * 0.34f + r * 1.3f, text)
+            c.drawText("Pull up from the bottom edge: show or hide the pad", w / 2, h * 0.34f + r * 2.2f, text)
+            c.drawText("The shield button on the pad blocks touches to the app behind it", w / 2, h * 0.34f + r * 3.1f, text)
+            val s = skipRect()
+            c.drawRoundRect(s[0], s[1], s[2], s[3], 16f, 16f, skipBox)
+            c.drawText("Done", w / 2, (s[1] + s[3]) / 2 + text.textSize * 0.35f, text)
+            return
+        }
         c.drawText("Step $step of 3", w / 2, labelY(), text)
         val s = skipRect()
         c.drawRoundRect(s[0], s[1], s[2], s[3], 16f, 16f, skipBox)
@@ -76,7 +87,7 @@ class GuideView(
             wantsUp -> {
                 arrow(c, w / 2, h * 0.94f, h * 0.76f, r, dragY.coerceIn(-h * 0.18f, 0f))
                 c.drawText("Pull up from the bottom edge", w / 2, h * 0.66f, title)
-                c.drawText(if (step == 2) "Try it now: it shows the pad" else "Once more: it hides the pad again", w / 2, h * 0.66f + r * 0.9f, text)
+                c.drawText(if (step == 2) "Try it now: it hides the pad" else "Once more: it brings the pad back", w / 2, h * 0.66f + r * 0.9f, text)
             }
         }
     }
@@ -101,6 +112,7 @@ class GuideView(
                 dragY = 0f; edge = null; invalidate()
                 val tap = hypot(dx, dy) < 30f
                 val s = skipRect()
+                if (isEnd) { if (tap) onSkip(); return true }
                 when {
                     g == EdgeGesture.PULL_DOWN && wantsDown && dy > need && abs(dx) < dy && fast -> onGesture(g)
                     g == EdgeGesture.PULL_UP && wantsUp && -dy > need && abs(dx) < -dy && fast -> onGesture(g)

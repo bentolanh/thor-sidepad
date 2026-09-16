@@ -195,6 +195,11 @@ class OverlayService : Service() {
     private fun overlayOrCreate(): PadOverlay =
         overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { ov ->
             overlay = ov
+            ov.pullTracker = object : PullListener {
+                override fun onPullStart() { if (guideStep == 0) openPanel(dragged = true) }
+                override fun onPullMove(dy: Float) { if (guideStep == 0) ov.dragPanel(dy) }
+                override fun onPullEnd(commit: Boolean) { if (guideStep == 0) ov.endPanelDrag(commit) }
+            }
             ov.onFocusReturn = { returnFocusToTopScreen() }
         }
 
@@ -206,7 +211,7 @@ class OverlayService : Service() {
 
     /** Keeps the edge strips on the pad's screen whenever the shield is not covering it. */
     private fun ensureCatcher() {
-        try { overlayOrCreate().showCatchers(onPullDown = { showPanel() }, onPullUp = { toggle() }) } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
+        try { val ov = overlayOrCreate(); ov.showCatchers(onPullDown = { showPanel() }, onPullUp = { toggle() }, tracker = ov.pullTracker) } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
     }
 
     /** Buttons that act on the pad itself. */
@@ -228,21 +233,21 @@ class OverlayService : Service() {
     }
 
     /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
-    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (show), 3 pull up (hide)
+    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (hide), 3 pull up (show), 4 end screen
     private var saved: Triple<Boolean, String, Float>? = null   // shield, backdrop, opacity before the guide
     private var savedVisible = false
 
     /**
-     * Starts the interactive guide from a hidden pad. While it runs the pad wears its most
-     * legible look (shield on, frosted backdrop, fully opaque buttons); everything is put back
-     * when the guide ends.
+     * Starts the interactive guide with the pad up in its most legible look (shield on, frosted
+     * backdrop, fully opaque buttons), so the panel in step 1 is seen over the shield. Everything
+     * is put back when the guide ends.
      */
     private fun showGuide() {
         if (saved == null) { saved = Triple(prefs.shield, prefs.backdrop, prefs.opacity); savedVisible = visible }
         prefs.shield = true; prefs.backdrop = Prefs.BACKDROP_FROSTED; prefs.opacity = 1f
-        if (visible) hide()
         guideStep = 1
-        main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 600)
+        if (visible) rebuildPad() else show()
+        main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 1500)
     }
 
     /** Puts the pad's look and visibility back to what they were before the guide. */
@@ -272,8 +277,8 @@ class OverlayService : Service() {
         val ov = overlay ?: return
         when {
             guideStep == 1 && g == EdgeGesture.PULL_DOWN -> { ov.removeGuide(); guideStep = 2; showPanel() }   // step 2 resumes when the panel closes
-            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 1000) }
-            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); finishGuide() }
+            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 1000) }
+            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); main.postDelayed({ if (guideStep == 3) showGuideStep(4) }, 1000) }
         }
     }
 
@@ -282,11 +287,13 @@ class OverlayService : Service() {
         if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 1000)
     }
 
-    private fun showPanel(keepPage: Boolean = false) {
+    private fun showPanel(keepPage: Boolean = false) = openPanel(dragged = false, keepPage = keepPage)
+
+    private fun openPanel(dragged: Boolean, keepPage: Boolean = false) {
         if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
         Injector.current()?.let { refreshTargets(it) }
-        ov.showPanel(panelState(ov), object : PanelActions {
+        ov.showPanel(panelState(ov), dragged = dragged, actions = object : PanelActions {
             override fun setTarget(choice: TargetChoice?) {
                 if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
                 else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }
