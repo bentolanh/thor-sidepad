@@ -44,6 +44,11 @@ class Prefs(ctx: Context) {
         get() = sp.getString("backdrop", BACKDROP_CLEAR) ?: BACKDROP_CLEAR
         set(v) = sp.edit().putString("backdrop", v).apply()
 
+    /** The look saved while the guide runs ("shield|backdrop|opacity"), so an interrupted guide can still be undone. */
+    var guideSnapshot: String?
+        get() = sp.getString("guideSnapshot", null)
+        set(v) = sp.edit().putString("guideSnapshot", v).apply()
+
     var guideShown: Boolean
         get() = sp.getBoolean("guideShown", false)
         set(v) = sp.edit().putBoolean("guideShown", v).apply()

@@ -68,7 +68,6 @@ class GuideView(
             c.drawText("You're all set", w / 2, h * 0.34f, title)
             c.drawText("Pull down from the top edge: the SidePad panel", w / 2, h * 0.34f + r * 1.3f, text)
             c.drawText("Pull up from the bottom edge: show or hide the pad", w / 2, h * 0.34f + r * 2.2f, text)
-            c.drawText("The shield button on the pad blocks touches to the app behind it", w / 2, h * 0.34f + r * 3.1f, text)
             val s = skipRect()
             c.drawRoundRect(s[0], s[1], s[2], s[3], 16f, 16f, skipBox)
             c.drawText("Done", w / 2, (s[1] + s[3]) / 2 + text.textSize * 0.35f, text)

@@ -107,6 +107,13 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
+        prefs.guideSnapshot?.let { snap ->
+            // A guide was interrupted (service killed, reboot): undo its temporary look now.
+            val p = snap.split("|")
+            if (p.size == 3) { prefs.backdrop = p[1]; prefs.opacity = p[2].toFloatOrNull() ?: prefs.opacity }
+            prefs.guideSnapshot = null
+            Log.i(TAG, "guide snapshot restored after interruption: $snap")
+        }
         prefs.shield = false   // SidePad always starts with the shield off; turn it on per session
         startForeground(NOTIF_ID, buildNotification())
         running = true
@@ -267,7 +274,10 @@ class OverlayService : Service() {
      * Everything is put back when the guide ends.
      */
     private fun showGuide() {
-        if (saved == null) { saved = Triple(prefs.shield, prefs.backdrop, prefs.opacity); savedVisible = visible }
+        if (saved == null) {
+            saved = Triple(prefs.shield, prefs.backdrop, prefs.opacity); savedVisible = visible
+            prefs.guideSnapshot = "${prefs.shield}|${prefs.backdrop}|${prefs.opacity}"
+        }
         Log.i(TAG, "guide start: saved=$saved visible=$savedVisible")
         prefs.shield = true; prefs.backdrop = Prefs.BACKDROP_FROSTED; prefs.opacity = 1f
         guideStep = 1
@@ -281,6 +291,7 @@ class OverlayService : Service() {
         saved = null
         Log.i(TAG, "guide end: restoring $s visible=$savedVisible")
         prefs.shield = s.first; prefs.backdrop = s.second; prefs.opacity = s.third
+        prefs.guideSnapshot = null
         if (savedVisible && !visible) show() else if (!savedVisible && visible) hide() else if (visible) rebuildPad()
     }
 
@@ -319,7 +330,7 @@ class OverlayService : Service() {
         if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
         Injector.current()?.let { refreshTargets(it) }
-        ov.showPanel(panelState(ov), dragged = dragged, actions = object : PanelActions {
+        ov.showPanel(panelState(ov), dragged = dragged, backdrop = if (prefs.shield && !ov.isShowing) prefs.backdrop else null, actions = object : PanelActions {
             override fun setTarget(choice: TargetChoice?) {
                 if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
                 else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }

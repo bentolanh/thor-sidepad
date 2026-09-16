@@ -112,12 +112,19 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * the screen and follows the finger through [dragPanel] until [endPanelDrag]; otherwise it
      * slides in on its own.
      */
-    fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false) {
+    fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false, backdrop: String? = null) {
         removePanel(animated = false)
         panelHeight = (height * 0.82f).roundToInt()
         val h = ControlPanel.build(themed, state, actions, panelHeight)
         val lp = fullScreenParams("SidePad panel")
         lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
+        // With the shield on but the pad hidden, the panel carries the shield's backdrop itself, so
+        // pulling it down looks the same whether or not the pad is up.
+        if (backdrop != null) {
+            val c = backdropColor(backdrop)
+            if (c != 0) h.scrim.setBackgroundColor(c or 0x88000000.toInt())
+            if (backdrop == "frosted" && blurSupported) { lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; lp.blurBehindRadius = 48 }
+        }
         h.sheet.translationY = -panelHeight.toFloat()
         h.scrim.alpha = 0f
         wm.addView(h.root, lp); panel = h.root; panelUpdate = h.update; panelSheet = h.sheet; panelScrim = h.scrim
