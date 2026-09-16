@@ -89,9 +89,9 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Look at the bottom screen.", Toast.LENGTH_SHORT).show()
         }
 
-        // Previews: the adaptive icons drawn the way a round launcher shows them.
-        findViewById<android.widget.ImageView>(R.id.iconPreviewFamicom).setImageDrawable(roundIcon(R.mipmap.ic_launcher_famicom))
-        findViewById<android.widget.ImageView>(R.id.iconPreviewGameBoy).setImageDrawable(roundIcon(R.mipmap.ic_launcher_gameboy))
+        // Previews: the adaptive icons drawn the way a round launcher shows them, above each radio's label.
+        findViewById<android.widget.RadioButton>(R.id.iconFamicom).setCompoundDrawablesWithIntrinsicBounds(null, roundIcon(R.mipmap.ic_launcher_famicom), null, null)
+        findViewById<android.widget.RadioButton>(R.id.iconGameBoy).setCompoundDrawablesWithIntrinsicBounds(null, roundIcon(R.mipmap.ic_launcher_gameboy), null, null)
         val icons = findViewById<RadioGroup>(R.id.iconGroup)
         icons.check(if (iconEnabled("LauncherGameBoy")) R.id.iconGameBoy else R.id.iconFamicom)
         icons.setOnCheckedChangeListener { _, id -> setIcon(if (id == R.id.iconGameBoy) "LauncherGameBoy" else "LauncherFamicom") }
