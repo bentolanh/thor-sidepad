@@ -79,7 +79,7 @@ class OverlayService : Service() {
             ACTION_TOGGLE -> toggle()
             ACTION_EDIT -> edit()
             ACTION_STOP -> { hide(); stopSelf() }
-            ACTION_PANEL -> showPanel()
+            ACTION_PANEL -> showPanel(keepPage = false)
             else -> { ensureCatcher(); ensureChord() }
         }
         return START_STICKY
@@ -186,7 +186,9 @@ class OverlayService : Service() {
         } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
     }
 
-    private fun showPanel() {
+    /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
+    private fun showPanel(keepPage: Boolean = false) {
+        if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
         Injector.current()?.let { refreshTargets(it) }
         val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity, prefs.backdrop, ov.blurSupported,
@@ -196,7 +198,7 @@ class OverlayService : Service() {
                 if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
                 else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }
                 if (visible) { hide(); show() }   // the target itself changes, so the injector must reopen
-                showPanel()
+                showPanel(keepPage = true)
             }
             override fun setChord(on: Boolean) {
                 prefs.chordEnabled = on
@@ -204,10 +206,10 @@ class OverlayService : Service() {
             }
             override fun togglePad() { ov.removePanel(); toggle() }
             override fun editLayout() { ov.removePanel(); edit() }
-            override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad() }
+            override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad(); showPanel(keepPage = true) }
             override fun setGestures(on: Boolean) { prefs.gestures = on; rebuildPad() }
             override fun setOpacity(value: Float) { prefs.opacity = value; rebuildPad() }
-            override fun setBackdrop(value: String) { prefs.backdrop = value; rebuildPad(); showPanel() }
+            override fun setBackdrop(value: String) { prefs.backdrop = value; rebuildPad(); showPanel(keepPage = true) }
             override fun openThorControlCenter() {
                 ov.removePanel()
                 Injector.connect(this@OverlayService) { svc ->
