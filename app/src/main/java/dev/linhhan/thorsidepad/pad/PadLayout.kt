@@ -37,13 +37,6 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             } catch (e: Exception) { default() }
         }
 
-        /** Named starting layouts. The first is the default. */
-        val presets: List<Pair<String, () -> PadLayout>> = listOf(
-            "Left hand: you hold the left side, the screen shows the right-side controls" to ::leftHand,
-            "Right hand: you hold the right side, the screen shows the left-side controls" to ::rightHand,
-            "Face buttons only (A/B/X/Y, L1/R1, M1/M2, Select/Start)" to ::faceButtons,
-        )
-
         fun default(): PadLayout = leftHand()
 
         /**

@@ -13,7 +13,7 @@ import android.widget.Switch
 import android.widget.TextView
 
 /** What the panel shows. */
-data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float)
+data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float, val pullUpTop: Boolean)
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
 interface PanelActions {
@@ -21,6 +21,7 @@ interface PanelActions {
     fun editLayout()
     fun setShield(on: Boolean)
     fun setGestures(on: Boolean)
+    fun setPullUpTop(on: Boolean)
     fun setOpacity(value: Float)
     fun openThorControlCenter()
     fun stopService()
@@ -49,9 +50,14 @@ object ControlPanel {
             buttons.forEach { b -> addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)) }
         }
         fun btn(t: String, onClick: () -> Unit) = Button(themed).apply { text = t; isAllCaps = false; setOnClickListener { onClick() } }
+        val openedAt = android.os.SystemClock.uptimeMillis()
         fun sw(t: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(themed).apply {
             text = t; isChecked = checked; setTextColor(Color.WHITE); setPadding(0, 12, 0, 12)
-            setOnCheckedChangeListener { _, on -> onChange(on) }
+            setOnCheckedChangeListener { v, on ->
+                // A switch flipped within the first moments is a stray touch from the opening gesture, not a choice.
+                if (android.os.SystemClock.uptimeMillis() - openedAt < 500) { v.isChecked = !on; return@setOnCheckedChangeListener }
+                onChange(on)
+            }
         }
 
         card.addView(label("Thor SidePad", 20f))
@@ -61,6 +67,7 @@ object ControlPanel {
         ))
         card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
         card.addView(sw("Edge swipes: pull up = Home, from left = Back", state.gestures) { actions.setGestures(it) })
+        card.addView(sw("Pull up goes Home on the top screen (off: presses the Thor's Home key)", state.pullUpTop) { actions.setPullUpTop(it) })
         card.addView(label("Opacity", 14f))
         card.addView(SeekBar(themed).apply {
             max = 100; progress = (state.opacity * 100).toInt()

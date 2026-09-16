@@ -15,7 +15,9 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.EditText
 import android.widget.ListView
+import android.widget.ScrollView
 import android.widget.TextView
 import dev.linhhan.thorsidepad.inject.Catalog
 import kotlin.math.min
@@ -29,7 +31,7 @@ import kotlin.math.roundToInt
  * All windows are non-focusable: that is what keeps the top screen's game the focused window,
  * which is where the kernel-level button events get delivered.
  */
-class PadOverlay(app: Context, val displayId: Int) {
+class PadOverlay(private val app: Context, val displayId: Int) {
 
     private val display: Display = app.getSystemService(DisplayManager::class.java).getDisplay(displayId)
         ?: throw IllegalStateException("display $displayId not found")
@@ -40,6 +42,9 @@ class PadOverlay(app: Context, val displayId: Int) {
     private val views = ArrayList<View>()          // pad windows (play or edit)
     private var catcher: View? = null
     private var panel: View? = null
+
+    /** Called after the one focusable window (the name dialog) closes, so focus can be handed back to the top screen. */
+    var onFocusReturn: (() -> Unit)? = null
 
     val width: Int
     val height: Int
@@ -150,8 +155,8 @@ class PadOverlay(app: Context, val displayId: Int) {
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }
         val bigger = btn("+") { sel(editor)?.let { it.size = (it.size + 0.02f).coerceAtMost(0.6f); editor.invalidate() } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
-        btn("Presets") { showChoice("Start from a preset", PadLayout.presets.map { it.first }) { pos ->
-            working.buttons.clear(); working.buttons.addAll(PadLayout.presets[pos].second().buttons); editor.selected = -1; editor.invalidate()
+        btn("Presets") { showPresets(working) { chosen ->
+            working.buttons.clear(); working.buttons.addAll(chosen.buttons.map { it.copy() }); editor.selected = -1; editor.invalidate()
         } }
         btn("Cancel") { removeAll(); onCancel() }
         btn("Save") { removeAll(); onSave(working) }
@@ -168,6 +173,115 @@ class PadOverlay(app: Context, val displayId: Int) {
     }
 
     private fun sel(editor: EditPadView): PadButton? = editor.layout.buttons.getOrNull(editor.selected)
+
+    /**
+     * The preset chooser: one card per preset with a miniature, name and description. Built-ins
+     * can be used; the user's own can be used, overwritten with the current layout, or deleted.
+     */
+    private fun showPresets(current: PadLayout, onUse: (PadLayout) -> Unit) {
+        val root = FrameLayout(themed)
+        root.setBackgroundColor(0x99000000.toInt())
+        var window: View? = null
+        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        root.setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) dismiss(); true }
+
+        val card = LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xF0181818.toInt())
+            isClickable = true
+        }
+        val header = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 8, 8, 8) }
+        header.addView(TextView(themed).apply { text = "Presets"; setTextColor(Color.WHITE); textSize = 18f },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+        header.addView(Button(themed).apply { text = "Save current as new"; isAllCaps = false; setOnClickListener {
+            dismiss()
+            askName(PresetStore.nextName(app)) { name ->
+                val list = PresetStore.customs(app)
+                list.add(Preset(name, "Your preset", current.copy(), false))
+                PresetStore.saveCustoms(app, list)
+                showPresets(current, onUse)
+            }
+        } })
+        header.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } })
+        card.addView(header)
+
+        val list = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 0, 16, 16) }
+        val aspect = width.toFloat() / height
+        fun rebuild() {
+            list.removeAllViews()
+            for (p in PresetStore.all(app)) {
+                val row = LinearLayout(themed).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setBackgroundColor(0xFF24282C.toInt())
+                    setPadding(16, 12, 16, 12)
+                }
+                row.addView(LayoutPreviewView(themed, p.layout, aspect), LinearLayout.LayoutParams(220, ViewGroup.LayoutParams.WRAP_CONTENT))
+                val text = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 0, 12, 0) }
+                text.addView(TextView(themed).apply { this.text = p.name; setTextColor(Color.WHITE); textSize = 17f; isAllCaps = false; setTypeface(typeface, android.graphics.Typeface.BOLD) })
+                text.addView(TextView(themed).apply { this.text = p.description; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
+                row.addView(text, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+                val actions = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL }
+                actions.addView(Button(themed).apply { this.text = "Use"; isAllCaps = false; setOnClickListener { dismiss(); onUse(p.layout) } })
+                if (!p.builtin) {
+                    actions.addView(Button(themed).apply { this.text = "Overwrite"; isAllCaps = false; setOnClickListener {
+                        val cs = PresetStore.customs(app)
+                        val i = cs.indexOfFirst { it.name == p.name }
+                        if (i >= 0) { cs[i] = Preset(p.name, p.description, current.copy(), false); PresetStore.saveCustoms(app, cs); rebuild() }
+                    } })
+                    actions.addView(Button(themed).apply { this.text = "Delete"; isAllCaps = false; setOnClickListener {
+                        PresetStore.saveCustoms(app, PresetStore.customs(app).filter { it.name != p.name }); rebuild()
+                    } })
+                }
+                row.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_VERTICAL })
+                list.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 })
+            }
+        }
+        rebuild()
+        val scroll = ScrollView(themed).apply { addView(list) }
+        card.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        root.addView(card, FrameLayout.LayoutParams((width * 0.86f).roundToInt(), (height * 0.9f).roundToInt(), Gravity.CENTER))
+        window = root
+        add(root, fullScreenParams("SidePad presets"))
+    }
+
+    /** A small focusable window with a text field. The only place the pad takes window focus. */
+    private fun askName(defaultName: String, onOk: (String) -> Unit) {
+        val root = FrameLayout(themed)
+        root.setBackgroundColor(0x99000000.toInt())
+        var window: View? = null
+        fun dismiss() {
+            window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) }
+            onFocusReturn?.invoke()
+        }
+        val card = LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(0xF0181818.toInt()); setPadding(28, 20, 28, 20); isClickable = true
+        }
+        card.addView(TextView(themed).apply { text = "Preset name"; setTextColor(Color.WHITE); textSize = 18f })
+        val field = EditText(themed).apply {
+            setText(defaultName); setSelectAllOnFocus(true); isSingleLine = true
+            // Keep the dialog visible instead of the keyboard's full-screen text box, and let Done save.
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
+        }
+        card.addView(field, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val row = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        fun save() { val name = field.text.toString().trim().ifEmpty { defaultName }; dismiss(); onOk(name) }
+        field.setOnEditorActionListener { _, _, _ -> save(); true }
+        row.addView(Button(themed).apply { text = "Save"; isAllCaps = false; setOnClickListener { save() } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        card.addView(row)
+        root.addView(card, FrameLayout.LayoutParams((width * 0.6f).roundToInt(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT)
+        lp.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        lp.title = "SidePad name"
+        window = root
+        add(root, lp)
+        field.requestFocus()
+    }
 
     /** A list chooser: a card over a scrim. Pick an entry, or Cancel / tap outside to back out. */
     private fun showChoice(title: String, labels: List<String>, onPick: (Int) -> Unit) {

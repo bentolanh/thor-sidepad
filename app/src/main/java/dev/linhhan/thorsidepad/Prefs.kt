@@ -37,6 +37,11 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("gestures", true)
         set(v) = sp.edit().putBoolean("gestures", v).apply()
 
+    /** Pull-up goes Home on the top (main) screen; off = press the Thor's Home key, which follows its own focus rules. */
+    var pullUpTop: Boolean
+        get() = sp.getBoolean("pullUpTop", true)
+        set(v) = sp.edit().putBoolean("pullUpTop", v).apply()
+
     var startAtBoot: Boolean
         get() = sp.getBoolean("startAtBoot", true)
         set(v) = sp.edit().putBoolean("startAtBoot", v).apply()

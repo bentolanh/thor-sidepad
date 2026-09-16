@@ -25,8 +25,9 @@ class EdgeCatcherView(ctx: Context, private val onPullDown: () -> Unit) : View(c
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> { y0 = e.y; t0 = e.eventTime; armed = true }
-            MotionEvent.ACTION_MOVE -> if (armed && e.y - y0 > PULL_PX) { armed = false; onPullDown() }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> armed = false
+            // Fire on finger-up so the panel never appears under a finger that is still moving.
+            MotionEvent.ACTION_UP -> { if (armed && e.y - y0 > PULL_PX) onPullDown(); armed = false }
+            MotionEvent.ACTION_CANCEL -> armed = false
         }
         return true
     }

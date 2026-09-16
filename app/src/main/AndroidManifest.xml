@@ -41,6 +41,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".FocusHandoffActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".pad.OverlayService"
             android:exported="false" />

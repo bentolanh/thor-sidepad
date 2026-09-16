@@ -178,6 +178,17 @@ class InjectorService() : IInjector.Stub() {
         return ""
     }
 
+    override fun shell(cmd: String): String = try {
+        // The user-service process may have no PATH; be explicit about where sh and the tools live.
+        val pb = ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true)
+        pb.environment()["PATH"] = "/system/bin:/system/xbin:/vendor/bin"
+        val proc = pb.start()
+        val out = proc.inputStream.bufferedReader().readText()
+        proc.waitFor()
+        Log.i(TAG, "shell[$cmd] -> ${out.trim().take(200)}")
+        out
+    } catch (e: Exception) { Log.w(TAG, "shell failed", e); "error: ${e.message}" }
+
     override fun stopWatch() {
         watching = false
         watchThread?.let { t -> try { t.join(500) } catch (_: InterruptedException) {} }

@@ -30,4 +30,7 @@ interface IInjector {
 
     // Press and release one key on any input node (e.g. the AYN key on gpio-keys). "" or error.
     String pressKeyOn(String path, int code, int holdMs) = 11;
+
+    // Run a shell command as the shell user; returns combined output.
+    String shell(String cmd) = 12;
 }

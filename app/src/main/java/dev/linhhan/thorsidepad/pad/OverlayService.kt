@@ -126,7 +126,16 @@ class OverlayService : Service() {
     }
 
     private fun overlayOrCreate(): PadOverlay =
-        overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { overlay = it }
+        overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { ov ->
+            overlay = ov
+            ov.onFocusReturn = { returnFocusToTopScreen() }
+        }
+
+    /** Starts the invisible hand-off activity on the top screen through the shell user (a plain start would be a blocked background launch). */
+    private fun returnFocusToTopScreen() {
+        val svc = Injector.current() ?: return
+        Thread { try { svc.shell("am start --display 0 -n $packageName/.FocusHandoffActivity") } catch (e: Exception) { Log.w(TAG, "focus handoff failed", e) } }.start()
+    }
 
     /** Keeps the pull-down strip on the pad's screen whenever the pad is not covering it. */
     private fun ensureCatcher() {
@@ -135,12 +144,13 @@ class OverlayService : Service() {
 
     private fun showPanel() {
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
-        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity)
+        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity, prefs.pullUpTop)
         ov.showPanel(state, object : PanelActions {
             override fun togglePad() { ov.removePanel(); toggle() }
             override fun editLayout() { ov.removePanel(); edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; if (visible) { hide(); show() } }
             override fun setGestures(on: Boolean) { prefs.gestures = on; if (visible) { hide(); show() } }
+            override fun setPullUpTop(on: Boolean) { prefs.pullUpTop = on }
             override fun setOpacity(value: Float) { prefs.opacity = value; if (visible) { hide(); show() } }
             override fun openThorControlCenter() {
                 ov.removePanel()
@@ -175,7 +185,9 @@ class OverlayService : Service() {
      * through the controller node, so the Thor routes them exactly as it routes the real keys.
      */
     private fun onGesture(g: EdgeGesture) {
+        Log.i(TAG, "gesture $g")
         if (g == EdgeGesture.PULL_DOWN) { showPanel(); return }
+        if (g == EdgeGesture.PULL_UP && prefs.pullUpTop) { goHomeOnTopScreen(); return }
         val svc = Injector.current() ?: return
         try {
             val err = when (g) {
@@ -184,6 +196,22 @@ class OverlayService : Service() {
             }
             if (err.isNotEmpty()) toast(err)
         } catch (e: Exception) { Log.w(TAG, "gesture failed", e) }
+    }
+
+    /**
+     * Home on the main screen, like pressing Home while the game has focus. The Thor's own Home
+     * key would act on the screen last touched (the pad's), and a plain startActivity from a
+     * service is a background launch that Android 13 blocks, so the shell user runs `am start`.
+     */
+    private fun goHomeOnTopScreen() {
+        val svc = Injector.current()
+        if (svc == null) { toast("Shizuku not ready"); return }
+        Thread {
+            try {
+                val out = svc.shell("am start --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME")
+                if (out.contains("Error", true)) Log.w(TAG, "home: $out")
+            } catch (e: Exception) { Log.w(TAG, "home failed", e) }
+        }.start()
     }
 
     /** The node named "gpio-keys", where the AYN key lives; found once per service life. */
