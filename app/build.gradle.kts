@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -28,11 +29,28 @@ android {
     // spaces in this repo's path). Its output dir is registered as a jniLibs source.
     sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("native/jniLibs"))
 
+    // The release key lives outside the repo and outside Dropbox, in
+    // ~/Library/Application Support/thor-sidepad/keystore.properties (storeFile, storePassword,
+    // keyAlias, keyPassword). Without that file a release build falls back to the debug key.
+    val keystoreProps = Properties().apply {
+        val f = File(System.getProperty("user.home"), "Library/Application Support/thor-sidepad/keystore.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    signingConfigs {
+        if (keystoreProps.containsKey("storeFile")) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Sideload build for one device: sign with the debug key so `adb install -r` upgrades in place.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

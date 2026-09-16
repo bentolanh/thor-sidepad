@@ -112,6 +112,23 @@ adb shell am start -n dev.linhhan.thorsidepad/.TriggerActivity -a dev.linhhan.th
 
 (actions: SHOW, HIDE, TOGGLE, EDIT, PANEL, START, STOP)
 
+## Release builds
+
+Release APKs are signed with a key that lives outside the repo and outside Dropbox:
+`~/Library/Application Support/thor-sidepad/release.keystore`, with its passwords in
+`keystore.properties` next to it. Back both up somewhere private (a password manager entry
+with the file attached is ideal). Losing them means existing installs can never be updated;
+leaking them lets someone else publish "updates". Without that file a release build falls
+back to the debug key, which is fine for your own device only.
+
+```bash
+./gradlew :app:assembleRelease
+# -> app/build/outputs/apk/release/app-release.apk, attach it to a GitHub Release
+```
+
+A debug-signed install cannot be updated by a release-signed APK (or vice versa): uninstall
+first, once.
+
 ## Build and install
 
 ```bash
