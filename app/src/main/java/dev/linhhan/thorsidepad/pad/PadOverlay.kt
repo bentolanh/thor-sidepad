@@ -37,7 +37,9 @@ class PadOverlay(app: Context, val displayId: Int) {
         .createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
     private val themed: Context = ContextThemeWrapper(ctx, android.R.style.Theme_DeviceDefault_DayNight)
     private val wm: WindowManager = ctx.getSystemService(WindowManager::class.java)
-    private val views = ArrayList<View>()
+    private val views = ArrayList<View>()          // pad windows (play or edit)
+    private var catcher: View? = null
+    private var panel: View? = null
 
     val width: Int
     val height: Int
@@ -63,6 +65,35 @@ class PadOverlay(app: Context, val displayId: Int) {
     }
 
     val isShowing get() = views.isNotEmpty()
+
+    private fun fullScreenParams(title: String) = WindowManager.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT).also { it.title = title }
+
+    /** The thin pull-down strip on the top edge. Idempotent. */
+    fun showCatcher(onPullDown: () -> Unit) {
+        if (catcher != null) return
+        val v = EdgeCatcherView(ctx, onPullDown)
+        val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.HEIGHT_PX,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        lp.title = "SidePad catcher"
+        wm.addView(v, lp); catcher = v
+    }
+
+    fun removeCatcher() { catcher?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; catcher = null }
+
+    fun showPanel(state: PanelState, actions: PanelActions) {
+        removePanel()
+        val v = ControlPanel.build(themed, state, actions)
+        wm.addView(v, fullScreenParams("SidePad panel")); panel = v
+    }
+
+    fun removePanel() { panel?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; panel = null }
+
+    val isPanelShowing get() = panel != null
+
+    fun tearDown() { removeAll(); removeCatcher(); removePanel() }
 
     fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean, gestures: Boolean, onGesture: (EdgeGesture) -> Unit) {
         removeAll()

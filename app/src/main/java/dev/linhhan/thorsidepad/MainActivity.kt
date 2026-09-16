@@ -88,6 +88,11 @@ class MainActivity : AppCompatActivity() {
         gestures.isChecked = prefs.gestures
         gestures.setOnCheckedChangeListener { _, on -> prefs.gestures = on }
 
+        val boot = findViewById<Switch>(R.id.bootSwitch)
+        boot.isChecked = prefs.startAtBoot
+        boot.setOnCheckedChangeListener { _, on -> prefs.startAtBoot = on }
+        findViewById<Button>(R.id.btnStart).setOnClickListener { OverlayService.send(this, OverlayService.ACTION_START) }
+
         val chord = findViewById<Switch>(R.id.chordSwitch)
         chord.isChecked = prefs.chordEnabled
         chord.setOnCheckedChangeListener { _, on -> prefs.chordEnabled = on }

@@ -56,13 +56,15 @@ class OverlayService : Service() {
             ACTION_TOGGLE -> toggle()
             ACTION_EDIT -> edit()
             ACTION_STOP -> { hide(); stopSelf() }
-            else -> ensureChord()
+            ACTION_PANEL -> showPanel()
+            else -> { ensureCatcher(); ensureChord() }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         hide()
+        overlay?.tearDown()
         try { Injector.current()?.stopWatch() } catch (_: Exception) {}
         running = false
         visible = false
@@ -99,8 +101,11 @@ class OverlayService : Service() {
                 engine?.shutdown()
                 val eng = PadEngine(svc, Caps.fromJson(svc.targetCaps()))
                 engine = eng
-                val ov = overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { overlay = it }
-                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures) { g -> onGesture(svc, g) }
+                val ov = overlayOrCreate()
+                ov.removePanel()
+                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures) { g -> onGesture(g) }
+                // The shield catches pull-down itself; islands mode still needs the strip.
+                if (prefs.shield) ov.removeCatcher() else ensureCatcher()
                 visible = true
                 updateNotification()
                 ensureChord()
@@ -117,12 +122,44 @@ class OverlayService : Service() {
         try { Injector.current()?.closeTarget() } catch (_: Exception) {}
         visible = false
         updateNotification()
+        ensureCatcher()
+    }
+
+    private fun overlayOrCreate(): PadOverlay =
+        overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { overlay = it }
+
+    /** Keeps the pull-down strip on the pad's screen whenever the pad is not covering it. */
+    private fun ensureCatcher() {
+        try { overlayOrCreate().showCatcher { showPanel() } } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
+    }
+
+    private fun showPanel() {
+        val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
+        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity)
+        ov.showPanel(state, object : PanelActions {
+            override fun togglePad() { ov.removePanel(); toggle() }
+            override fun editLayout() { ov.removePanel(); edit() }
+            override fun setShield(on: Boolean) { prefs.shield = on; if (visible) { hide(); show() } }
+            override fun setGestures(on: Boolean) { prefs.gestures = on; if (visible) { hide(); show() } }
+            override fun setOpacity(value: Float) { prefs.opacity = value; if (visible) { hide(); show() } }
+            override fun openThorControlCenter() {
+                ov.removePanel()
+                Injector.connect(this@OverlayService) { svc ->
+                    if (svc == null) { toast("Shizuku not ready"); return@connect }
+                    val err = gpioPath(svc)?.let { svc.pressKeyOn(it, Key.F24, 60) } ?: "gpio-keys device not found"
+                    if (err.isNotEmpty()) toast(err)
+                }
+            }
+            override fun stopService() { ov.removePanel(); hide(); stopSelf() }
+            override fun close() { ov.removePanel() }
+        })
     }
 
     private fun edit() {
         withInjector {
             try {
-                val ov = overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { overlay = it }
+                val ov = overlayOrCreate()
+                ov.removePanel()
                 ov.showEdit(PadLayout.fromJson(prefs.layoutJson),
                     onSave = { l -> prefs.layoutJson = l.toJson(); show() },
                     onCancel = { show() })
@@ -134,15 +171,16 @@ class OverlayService : Service() {
     }
 
     /**
-     * Edge swipes press the Thor's own buttons: the AYN key (Control Center), Home, Back. Those
-     * go through the same nodes the physical keys use, so the Thor routes them exactly as usual.
+     * Pull-down opens our panel. Pull-up and left-edge press the Thor's own Home and Back keys
+     * through the controller node, so the Thor routes them exactly as it routes the real keys.
      */
-    private fun onGesture(svc: IInjector, g: EdgeGesture) {
+    private fun onGesture(g: EdgeGesture) {
+        if (g == EdgeGesture.PULL_DOWN) { showPanel(); return }
+        val svc = Injector.current() ?: return
         try {
             val err = when (g) {
-                EdgeGesture.PULL_DOWN -> gpioPath(svc)?.let { svc.pressKeyOn(it, Key.F24, 60) } ?: "gpio-keys device not found"
                 EdgeGesture.PULL_UP -> svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60)
-                EdgeGesture.LEFT_EDGE -> svc.pressKeyOn(prefs.physicalPath, Key.BACK, 60)
+                else -> svc.pressKeyOn(prefs.physicalPath, Key.BACK, 60)
             }
             if (err.isNotEmpty()) toast(err)
         } catch (e: Exception) { Log.w(TAG, "gesture failed", e) }
@@ -182,7 +220,7 @@ class OverlayService : Service() {
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_pad)
             .setContentTitle("Thor SidePad")
-            .setContentText(if (visible) "Pad is on the second screen" else "Pad hidden. Hold Select+Start to show it.")
+            .setContentText(if (visible) "Pad is on the second screen" else "Pad hidden. Pull down from the top edge, or hold Select+Start.")
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, if (visible) "Hide" else "Show", pending(ACTION_TOGGLE)).build())
@@ -206,6 +244,8 @@ class OverlayService : Service() {
         const val ACTION_TOGGLE = "dev.linhhan.thorsidepad.TOGGLE"
         const val ACTION_EDIT = "dev.linhhan.thorsidepad.EDIT"
         const val ACTION_STOP = "dev.linhhan.thorsidepad.STOP"
+        const val ACTION_PANEL = "dev.linhhan.thorsidepad.PANEL"
+        const val ACTION_START = "dev.linhhan.thorsidepad.START"
 
         @Volatile var running = false
         @Volatile var visible = false

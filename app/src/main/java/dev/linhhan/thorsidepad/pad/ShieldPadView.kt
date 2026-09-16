@@ -50,10 +50,10 @@ class ShieldPadView(
             val enabled = engine.plan(b.code).isNotEmpty()
             painter.draw(c, b.cx * width, b.cy * height, r, Catalog.byCode(b.code).label, enabled, (pressCount[i] ?: 0) > 0)
         }
+        // Small pills marking the gesture edges: top always (our panel), others when enabled.
+        val w = width * 0.18f; val h = 8f
+        c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
         if (gesturesEnabled) {
-            // Small pills marking the gesture edges.
-            val w = width * 0.18f; val h = 8f
-            c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
             c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
             c.drawRoundRect(10f, (height - w) / 2, 10f + h, (height + w) / 2, h, h, hint)
         }
@@ -74,10 +74,10 @@ class ShieldPadView(
     }
 
     private fun edgeAt(x: Float, y: Float): EdgeGesture? {
-        if (!gesturesEnabled) return null
         val zone = short() * EDGE_ZONE
         return when {
-            y < zone -> EdgeGesture.PULL_DOWN
+            y < zone -> EdgeGesture.PULL_DOWN            // always: it opens our own panel
+            !gesturesEnabled -> null
             y > height - zone -> EdgeGesture.PULL_UP
             x < zone -> EdgeGesture.LEFT_EDGE
             else -> null

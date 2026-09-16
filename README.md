@@ -21,10 +21,13 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   every touch. Nothing behind the pad can be tapped by accident, a thumb can slide from one
   button to the next, and edge swipes become gestures. Islands mode (one small window per
   button) is the alternative when the app under the pad should stay usable.
-- **Edge swipes** press the Thor's own keys through the same input nodes the hardware uses:
-  pull down from the top = the AYN key (opens the Control Center), pull up from the bottom =
-  Home, swipe in from the left = Back. The Thor routes them exactly as it routes the real keys,
-  so Home and Back act on the bottom screen when that is the screen last touched.
+- **Pull down from the top edge** of the second screen opens SidePad's own control panel:
+  show/hide, edit layout, shield, edge swipes, opacity, a button for the Thor Control Center
+  (it presses the AYN key), stop. While the pad is hidden a thin strip stays parked on the top
+  edge so the pull-down still works; with start-at-boot on, it is always there.
+- **Other edge swipes** press the Thor's own keys through the controller's input node: pull up
+  from the bottom = Home, swipe in from the left = Back. The Thor routes them exactly as it
+  routes the real keys, so they act on the bottom screen when that is the screen last touched.
 - The top screen keeps input focus while the pad is used.
 - Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
 - **Editor** (Edit layout in the app, or Edit on the notification): opens on the pad's screen.
@@ -54,7 +57,7 @@ Driving the pad from adb, Tasker or a launcher shortcut:
 adb shell am start -n dev.linhhan.thorsidepad/.TriggerActivity -a dev.linhhan.thorsidepad.TOGGLE
 ```
 
-(actions: SHOW, HIDE, TOGGLE, EDIT, STOP)
+(actions: SHOW, HIDE, TOGGLE, EDIT, PANEL, START, STOP)
 
 ## Build and install
 
