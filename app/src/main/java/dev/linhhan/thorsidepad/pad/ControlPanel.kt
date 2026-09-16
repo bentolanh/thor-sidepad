@@ -34,6 +34,7 @@ data class PanelState(
     val padVisible: Boolean, val shield: Boolean, val opacity: Float,
     val backdrop: String, val blurSupported: Boolean,
     val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean,
+    val shizukuReady: Boolean = true,
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -111,6 +112,12 @@ object ControlPanel {
             card.addView(bar)
 
             if (page == Page.MAIN) {
+                if (!state.shizukuReady) {
+                    card.addView(TextView(themed).apply {
+                        text = "Shizuku is not running, so the pad cannot press anything. Start Shizuku, or tap Open app for help."
+                        setTextColor(0xFFFFB4A9.toInt()); textSize = 14f; setPadding(16, 10, 16, 10); setBackgroundColor(0x33FF6B5A)
+                    })
+                }
                 // Quick settings: everything on one page, as before.
                 val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
                 card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })

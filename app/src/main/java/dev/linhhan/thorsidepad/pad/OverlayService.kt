@@ -69,7 +69,8 @@ class OverlayService : Service() {
     }
 
     private fun panelState(ov: PadOverlay) = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
-        targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL)
+        targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL,
+        shizukuReady = Injector.state() == Injector.ShizukuState.READY)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {

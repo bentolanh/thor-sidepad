@@ -127,7 +127,7 @@ class MainActivity : AppCompatActivity() {
         val s1help = findViewById<TextView>(R.id.step1Help)
         val s1btn = findViewById<Button>(R.id.step1Button)
         val shizukuReady: Boolean
-        val why = "Why: Android does not let one app press buttons for another. Shizuku lends SidePad the same access a computer has over USB debugging, which is what lets it write presses into the controller. No root needed.\n\n"
+        val why = "Android does not let one app press buttons for another. Shizuku lends SidePad the same access a computer has over USB debugging, which is what lets it write presses into the controller. No root needed.\n\n"
         when {
             !shizukuInstalled() -> {
                 shizukuReady = false
@@ -137,19 +137,19 @@ class MainActivity : AppCompatActivity() {
             }
             Injector.state() == Injector.ShizukuState.NOT_RUNNING -> {
                 shizukuReady = false
-                s1status.text = "Installed, but not running."
+                s1status.text = "Installed but not running."
                 s1help.text = why + "Open Shizuku and choose “Start via Wireless debugging”. The first time it asks you to enable Wireless debugging in Developer options and to pair once with a code; after that it is one tap. Then come back here."
                 s1btn.text = "Open Shizuku"
             }
             Injector.state() == Injector.ShizukuState.NO_PERMISSION -> {
                 shizukuReady = false
-                s1status.text = "Running. SidePad needs your permission to use it."
+                s1status.text = "Running, not allowed yet."
                 s1help.text = why + "Shizuku will ask whether SidePad may use it. Choose “Allow all the time”."
                 s1btn.text = "Grant SidePad access to Shizuku"
             }
             else -> {
                 shizukuReady = true
-                s1status.text = "Running, access granted."
+                s1status.text = "Running and allowed."
                 s1help.text = "Shizuku stops when the Thor reboots. In Shizuku, turn on “Start on boot (wireless debugging)” so it comes back on its own."
             }
         }
@@ -162,7 +162,7 @@ class MainActivity : AppCompatActivity() {
         setDone(R.id.step2, R.id.step2Title, R.id.step2Status, overlayOk(), locked = !shizukuReady)
 
         // Step 3: notifications, optional; never locks anything.
-        findViewById<TextView>(R.id.step3Status).text = if (notifOk()) "Allowed." else "Not allowed. You can skip this."
+        findViewById<TextView>(R.id.step3Status).text = if (notifOk()) "Allowed." else "Not allowed yet. You can skip this."
         findViewById<Button>(R.id.step3Button).visibility = if (notifOk()) View.GONE else View.VISIBLE
         setDone(R.id.step3, R.id.step3Title, R.id.step3Status, notifOk(), locked = !(shizukuReady && overlayOk()))
 
