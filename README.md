@@ -107,7 +107,7 @@ adb shell 'cp /data/app/*/moe.shizuku.privileged.api-*/lib/arm64/libshizuku.so /
 Driving the pad from adb, Tasker or a launcher shortcut:
 
 ```bash
-adb shell am start -n dev.linhhan.thorsidepad/.TriggerActivity -a dev.linhhan.thorsidepad.TOGGLE
+adb shell am start -n dev.lbento.thorsidepad/.TriggerActivity -a dev.lbento.thorsidepad.TOGGLE
 ```
 
 (actions: SHOW, HIDE, TOGGLE, EDIT, PANEL, START, STOP)
@@ -137,3 +137,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Notes, plans and status live in the Obsidian vault under `Claude/thor-sidepad/`, not here.
+
+## License
+
+MIT. See `LICENSE`.

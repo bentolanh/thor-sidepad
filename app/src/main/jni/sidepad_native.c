@@ -20,7 +20,7 @@
 #define TEST_BIT(bit, arr) (((arr)[(bit) / BITS_PER_LONG] >> ((bit) % BITS_PER_LONG)) & 1)
 
 JNIEXPORT jint JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_openDevice(JNIEnv* env, jclass cls, jstring jpath, jboolean rw) {
+Java_dev_lbento_thorsidepad_inject_Native_openDevice(JNIEnv* env, jclass cls, jstring jpath, jboolean rw) {
     const char* path = (*env)->GetStringUTFChars(env, jpath, NULL);
     int fd = open(path, (rw ? O_RDWR : O_RDONLY) | O_NONBLOCK | O_CLOEXEC);
     int err = errno;
@@ -29,12 +29,12 @@ Java_dev_linhhan_thorsidepad_inject_Native_openDevice(JNIEnv* env, jclass cls, j
 }
 
 JNIEXPORT void JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_closeDevice(JNIEnv* env, jclass cls, jint fd) {
+Java_dev_lbento_thorsidepad_inject_Native_closeDevice(JNIEnv* env, jclass cls, jint fd) {
     if (fd >= 0) close(fd);
 }
 
 JNIEXPORT jstring JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_deviceName(JNIEnv* env, jclass cls, jint fd) {
+Java_dev_lbento_thorsidepad_inject_Native_deviceName(JNIEnv* env, jclass cls, jint fd) {
     char name[256];
     memset(name, 0, sizeof(name));
     if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0) return NULL;
@@ -43,7 +43,7 @@ Java_dev_linhhan_thorsidepad_inject_Native_deviceName(JNIEnv* env, jclass cls, j
 
 // Returns every code whose capability bit is set for the given event type (EV_KEY or EV_ABS).
 JNIEXPORT jintArray JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_deviceCodes(JNIEnv* env, jclass cls, jint fd, jint evType) {
+Java_dev_lbento_thorsidepad_inject_Native_deviceCodes(JNIEnv* env, jclass cls, jint fd, jint evType) {
     unsigned long bits[NBITS(KEY_MAX + 1)];
     memset(bits, 0, sizeof(bits));
     int maxCode = evType == EV_KEY ? KEY_MAX : (evType == EV_ABS ? ABS_MAX : 0);
@@ -63,7 +63,7 @@ Java_dev_linhhan_thorsidepad_inject_Native_deviceCodes(JNIEnv* env, jclass cls, 
 
 // [min, max, flat, fuzz] for an absolute axis, or null.
 JNIEXPORT jintArray JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_absInfo(JNIEnv* env, jclass cls, jint fd, jint code) {
+Java_dev_lbento_thorsidepad_inject_Native_absInfo(JNIEnv* env, jclass cls, jint fd, jint code) {
     struct input_absinfo ai;
     memset(&ai, 0, sizeof(ai));
     if (ioctl(fd, EVIOCGABS(code), &ai) < 0) return NULL;
@@ -74,7 +74,7 @@ Java_dev_linhhan_thorsidepad_inject_Native_absInfo(JNIEnv* env, jclass cls, jint
 }
 
 JNIEXPORT jint JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_writeEvent(JNIEnv* env, jclass cls, jint fd, jint type, jint code, jint value) {
+Java_dev_lbento_thorsidepad_inject_Native_writeEvent(JNIEnv* env, jclass cls, jint fd, jint type, jint code, jint value) {
     struct input_event ev;
     memset(&ev, 0, sizeof(ev));
     ev.type = (unsigned short) type;
@@ -86,7 +86,7 @@ Java_dev_linhhan_thorsidepad_inject_Native_writeEvent(JNIEnv* env, jclass cls, j
 
 // Blocks up to timeoutMs. Returns [type, code, value]; null on timeout; [-1, -errno, 0] on error.
 JNIEXPORT jintArray JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_readEvent(JNIEnv* env, jclass cls, jint fd, jint timeoutMs) {
+Java_dev_lbento_thorsidepad_inject_Native_readEvent(JNIEnv* env, jclass cls, jint fd, jint timeoutMs) {
     struct pollfd p = { .fd = fd, .events = POLLIN };
     int r = poll(&p, 1, timeoutMs);
     if (r == 0) return NULL;
@@ -112,7 +112,7 @@ Java_dev_linhhan_thorsidepad_inject_Native_readEvent(JNIEnv* env, jclass cls, ji
 
 // Creates a uinput device. Returns fd >= 0, or -errno.
 JNIEXPORT jint JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_createUinput(JNIEnv* env, jclass cls, jstring jname, jint vendor, jint product,
+Java_dev_lbento_thorsidepad_inject_Native_createUinput(JNIEnv* env, jclass cls, jstring jname, jint vendor, jint product,
         jintArray jkeys, jintArray jabs, jintArray jabsMin, jintArray jabsMax) {
     int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) return -errno;
@@ -171,13 +171,13 @@ fail: ;
 }
 
 JNIEXPORT void JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_destroyUinput(JNIEnv* env, jclass cls, jint fd) {
+Java_dev_lbento_thorsidepad_inject_Native_destroyUinput(JNIEnv* env, jclass cls, jint fd) {
     if (fd < 0) return;
     ioctl(fd, UI_DEV_DESTROY);
     close(fd);
 }
 
 JNIEXPORT jstring JNICALL
-Java_dev_linhhan_thorsidepad_inject_Native_strerror(JNIEnv* env, jclass cls, jint err) {
+Java_dev_lbento_thorsidepad_inject_Native_strerror(JNIEnv* env, jclass cls, jint err) {
     return (*env)->NewStringUTF(env, strerror(err < 0 ? -err : err));
 }

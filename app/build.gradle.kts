@@ -7,12 +7,12 @@ plugins {
 }
 
 android {
-    namespace = "dev.linhhan.thorsidepad"
+    namespace = "dev.lbento.thorsidepad"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "dev.linhhan.thorsidepad"
+        applicationId = "dev.lbento.thorsidepad"
         minSdk = 30
         targetSdk = 33
         versionCode = 1

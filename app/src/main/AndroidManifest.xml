@@ -34,14 +34,14 @@
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
-                <action android:name="dev.linhhan.thorsidepad.SHOW" />
-                <action android:name="dev.linhhan.thorsidepad.HIDE" />
-                <action android:name="dev.linhhan.thorsidepad.TOGGLE" />
-                <action android:name="dev.linhhan.thorsidepad.EDIT" />
-                <action android:name="dev.linhhan.thorsidepad.STOP" />
-                <action android:name="dev.linhhan.thorsidepad.PANEL" />
-                <action android:name="dev.linhhan.thorsidepad.START" />
-                <action android:name="dev.linhhan.thorsidepad.GUIDE" />
+                <action android:name="dev.lbento.thorsidepad.SHOW" />
+                <action android:name="dev.lbento.thorsidepad.HIDE" />
+                <action android:name="dev.lbento.thorsidepad.TOGGLE" />
+                <action android:name="dev.lbento.thorsidepad.EDIT" />
+                <action android:name="dev.lbento.thorsidepad.STOP" />
+                <action android:name="dev.lbento.thorsidepad.PANEL" />
+                <action android:name="dev.lbento.thorsidepad.START" />
+                <action android:name="dev.lbento.thorsidepad.GUIDE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
