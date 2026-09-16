@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.input.InputManager
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
@@ -186,6 +187,7 @@ class OverlayService : Service() {
         hide()
         stopImeWatch()
         overlay?.tearDown()
+        try { levelThread.quitSafely() } catch (_: Exception) {}
         running = false
         visible = false
         super.onDestroy()
@@ -226,7 +228,7 @@ class OverlayService : Service() {
                 ov.removePanel()
                 readLevels(svc)
                 ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                    onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l -> onSlider(c, l) })
+                    onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
@@ -326,20 +328,42 @@ class OverlayService : Service() {
         } catch (e: Exception) { Log.w(TAG, "levels", e) }
     }
 
-    /** A slider moved: apply the level on a worker so the drag stays smooth. */
-    private fun onSlider(code: Int, level: Float) {
+    /**
+     * A slider moved. Levels go to the injector on one worker, and only the newest value per
+     * slider is sent: a drag produces far more move events than the system can apply, and
+     * queueing them all made the screen lag behind the thumb. Brightness uses the live
+     * (temporary) path while dragging, which skips the system's ramp animation, and is
+     * committed when the finger lifts ([final]).
+     */
+    private val levelThread by lazy { HandlerThread("sidepad-levels").apply { start() } }
+    private val levelHandler by lazy { Handler(levelThread.looper) }
+    private val pendingLevel = HashMap<Int, Pair<Float, Boolean>>()   // code -> (level, final)
+
+    private fun onSlider(code: Int, level: Float, final: Boolean) {
+        synchronized(pendingLevel) {
+            val had = pendingLevel[code]
+            pendingLevel[code] = level to (final || had?.second == true)
+            if (had != null) return      // a job is already queued; it will pick up this newer value
+        }
+        levelHandler.post {
+            val (lv, fin) = synchronized(pendingLevel) { pendingLevel.remove(code) } ?: return@post
+            applyLevel(code, lv, fin)
+        }
+    }
+
+    private fun applyLevel(code: Int, level: Float, final: Boolean) {
         val svc = Injector.current() ?: return
-        Thread {
-            try {
-                when (code) {
-                    dev.lbento.thorsidepad.inject.Slider.VOLUME -> svc.setVolume(level)
-                    dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND -> svc.setVolume2nd(level)
-                    dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP -> svc.setBrightness(0, level)
-                    dev.lbento.thorsidepad.inject.Slider.BRIGHT_2ND -> svc.setBrightness(overlay?.displayId ?: 0, level)
-                    dev.lbento.thorsidepad.inject.Slider.BRIGHT_BOTH -> { svc.setBrightness(0, level); svc.setBrightness(overlay?.displayId ?: 0, level) }
-                }
-            } catch (e: Exception) { Log.w(TAG, "slider failed", e) }
-        }.start()
+        val second = overlay?.displayId ?: 0
+        fun bright(display: Int) = if (final) svc.setBrightness(display, level) else svc.setBrightnessLive(display, level)
+        try {
+            when (code) {
+                dev.lbento.thorsidepad.inject.Slider.VOLUME -> svc.setVolume(level)
+                dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND -> svc.setVolume2nd(level)
+                dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP -> bright(0)
+                dev.lbento.thorsidepad.inject.Slider.BRIGHT_2ND -> bright(second)
+                dev.lbento.thorsidepad.inject.Slider.BRIGHT_BOTH -> { bright(0); bright(second) }
+            }
+        } catch (e: Exception) { Log.w(TAG, "slider failed", e) }
     }
 
     /** Re-lays the pad windows with the current looks, keeping the injector target open. */
@@ -349,7 +373,7 @@ class OverlayService : Service() {
         try {
             Injector.current()?.let { readLevels(it) }
             ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l -> onSlider(c, l) })
+                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
             if (prefs.shield) ov.removeCatchers() else ensureCatcher()
         } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
     }

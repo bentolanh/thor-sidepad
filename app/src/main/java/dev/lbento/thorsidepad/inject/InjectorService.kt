@@ -29,12 +29,27 @@ class InjectorService() : IInjector.Stub() {
         (m.invoke(dm, displayId) as Float)
     } catch (e: Throwable) { Log.w(TAG, "getBrightness", e); -1f }
 
+    private var setBrightnessM: java.lang.reflect.Method? = null
+    private var setTempBrightnessM: java.lang.reflect.Method? = null
+    private var tempMissing = false
+
     override fun setBrightness(displayId: Int, level: Float) {
         try {
             val dm = displayManager() ?: return
-            val m = dm.javaClass.getMethod("setBrightness", Int::class.javaPrimitiveType, Float::class.javaPrimitiveType)
+            val m = setBrightnessM ?: dm.javaClass.getMethod("setBrightness", Int::class.javaPrimitiveType, Float::class.javaPrimitiveType).also { setBrightnessM = it }
             m.invoke(dm, displayId, level.coerceIn(0f, 1f))
         } catch (e: Throwable) { Log.w(TAG, "setBrightness", e) }
+    }
+
+    override fun setBrightnessLive(displayId: Int, level: Float) {
+        if (tempMissing) { setBrightness(displayId, level); return }
+        try {
+            val dm = displayManager() ?: return
+            val m = setTempBrightnessM ?: dm.javaClass.getMethod("setTemporaryBrightness", Int::class.javaPrimitiveType, Float::class.javaPrimitiveType).also { setTempBrightnessM = it }
+            m.invoke(dm, displayId, level.coerceIn(0f, 1f))
+        } catch (e: NoSuchMethodException) {
+            tempMissing = true; setBrightness(displayId, level)
+        } catch (e: Throwable) { Log.w(TAG, "setBrightnessLive", e) }
     }
 
     private fun audio(): android.media.AudioManager? = context?.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager

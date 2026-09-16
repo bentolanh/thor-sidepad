@@ -37,4 +37,7 @@ interface IInjector {
     // The Thor's second-screen volume (the media stream's hdmi device), set the way AYN's panel does.
     float getVolume2nd() = 17;
     void setVolume2nd(float level) = 18;
+    // Brightness while a slider is being dragged: applied at once, without the system's ramp
+    // animation, the way Android's own quick-settings slider does. setBrightness commits it.
+    void setBrightnessLive(int displayId, float level) = 19;
 }

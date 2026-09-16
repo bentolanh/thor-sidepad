@@ -7,7 +7,7 @@ import android.view.View
 import dev.lbento.thorsidepad.inject.Catalog
 
 /** A vertical level slider in its own overlay window (islands mode). */
-class SliderView(ctx: Context, val code: Int, private var level: Float, private val onSlider: (Int, Float) -> Unit) : View(ctx) {
+class SliderView(ctx: Context, val code: Int, private var level: Float, private val onSlider: (Int, Float, Boolean) -> Unit) : View(ctx) {
     private val painter = ButtonPainter()
     private var active = false
 
@@ -22,14 +22,14 @@ class SliderView(ctx: Context, val code: Int, private var level: Float, private 
         val r = width.toFloat(); val cy = r
         val top = cy - r * 0.9f; val bottom = cy + r * 0.55f
         level = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
-        onSlider(code, level); invalidate()
+        onSlider(code, level, false); invalidate()
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> { active = true; slide(e.y) }
             MotionEvent.ACTION_MOVE -> slide(e.y)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { active = false; invalidate() }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { active = false; onSlider(code, level, true); invalidate() }
         }
         return true
     }

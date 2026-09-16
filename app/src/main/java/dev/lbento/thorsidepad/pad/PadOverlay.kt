@@ -247,7 +247,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean,
                  backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit,
-                 levels: MutableMap<Int, Float> = HashMap(), onSlider: (Int, Float) -> Unit = { _, _ -> }) {
+                 levels: MutableMap<Int, Float> = HashMap(), onSlider: (Int, Float, Boolean) -> Unit = { _, _, _ -> }) {
         val old = ArrayList(views)
         views.clear()
         shieldView = null; shieldParams = null

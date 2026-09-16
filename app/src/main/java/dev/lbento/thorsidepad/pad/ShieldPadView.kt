@@ -41,7 +41,7 @@ class ShieldPadView(
     opacity: Float = 1f,
     backdropColor: Int = 0,
     private val levels: MutableMap<Int, Float> = HashMap(),     // slider code -> current 0..1
-    private val onSlider: (Int, Float) -> Unit = { _, _ -> },
+    private val onSlider: (Int, Float, Boolean) -> Unit = { _, _, _ -> },   // code, level, final (finger lifted)
 ) : View(ctx) {
     private val sliderBy = HashMap<Int, Int>()       // pointerId -> slider index it is dragging
     var opacity: Float = opacity
@@ -122,7 +122,14 @@ class ShieldPadView(
         val top = b.cy * height - r * 0.9f; val bottom = b.cy * height + r * 0.55f
         val lv = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
         levels[b.code] = lv
-        onSlider(b.code, lv)
+        onSlider(b.code, lv, false)
+    }
+
+    /** The finger left a slider: commit its last level. */
+    private fun endSlide(pid: Int) {
+        val i = sliderBy.remove(pid) ?: return
+        val code = layout.buttons[i].code
+        onSlider(code, levels[code] ?: return, true)
     }
 
     private fun steerDpad(i: Int, x: Float, y: Float) {
@@ -214,7 +221,7 @@ class ShieldPadView(
                 release(pid, fireAction = pressedBy[pid]?.let { it == hit(e.getX(idx), e.getY(idx)) } == true)
                 releaseStick(pid)
                 releaseDpad(pid)
-                sliderBy.remove(pid)
+                endSlide(pid)
                 tracked.remove(pid)
                 swipes.remove(pid)?.let { s ->
                     val dx = e.getX(idx) - s.x0; val dy = e.getY(idx) - s.y0
@@ -234,7 +241,7 @@ class ShieldPadView(
                 pressedBy.keys.toList().forEach { release(it) }
                 stickBy.keys.toList().forEach { releaseStick(it) }
                 dpadBy.keys.toList().forEach { releaseDpad(it) }
-                sliderBy.clear()
+                sliderBy.keys.toList().forEach { endSlide(it) }
                 tracked.clear()
                 swipes.clear()
                 invalidate()
