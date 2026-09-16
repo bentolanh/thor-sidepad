@@ -28,6 +28,7 @@ import rikka.shizuku.Shizuku
  * (target controller, looks, layout) lives in the pull-down panel on the pad's screen.
  */
 class MainActivity : AppCompatActivity() {
+    companion object { @Volatile var lastResumedAt = 0L }
 
     private lateinit var prefs: Prefs
     private lateinit var shizukuStatus: TextView
@@ -77,7 +78,7 @@ class MainActivity : AppCompatActivity() {
         Shizuku.addRequestPermissionResultListener(permListener)
     }
 
-    override fun onResume() { super.onResume(); refreshStatus() }
+    override fun onResume() { super.onResume(); lastResumedAt = System.currentTimeMillis(); refreshStatus() }
 
     /** Leaving the app on the second screen would leave focus there; hand it back to the game's screen. */
     override fun onPause() {

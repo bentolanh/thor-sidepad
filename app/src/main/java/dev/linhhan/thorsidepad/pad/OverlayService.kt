@@ -214,6 +214,30 @@ class OverlayService : Service() {
         try { val ov = overlayOrCreate(); ov.showCatchers(onPullDown = { showPanel() }, onPullUp = { toggle() }, tracker = ov.pullTracker) } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
     }
 
+    /**
+     * Opens the setup screen on the pad's display. Android 13 usually refuses activity launches
+     * from a background service, but not always, so try directly first; if the activity has not
+     * resumed shortly after, fall back to the shell user, and if that is not available either,
+     * point at the notification, which can always open the app.
+     */
+    private fun openApp(displayId: Int) {
+        val before = MainActivity.lastResumedAt
+        try {
+            val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val opts = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
+            startActivity(intent, opts.toBundle())
+        } catch (e: Exception) { Log.w(TAG, "direct open failed", e) }
+        main.postDelayed({
+            if (MainActivity.lastResumedAt > before) return@postDelayed
+            val svc = Injector.current()
+            if (svc != null) {
+                Thread { try { svc.shell("am start --display $displayId -n $packageName/.MainActivity") } catch (e: Exception) { Log.w(TAG, "open app failed", e) } }.start()
+            } else {
+                toast("Android blocked the launch and Shizuku is not running. Tap the Thor SidePad notification to open the app.")
+            }
+        }, 1200)
+    }
+
     /** Buttons that act on the pad itself. */
     private fun onAction(code: Int) {
         when (code) {
@@ -306,13 +330,7 @@ class OverlayService : Service() {
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)) }
             override fun stopService() { ov.removePanel(); padDirty = false; hide(); stopSelf() }
-            override fun openApp() {
-                ov.removePanel(); applyDirty()
-                val svc = Injector.current()
-                if (svc == null) { toast("Shizuku not ready"); return }
-                // Started by the shell user (a service may not launch activities itself), on the pad's screen.
-                Thread { try { svc.shell("am start --display ${ov.displayId} -n $packageName/.MainActivity") } catch (e: Exception) { Log.w(TAG, "open app failed", e) } }.start()
-            }
+            override fun openApp() { ov.removePanel(); applyDirty(); openApp(ov.displayId) }
             override fun close() { ov.removePanel(); applyDirty(); panelClosed() }
         })
     }
