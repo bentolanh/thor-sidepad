@@ -47,7 +47,33 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private var panelUpdate: ((PanelState) -> Unit)? = null
     private var panelSheet: View? = null
     private var panelScrim: View? = null
+    private var panelParams: WindowManager.LayoutParams? = null
     private var panelHeight = 0
+
+    /**
+     * One consistent look around the panel. Shield off: a plain dim. Shield on with the pad up: the
+     * shield window already supplies tint and blur, so the panel adds only a little. Shield on with
+     * the pad hidden: the panel supplies the shield's tint and blur itself, to the same total.
+     */
+    private fun applyPanelLook(scrim: View, lp: WindowManager.LayoutParams, shieldOn: Boolean, backdrop: String) {
+        val frosted = backdrop == "frosted" && blurSupported
+        val color = when {
+            !shieldOn -> 0x88000000.toInt()
+            isShowing -> 0x44000000
+            else -> when (backdrop) { "dark" -> 0xFF000000.toInt(); "dim" -> 0xB0000000.toInt(); else -> 0x88000000.toInt() }
+        }
+        scrim.setBackgroundColor(color)
+        val blur = shieldOn && !isShowing && frosted
+        lp.flags = if (blur) lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND else lp.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
+        lp.blurBehindRadius = if (blur) 48 else 0
+    }
+
+    /** The shield switch or backdrop changed inside the open panel: restyle it in place. */
+    fun updatePanelLook(shieldOn: Boolean, backdrop: String) {
+        val root = panel ?: return; val scrim = panelScrim ?: return; val lp = panelParams ?: return
+        applyPanelLook(scrim, lp, shieldOn, backdrop)
+        try { wm.updateViewLayout(root, lp) } catch (_: Exception) {}
+    }
     private var shieldView: ShieldPadView? = null
     private var shieldParams: WindowManager.LayoutParams? = null
 
@@ -118,17 +144,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val h = ControlPanel.build(themed, state, actions, panelHeight)
         val lp = fullScreenParams("SidePad panel")
         lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
-        // One consistent look around the panel. Shield off: a plain dim. Shield on with the pad up: the
-        // shield window already supplies tint and blur, so the panel adds only a little. Shield on with
-        // the pad hidden: the panel supplies the shield's tint and blur itself, to the same total.
-        val frosted = backdrop == "frosted" && blurSupported
-        val scrim = when {
-            !shieldOn -> 0x88000000.toInt()
-            isShowing -> 0x44000000
-            else -> when (backdrop) { "dark" -> 0xFF000000.toInt(); "dim" -> 0xB0000000.toInt(); else -> 0x88000000.toInt() }
-        }
-        h.scrim.setBackgroundColor(scrim)
-        if (shieldOn && !isShowing && frosted) { lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; lp.blurBehindRadius = 48 }
+        applyPanelLook(h.scrim, lp, shieldOn, backdrop)
+        panelParams = lp
         h.sheet.translationY = -panelHeight.toFloat()
         h.scrim.alpha = 0f
         wm.addView(h.root, lp); panel = h.root; panelUpdate = h.update; panelSheet = h.sheet; panelScrim = h.scrim
@@ -158,7 +175,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun removePanel(animated: Boolean = true) {
         val root = panel ?: return
-        panel = null; panelUpdate = null
+        panel = null; panelUpdate = null; panelParams = null
         val sheet = panelSheet; panelSheet = null; panelScrim = null
         fun drop() { try { wm.removeViewImmediate(root) } catch (_: Exception) {} }
         if (animated && sheet != null) {

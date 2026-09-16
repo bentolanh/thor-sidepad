@@ -339,9 +339,9 @@ class OverlayService : Service() {
             }
             override fun togglePad() { ov.removePanel(); padDirty = false; toggle(); panelClosed() }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
-            override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)) }
+            override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
-            override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)) }
+            override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun stopService() { ov.removePanel(); padDirty = false; hide(); stopSelf() }
             override fun openApp() { ov.removePanel(); applyDirty(); openApp(ov.displayId) }
             override fun close() { ov.removePanel(); applyDirty(); panelClosed() }
