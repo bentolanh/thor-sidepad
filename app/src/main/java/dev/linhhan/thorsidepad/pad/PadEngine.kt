@@ -76,20 +76,30 @@ fun stickPlanFor(code: Int, caps: Caps): StickPlan? {
 }
 
 /** Sends press/release plans to the injector off the UI thread, in order. */
-class PadEngine(private val injector: IInjector, val caps: Caps, private val onTargetLost: () -> Unit = {}) {
+class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private val onTargetLost: () -> Unit = {}) {
     private val thread = HandlerThread("sidepad-engine").apply { start() }
     private val handler = Handler(thread.looper)
     private val plans = HashMap<Int, List<Emit>>()
     @Volatile private var lost = false
+    @Volatile var caps: Caps = caps
+        private set
+
+    /** Points the engine at a (re)opened target without touching the views that hold it. */
+    fun rebind(newInjector: IInjector, newCaps: Caps) {
+        injector = newInjector; caps = newCaps
+        synchronized(plans) { plans.clear() }
+        synchronized(sticks) { sticks.clear() }
+        lost = false
+    }
 
     /** A write into a recreated node fails with -ENODEV; tell the service once so it reopens. */
     private fun check(r: Int) {
         if (r < 0 && !lost) { lost = true; Log.w("SidePadEngine", "target lost (${r})"); onTargetLost() }
     }
 
-    fun plan(code: Int): List<Emit> = plans.getOrPut(code) { planFor(code, caps) }
+    fun plan(code: Int): List<Emit> = synchronized(plans) { plans.getOrPut(code) { planFor(code, caps) } }
     private val sticks = HashMap<Int, StickPlan?>()
-    fun stickPlan(code: Int): StickPlan? = sticks.getOrPut(code) { stickPlanFor(code, caps) }
+    fun stickPlan(code: Int): StickPlan? = synchronized(sticks) { sticks.getOrPut(code) { stickPlanFor(code, caps) } }
 
     /** Whether the current target can express this element at all. */
     fun enabled(code: Int): Boolean = when {

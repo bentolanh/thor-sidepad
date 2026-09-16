@@ -33,6 +33,7 @@ class OverlayService : Service() {
     private var engine: PadEngine? = null
     private var gpioPath: String? = null
     private var reopenScheduled = false
+    private var padDirty = false     // a shield/islands switch made from the panel; applied when the panel closes
 
     /**
      * The Thor recreates its controller node when its style changes, and a Bluetooth pad comes
@@ -51,18 +52,28 @@ class OverlayService : Service() {
         main.postDelayed({ reopenScheduled = false; reopenTarget(why) }, 700)
     }
 
-    /** Re-resolves and reopens the target, then re-lays the pad with a fresh engine. No flash. */
+    /** Re-resolves and reopens the target and points the existing engine at it. No window is touched. */
     private fun reopenTarget(why: String) {
         if (!visible) return
         val svc = Injector.current() ?: return
         try {
             val err = openTarget(svc)
             if (err.isNotEmpty()) { Log.w(TAG, "reopen ($why): $err"); toast(err); return }
-            engine?.shutdown()
-            engine = PadEngine(svc, Caps.fromJson(svc.targetCaps())) { main.post { scheduleReopen("write failed") } }
+            val caps = Caps.fromJson(svc.targetCaps())
+            val eng = engine
+            if (eng == null) { show(); return }
+            eng.rebind(svc, caps)
+            overlay?.invalidatePad()
             Log.i(TAG, "reopened target ($why): ${thorLabel(prefs.physicalName) ?: prefs.physicalName}")
-            rebuildPad()
         } catch (e: Exception) { Log.w(TAG, "reopen failed", e) }
+    }
+
+    private fun panelState(ov: PadOverlay) = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
+        targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL)
+
+    /** Applies a shield/islands switch that was chosen while the panel was open. */
+    private fun applyDirty() {
+        if (padDirty) { padDirty = false; if (visible) rebuildPad() }
     }
     private var targets: List<TargetChoice> = emptyList()   // controllers seen at the last probe
 
@@ -207,7 +218,6 @@ class OverlayService : Service() {
         val eng = engine; val ov = overlay
         if (!visible || eng == null || ov == null) { if (visible) show(); return }
         try {
-            ov.removePanel()
             ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
                 onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
             if (prefs.shield) ov.removeCatchers() else ensureCatcher()
@@ -219,22 +229,20 @@ class OverlayService : Service() {
         if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
         Injector.current()?.let { refreshTargets(it) }
-        val state = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
-            targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL)
-        ov.showPanel(state, object : PanelActions {
+        ov.showPanel(panelState(ov), object : PanelActions {
             override fun setTarget(choice: TargetChoice?) {
                 if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
                 else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }
-                if (visible) { hide(); show() }   // the target itself changes, so the injector must reopen
-                showPanel(keepPage = true)
+                if (visible) reopenTarget("target chosen")   // reopens the injector; the windows stay
+                ov.updatePanel(panelState(ov))
             }
-            override fun togglePad() { ov.removePanel(); toggle() }
-            override fun editLayout() { ov.removePanel(); edit() }
-            override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad(); showPanel(keepPage = true) }
-            override fun setOpacity(value: Float) { prefs.opacity = value; rebuildPad() }
-            override fun setBackdrop(value: String) { prefs.backdrop = value; rebuildPad(); showPanel(keepPage = true) }
-            override fun stopService() { ov.removePanel(); hide(); stopSelf() }
-            override fun close() { ov.removePanel() }
+            override fun togglePad() { ov.removePanel(); padDirty = false; toggle() }
+            override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
+            override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)) }
+            override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
+            override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)) }
+            override fun stopService() { ov.removePanel(); padDirty = false; hide(); stopSelf() }
+            override fun close() { ov.removePanel(); applyDirty() }
         })
     }
 

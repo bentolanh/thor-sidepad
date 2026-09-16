@@ -58,7 +58,11 @@ object ControlPanel {
     /** Remembered so a re-render after a setting change stays on the same page. */
     var page: Page = Page.MAIN
 
-    fun build(themed: Context, state: PanelState, actions: PanelActions, maxHeightPx: Int): FrameLayout {
+    /** The built panel window and a way to re-render its contents in place with a new state. */
+    class Handle(val root: FrameLayout, val update: (PanelState) -> Unit)
+
+    fun build(themed: Context, initial: PanelState, actions: PanelActions, maxHeightPx: Int): Handle {
+        var state = initial
         val root = FrameLayout(themed)
         root.setBackgroundColor(0x88000000.toInt())
         root.setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_DOWN) actions.close(); true }
@@ -134,6 +138,6 @@ object ControlPanel {
 
         val scroll = ScrollView(themed).apply { addView(card); isClickable = true }
         root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx, Gravity.TOP))
-        return root
+        return Handle(root) { s -> state = s; render() }
     }
 }

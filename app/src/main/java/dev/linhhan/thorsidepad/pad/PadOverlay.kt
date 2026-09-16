@@ -44,6 +44,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private val views = ArrayList<View>()          // pad windows (play or edit)
     private val catchers = ArrayList<View>()
     private var panel: View? = null
+    private var panelUpdate: ((PanelState) -> Unit)? = null
+    private var shieldView: ShieldPadView? = null
+    private var shieldParams: WindowManager.LayoutParams? = null
 
     /** Called after the one focusable window (the name dialog) closes, so focus can be handed back to the top screen. */
     var onFocusReturn: (() -> Unit)? = null
@@ -69,6 +72,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     fun removeAll() {
         views.forEach { v -> try { wm.removeViewImmediate(v) } catch (_: Exception) {} }
         views.clear()
+        shieldView = null; shieldParams = null
     }
 
     val isShowing get() = views.isNotEmpty()
@@ -94,11 +98,44 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun showPanel(state: PanelState, actions: PanelActions) {
         removePanel()
-        val v = ControlPanel.build(themed, state, actions, (height * 0.82f).roundToInt())
-        wm.addView(v, fullScreenParams("SidePad panel")); panel = v
+        val h = ControlPanel.build(themed, state, actions, (height * 0.82f).roundToInt())
+        wm.addView(h.root, fullScreenParams("SidePad panel")); panel = h.root; panelUpdate = h.update
     }
 
-    fun removePanel() { panel?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; panel = null }
+    /** Re-renders the open panel with new state; the window stays, so nothing flashes. */
+    fun updatePanel(state: PanelState) { panelUpdate?.invoke(state) }
+
+    fun removePanel() { panel?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; panel = null; panelUpdate = null }
+
+    private fun backdropColor(backdrop: String): Int {
+        val frosted = backdrop == "frosted" && blurSupported
+        return when (backdrop) {
+            "dim" -> 0x99000000.toInt()
+            "dark" -> 0xFF000000.toInt()
+            "frosted" -> if (frosted) 0x55000000 else 0xB0000000.toInt()   // no blur: fall back to a heavier dim
+            else -> 0
+        }
+    }
+
+    /** Applies opacity and backdrop to the pad that is already up, without re-adding any window. */
+    fun updateLooks(opacity: Float, backdrop: String) {
+        val sv = shieldView; val lp = shieldParams
+        if (sv != null && lp != null) {
+            sv.opacity = opacity
+            sv.backdropColor = backdropColor(backdrop)
+            val frosted = backdrop == "frosted" && blurSupported
+            val flags = if (frosted) lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND else lp.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
+            if (flags != lp.flags || (frosted && lp.blurBehindRadius != 48)) {
+                lp.flags = flags; lp.blurBehindRadius = if (frosted) 48 else 0
+                try { wm.updateViewLayout(sv, lp) } catch (_: Exception) {}
+            }
+        } else {
+            views.forEach { it.alpha = opacity }
+        }
+    }
+
+    /** Redraws pad views so enabled/disabled states follow a changed target. */
+    fun invalidatePad() { views.forEach { it.invalidate() } }
 
     val isPanelShowing get() = panel != null
 
@@ -115,14 +152,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                  backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
         val old = ArrayList(views)
         views.clear()
+        shieldView = null; shieldParams = null
         if (shield) {
             val frosted = backdrop == "frosted" && blurSupported
-            val color = when (backdrop) {
-                "dim" -> 0x99000000.toInt()
-                "dark" -> 0xFF000000.toInt()
-                "frosted" -> if (frosted) 0x55000000 else 0xB0000000.toInt()   // no blur: fall back to a heavier dim
-                else -> 0
-            }
+            val color = backdropColor(backdrop)
             val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, shieldOn = true, opacity = opacity, backdropColor = color)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
@@ -132,6 +165,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             lp.title = "SidePad shield"
             add(v, lp)
+            shieldView = v; shieldParams = lp
             old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
             return
         }

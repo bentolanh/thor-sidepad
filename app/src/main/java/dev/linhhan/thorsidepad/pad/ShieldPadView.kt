@@ -27,9 +27,13 @@ class ShieldPadView(
     private val onGesture: (EdgeGesture) -> Unit,
     private val onAction: (Int) -> Unit,
     private val shieldOn: Boolean = true,
-    private val opacity: Float = 1f,
-    private val backdropColor: Int = 0,
+    opacity: Float = 1f,
+    backdropColor: Int = 0,
 ) : View(ctx) {
+    var opacity: Float = opacity
+        set(v) { field = v; invalidate() }
+    var backdropColor: Int = backdropColor
+        set(v) { field = v; invalidate() }
 
     private val painter = ButtonPainter()
     private val hint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x55FFFFFF }
