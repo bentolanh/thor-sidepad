@@ -87,6 +87,7 @@ data class PadCode(val code: Int, val label: String, val androidName: String) {
     val isTrigger get() = code == Btn.TL2 || code == Btn.TR2
     val isExtra get() = code == Btn.C || code == Btn.Z
     val isStick get() = isStickCode(code)
+    val isStickClick get() = code == Btn.THUMBL || code == Btn.THUMBR   // L3 / R3: pressing a stick in
     val isAction get() = isActionCode(code)
     val isSlider get() = isSliderCode(code)
 }
@@ -132,8 +133,8 @@ object Catalog {
 
     /** The Add picker's pages: one per kind of element, so the list stays short. */
     val groups: List<Pair<String, List<PadCode>>> = listOf(
-        "Buttons" to all.filter { it.code > 0 },
-        "Sticks" to all.filter { it.isStick },
+        "Buttons" to all.filter { it.code > 0 && !it.isStickClick },
+        "Sticks" to all.filter { it.isStick } + all.filter { it.isStickClick },
         "Screen" to all.filter { it.isAction },
         "Sliders" to all.filter { it.isSlider },
     )
