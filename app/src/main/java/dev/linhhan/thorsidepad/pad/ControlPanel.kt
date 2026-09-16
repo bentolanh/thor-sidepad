@@ -71,7 +71,9 @@ object ControlPanel {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xF0202124.toInt())
             setPadding(28, 20, 28, 24)
-            isClickable = true
+            // Swallow touches in the gaps without being "clickable": a clickable parent pushes its
+            // pressed state onto non-clickable children, which made the opacity thumb light up on any tap.
+            setOnTouchListener { _, _ -> true }
         }
         val openedAt = android.os.SystemClock.uptimeMillis()
         val grey = 0xFFB0B8C0.toInt()
@@ -136,7 +138,7 @@ object ControlPanel {
         }
         render()
 
-        val scroll = ScrollView(themed).apply { addView(card); isClickable = true }
+        val scroll = ScrollView(themed).apply { addView(card) }
         root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx, Gravity.TOP))
         return Handle(root) { s -> state = s; render() }
     }
