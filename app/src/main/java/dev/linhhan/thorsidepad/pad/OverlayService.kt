@@ -233,14 +233,6 @@ class OverlayService : Service() {
             override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad(); showPanel(keepPage = true) }
             override fun setOpacity(value: Float) { prefs.opacity = value; rebuildPad() }
             override fun setBackdrop(value: String) { prefs.backdrop = value; rebuildPad(); showPanel(keepPage = true) }
-            override fun openThorControlCenter() {
-                ov.removePanel()
-                Injector.connect(this@OverlayService) { svc ->
-                    if (svc == null) { toast("Shizuku not ready"); return@connect }
-                    val err = gpioPath(svc)?.let { svc.pressKeyOn(it, Key.F24, 60) } ?: "gpio-keys device not found"
-                    if (err.isNotEmpty()) toast(err)
-                }
-            }
             override fun stopService() { ov.removePanel(); hide(); stopSelf() }
             override fun close() { ov.removePanel() }
         })

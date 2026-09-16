@@ -29,8 +29,8 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   button to the next, and edge swipes become gestures. Islands mode (one small window per
   button) is the alternative when the app under the pad should stay usable.
 - **Pull down from the top edge** of the second screen opens SidePad's own control panel: one
-  quick-settings page (show/hide, edit layout, shield, backdrop, opacity, Thor Control Center,
-  stop) plus a Controller page, opened from its
+  quick-settings page (controller, show/hide, edit layout, shield, backdrop, opacity, stop)
+  plus a Controller page, opened from its
   "Controller: …" row, where presses are routed. While the pad is hidden thin strips stay
   parked on the top and bottom edges so the pulls still work; with start-at-boot on, they are
   always there.

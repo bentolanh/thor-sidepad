@@ -43,7 +43,6 @@ interface PanelActions {
     fun setOpacity(value: Float)
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
-    fun openThorControlCenter()
     fun stopService()
     fun close()
 }
@@ -94,17 +93,17 @@ object ControlPanel {
             if (page == Page.CONTROLLER) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
             bar.addView(label(if (page == Page.MAIN) "Thor SidePad" else "Controller", 20f),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page == Page.CONTROLLER) 16 else 0 })
-            bar.addView(btn("Close") { actions.close() })
+            if (page == Page.MAIN) bar.addView(btn("Stop SidePad") { actions.stopService() })
             card.addView(bar)
 
             if (page == Page.MAIN) {
                 // Quick settings: everything on one page, as before.
+                val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
+                card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })
                 card.addView(row(
                     btn(if (state.padVisible) "Hide pad" else "Show pad") { actions.togglePad() },
                     btn("Edit layout") { actions.editLayout() },
                 ))
-                val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
-                card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))
@@ -119,10 +118,6 @@ object ControlPanel {
                         override fun onStopTrackingTouch(sb: SeekBar) { actions.setOpacity(sb.progress / 100f) }
                     })
                 })
-                card.addView(row(
-                    btn("Thor Control Center") { actions.openThorControlCenter() },
-                    btn("Stop SidePad") { actions.stopService() },
-                ))
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
             } else {
                 card.addView(label("Presses go to", 14f, grey))
