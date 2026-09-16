@@ -13,7 +13,7 @@ import android.widget.Switch
 import android.widget.TextView
 
 /** What the panel shows. */
-data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float)
+data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float, val backdrop: String, val blurSupported: Boolean)
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
 interface PanelActions {
@@ -22,6 +22,7 @@ interface PanelActions {
     fun setShield(on: Boolean)
     fun setGestures(on: Boolean)
     fun setOpacity(value: Float)
+    fun setBackdrop(value: String)
     fun openThorControlCenter()
     fun stopService()
     fun close()
@@ -66,7 +67,18 @@ object ControlPanel {
         ))
         card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
         card.addView(sw("Swipe in from the left edge = Back", state.gestures) { actions.setGestures(it) })
-        card.addView(label("Button opacity (the shield itself is invisible)", 14f))
+        card.addView(label("Behind the pad (shield mode)", 14f))
+        val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))
+        val backdropRow = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((key, name) in choices) {
+            backdropRow.addView(Button(themed).apply {
+                text = name; isAllCaps = false; isEnabled = key != state.backdrop
+                setOnClickListener { actions.setBackdrop(key) }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        card.addView(backdropRow)
+        if (!state.blurSupported) card.addView(label("* This device cannot blur behind windows; Frosted falls back to a heavy dim.", 11f))
+        card.addView(label("Button opacity", 14f))
         card.addView(SeekBar(themed).apply {
             max = 100; progress = (state.opacity * 100).toInt()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {

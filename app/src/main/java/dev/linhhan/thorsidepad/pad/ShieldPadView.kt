@@ -27,6 +27,8 @@ class ShieldPadView(
     private val onGesture: (EdgeGesture) -> Unit,
     private val onAction: (Int) -> Unit,
     private val shieldOn: Boolean = true,
+    private val opacity: Float = 1f,
+    private val backdropColor: Int = 0,
 ) : View(ctx) {
 
     private val painter = ButtonPainter()
@@ -51,6 +53,9 @@ class ShieldPadView(
     }
 
     override fun onDraw(c: Canvas) {
+        if (backdropColor != 0) c.drawColor(backdropColor)
+        // Opacity applies to the buttons and pills only, never to the backdrop.
+        val layer = c.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), (opacity.coerceIn(0f, 1f) * 255).toInt())
         layout.buttons.forEachIndexed { i, b ->
             val r = b.size * short() / 2f
             val label = Catalog.byCode(b.code).label
@@ -58,7 +63,7 @@ class ShieldPadView(
                 val k = knob[i]
                 painter.drawStick(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), k?.get(0) ?: 0f, k?.get(1) ?: 0f)
             } else if (isActionCode(b.code)) {
-                painter.draw(c, b.cx * width, b.cy * height, r, label, true, shieldOn || (pressCount[i] ?: 0) > 0)
+                painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, shieldOn)
             } else {
                 painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0)
             }
@@ -68,6 +73,7 @@ class ShieldPadView(
         c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
         c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
         if (gesturesEnabled) c.drawRoundRect(10f, (height - w) / 2, 10f + h, (height + w) / 2, h, h, hint)
+        c.restoreToCount(layer)
     }
 
     private fun steer(i: Int, x: Float, y: Float) {

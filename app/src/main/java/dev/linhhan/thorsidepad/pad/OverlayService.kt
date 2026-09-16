@@ -103,7 +103,7 @@ class OverlayService : Service() {
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
-                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures,
+                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures, prefs.backdrop,
                     onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
@@ -146,19 +146,32 @@ class OverlayService : Service() {
     /** Buttons that act on the pad itself. */
     private fun onAction(code: Int) {
         when (code) {
-            dev.linhhan.thorsidepad.inject.Action.SHIELD -> { prefs.shield = !prefs.shield; hide(); show() }
+            dev.linhhan.thorsidepad.inject.Action.SHIELD -> { prefs.shield = !prefs.shield; rebuildPad() }
         }
+    }
+
+    /** Re-lays the pad windows with the current looks, keeping the injector target open. */
+    private fun rebuildPad() {
+        val eng = engine; val ov = overlay
+        if (!visible || eng == null || ov == null) { if (visible) show(); return }
+        try {
+            ov.removePanel()
+            ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures, prefs.backdrop,
+                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) })
+            if (prefs.shield) ov.removeCatchers() else ensureCatcher()
+        } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
     }
 
     private fun showPanel() {
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
-        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity)
+        val state = PanelState(ov.isShowing, prefs.shield, prefs.gestures, prefs.opacity, prefs.backdrop, ov.blurSupported)
         ov.showPanel(state, object : PanelActions {
             override fun togglePad() { ov.removePanel(); toggle() }
             override fun editLayout() { ov.removePanel(); edit() }
-            override fun setShield(on: Boolean) { prefs.shield = on; if (visible) { hide(); show() } }
-            override fun setGestures(on: Boolean) { prefs.gestures = on; if (visible) { hide(); show() } }
-            override fun setOpacity(value: Float) { prefs.opacity = value; if (visible) { hide(); show() } }
+            override fun setShield(on: Boolean) { prefs.shield = on; rebuildPad() }
+            override fun setGestures(on: Boolean) { prefs.gestures = on; rebuildPad() }
+            override fun setOpacity(value: Float) { prefs.opacity = value; rebuildPad() }
+            override fun setBackdrop(value: String) { prefs.backdrop = value; rebuildPad(); showPanel() }
             override fun openThorControlCenter() {
                 ov.removePanel()
                 Injector.connect(this@OverlayService) { svc ->

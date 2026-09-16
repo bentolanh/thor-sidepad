@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import dev.linhhan.thorsidepad.inject.Catalog
+import dev.linhhan.thorsidepad.inject.isActionCode
 import dev.linhhan.thorsidepad.inject.isStickCode
 import kotlin.math.hypot
 import kotlin.math.min
@@ -45,6 +46,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         layout.buttons.forEachIndexed { i, b ->
             val label = Catalog.byCode(b.code).label
             if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
+            else if (isActionCode(b.code)) painter.drawShieldToggle(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, i == selected)
             else painter.draw(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, false, i == selected)
         }
     }

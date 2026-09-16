@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.view.MotionEvent
 import android.view.View
 import dev.linhhan.thorsidepad.inject.Catalog
+import dev.linhhan.thorsidepad.inject.isActionCode
 
 /** A single round button living in its own overlay window (islands mode). */
 class PadButtonView(
@@ -21,7 +22,7 @@ class PadButtonView(
 
     override fun onDraw(c: Canvas) {
         val r = width / 2f
-        painter.draw(c, r, r, r, label, enabled, down)
+        if (isActionCode(code)) painter.drawShieldToggle(c, r, r, r, false) else painter.draw(c, r, r, r, label, enabled, down)
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {

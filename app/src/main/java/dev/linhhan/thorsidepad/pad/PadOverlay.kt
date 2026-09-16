@@ -104,16 +104,35 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun tearDown() { removeAll(); removeCatchers(); removePanel() }
 
+    /** Whether the compositor can blur what is behind a window (needed for the frosted backdrop). */
+    val blurSupported: Boolean get() = try { wm.isCrossWindowBlurEnabled } catch (_: Throwable) { false }
+
+    /**
+     * Shows the pad in play mode. The previous pad windows are removed only after the new ones
+     * are up, so switching shield/islands or changing looks does not flash the screen.
+     */
     fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean, gestures: Boolean,
-                 onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
-        removeAll()
+                 backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit) {
+        val old = ArrayList(views)
+        views.clear()
         if (shield) {
-            val v = ShieldPadView(ctx, layout, engine, gestures, onGesture, onAction, shieldOn = true)
-            v.alpha = opacity
+            val frosted = backdrop == "frosted" && blurSupported
+            val color = when (backdrop) {
+                "dim" -> 0x99000000.toInt()
+                "dark" -> 0xFF000000.toInt()
+                "frosted" -> if (frosted) 0x55000000 else 0xB0000000.toInt()   // no blur: fall back to a heavier dim
+                else -> 0
+            }
+            val v = ShieldPadView(ctx, layout, engine, gestures, onGesture, onAction, shieldOn = true, opacity = opacity, backdropColor = color)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+            if (frosted) {
+                lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                lp.blurBehindRadius = 48
+            }
             lp.title = "SidePad shield"
             add(v, lp)
+            old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
             return
         }
         val short = min(width, height)
@@ -133,6 +152,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             lp.title = "SidePad ${Catalog.byCode(b.code).label}"
             add(v, lp)
         }
+        old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
     }
 
     /**

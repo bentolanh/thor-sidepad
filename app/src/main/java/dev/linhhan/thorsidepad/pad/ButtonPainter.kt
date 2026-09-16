@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.Path
 
 /** Draws one round pad button. Shared by the per-button windows, the shield, and the editor. */
 class ButtonPainter {
@@ -11,6 +12,38 @@ class ButtonPainter {
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.WHITE }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
     private val dash = DashPathEffect(floatArrayOf(12f, 9f), 0f)
+
+    private val shieldPath = Path()
+
+    /** The shield toggle: a shield-shaped badge, filled blue with a tick when on, outlined when off. */
+    fun drawShieldToggle(c: Canvas, cx: Float, cy: Float, r: Float, on: Boolean, selected: Boolean = false) {
+        // Soft round base so it reads as a button.
+        fill.color = if (on) 0xDD2E7DFF.toInt() else 0xAA202020.toInt()
+        ring.pathEffect = null
+        ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
+        ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
+        c.drawCircle(cx, cy, r * 0.92f, fill)
+        c.drawCircle(cx, cy, r * 0.92f, ring)
+        // Shield glyph.
+        val w = r * 0.55f; val top = cy - r * 0.5f; val bottom = cy + r * 0.55f
+        shieldPath.reset()
+        shieldPath.moveTo(cx - w, top)
+        shieldPath.lineTo(cx + w, top)
+        shieldPath.lineTo(cx + w, cy)
+        shieldPath.quadTo(cx + w, bottom - r * 0.15f, cx, bottom)
+        shieldPath.quadTo(cx - w, bottom - r * 0.15f, cx - w, cy)
+        shieldPath.close()
+        fill.color = if (on) Color.WHITE else 0x00000000
+        ring.strokeWidth = r * 0.07f; ring.color = Color.WHITE
+        if (on) c.drawPath(shieldPath, fill)
+        c.drawPath(shieldPath, ring)
+        if (on) {
+            // Tick inside the shield.
+            ring.color = 0xFF2E7DFF.toInt(); ring.strokeWidth = r * 0.1f
+            c.drawLine(cx - w * 0.5f, cy, cx - w * 0.1f, cy + r * 0.22f, ring)
+            c.drawLine(cx - w * 0.1f, cy + r * 0.22f, cx + w * 0.55f, cy - r * 0.25f, ring)
+        }
+    }
 
     /** A stick: outer ring, knob offset by (kx, ky) in -1..1 of the ring radius. */
     fun drawStick(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, kx: Float, ky: Float, selected: Boolean = false) {

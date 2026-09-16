@@ -28,10 +28,14 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 - **Pull up from the bottom edge** shows or hides the pad. While hidden, thin strips stay on
   the top and bottom edges, so both pulls keep working. **Swipe in from the left** presses the
   Thor's Back key through the controller's input node (switchable in the panel).
-- **SHLD button.** Every built-in preset carries a small SHLD button that toggles shield mode
-  from the pad itself; lit blue while the shield is on. Delete it in the editor if unwanted.
-- **Opacity** applies to the buttons only. The shield itself is invisible; only its three
-  edge pills are drawn.
+- **Shield toggle.** Every built-in preset carries a small shield-shaped toggle that switches
+  shield mode from the pad itself: filled with a tick while on, outlined while off. Delete it in
+  the editor if unwanted. Switching rebuilds only the windows, not the injector, and the new
+  windows go up before the old come down, so there is no flash.
+- **Backdrop** (panel, shield mode): Clear, Dim, Dark (solid black, for playing in bed) or
+  Frosted (real blur behind the window on devices whose compositor supports it, which the
+  Thor does; elsewhere a heavy dim). **Opacity** applies to the buttons only, never to the
+  backdrop.
 - The top screen keeps input focus while the pad is used.
 - Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
 - **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the

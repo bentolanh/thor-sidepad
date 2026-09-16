@@ -42,6 +42,11 @@ class Prefs(ctx: Context) {
         get() = sp.getString("activePreset", "Left hand") ?: "Left hand"
         set(v) = sp.edit().putString("activePreset", v).apply()
 
+    /** What the shield paints behind the buttons: "clear", "dim", "dark" or "frosted" (blur, where supported). */
+    var backdrop: String
+        get() = sp.getString("backdrop", BACKDROP_CLEAR) ?: BACKDROP_CLEAR
+        set(v) = sp.edit().putString("backdrop", v).apply()
+
     var startAtBoot: Boolean
         get() = sp.getBoolean("startAtBoot", true)
         set(v) = sp.edit().putBoolean("startAtBoot", v).apply()
@@ -51,6 +56,10 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putString("layout", v).apply()
 
     companion object {
+        const val BACKDROP_CLEAR = "clear"
+        const val BACKDROP_DIM = "dim"
+        const val BACKDROP_DARK = "dark"
+        const val BACKDROP_FROSTED = "frosted"
         const val MODE_PHYSICAL = "physical"
         const val MODE_VIRTUAL = "virtual"
     }

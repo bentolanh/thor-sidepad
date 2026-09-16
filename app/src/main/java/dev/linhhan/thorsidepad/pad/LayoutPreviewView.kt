@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import dev.linhhan.thorsidepad.inject.Catalog
+import dev.linhhan.thorsidepad.inject.isActionCode
 import dev.linhhan.thorsidepad.inject.isStickCode
 import kotlin.math.min
 
@@ -27,6 +28,7 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
             val r = b.size * short / 2f
             val label = Catalog.byCode(b.code).label
             if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, r, label, true, 0f, 0f)
+            else if (isActionCode(b.code)) painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, true)
             else painter.draw(c, b.cx * width, b.cy * height, r, label, true, false)
         }
     }
