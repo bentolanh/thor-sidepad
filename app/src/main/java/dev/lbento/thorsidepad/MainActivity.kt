@@ -89,6 +89,9 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Look at the bottom screen.", Toast.LENGTH_SHORT).show()
         }
 
+        // Previews: the adaptive icons drawn the way a round launcher shows them.
+        findViewById<android.widget.ImageView>(R.id.iconPreviewFamicom).setImageDrawable(roundIcon(R.mipmap.ic_launcher_famicom))
+        findViewById<android.widget.ImageView>(R.id.iconPreviewGameBoy).setImageDrawable(roundIcon(R.mipmap.ic_launcher_gameboy))
         val icons = findViewById<RadioGroup>(R.id.iconGroup)
         icons.check(if (iconEnabled("LauncherGameBoy")) R.id.iconGameBoy else R.id.iconFamicom)
         icons.setOnCheckedChangeListener { _, id -> setIcon(if (id == R.id.iconGameBoy) "LauncherGameBoy" else "LauncherFamicom") }
@@ -225,6 +228,20 @@ class MainActivity : AppCompatActivity() {
                 if (launch != null) startActivity(launch) else Toast.makeText(this, "Could not open Shizuku.", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /** Renders an adaptive icon inside a circle, like most launchers do. */
+    private fun roundIcon(resId: Int): android.graphics.drawable.Drawable {
+        val d = androidx.core.content.res.ResourcesCompat.getDrawable(resources, resId, theme)!!
+        val px = (56 * resources.displayMetrics.density).toInt()
+        val bmp = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        val path = android.graphics.Path().apply { addCircle(px / 2f, px / 2f, px / 2f, android.graphics.Path.Direction.CW) }
+        c.clipPath(path)
+        // Adaptive icons carry 1/3 of extra canvas; draw the full 108 so the middle 72 fills the circle.
+        val full = (px * 1.5f).toInt(); val off = (full - px) / 2
+        d.setBounds(-off, -off, full - off, full - off); d.draw(c)
+        return android.graphics.drawable.BitmapDrawable(resources, bmp)
     }
 
     // ---- launcher icon: two aliases of the same activity, one enabled at a time
