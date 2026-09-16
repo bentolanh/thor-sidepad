@@ -13,19 +13,40 @@
 
     <application
         android:label="@string/app_name"
-        android:icon="@drawable/ic_pad"
+        android:icon="@mipmap/ic_launcher_famicom"
         android:theme="@style/Theme.SidePad"
         android:allowBackup="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask" />
+
+        <!-- Two launcher icons for the same screen; the app enables one at a time. Famicom is the default. -->
+        <activity-alias
+            android:name=".LauncherFamicom"
+            android:targetActivity=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_famicom"
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherGameBoy"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_gameboy"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".TriggerActivity"

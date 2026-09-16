@@ -12,7 +12,9 @@ import android.view.Display
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.content.ComponentName
 import android.widget.Button
+import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
@@ -86,6 +88,10 @@ class MainActivity : AppCompatActivity() {
             OverlayService.send(this, OverlayService.ACTION_GUIDE)
             Toast.makeText(this, "Look at the bottom screen.", Toast.LENGTH_SHORT).show()
         }
+
+        val icons = findViewById<RadioGroup>(R.id.iconGroup)
+        icons.check(if (iconEnabled("LauncherGameBoy")) R.id.iconGameBoy else R.id.iconFamicom)
+        icons.setOnCheckedChangeListener { _, id -> setIcon(if (id == R.id.iconGameBoy) "LauncherGameBoy" else "LauncherFamicom") }
 
         val boot = findViewById<Switch>(R.id.bootSwitch)
         boot.isChecked = prefs.startAtBoot
@@ -219,6 +225,23 @@ class MainActivity : AppCompatActivity() {
                 if (launch != null) startActivity(launch) else Toast.makeText(this, "Could not open Shizuku.", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // ---- launcher icon: two aliases of the same activity, one enabled at a time
+
+    private fun alias(name: String) = ComponentName(this, "$packageName.$name")
+
+    private fun iconEnabled(name: String): Boolean =
+        packageManager.getComponentEnabledSetting(alias(name)) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+
+    private fun setIcon(chosen: String) {
+        val pm = packageManager
+        for (name in listOf("LauncherFamicom", "LauncherGameBoy")) {
+            pm.setComponentEnabledSetting(alias(name),
+                if (name == chosen) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP)
+        }
+        Toast.makeText(this, "Icon changed. Some launchers take a moment to notice.", Toast.LENGTH_SHORT).show()
     }
 
     private fun fillDisplays() {

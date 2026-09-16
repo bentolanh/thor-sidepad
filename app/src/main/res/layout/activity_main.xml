@@ -49,6 +49,11 @@
         <Spinner android:id="@+id/displaySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
         <Switch android:id="@+id/bootSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Start in the background at boot" />
+        <TextView style="@style/StatusLine" android:text="App icon" />
+        <RadioGroup android:id="@+id/iconGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <RadioButton android:id="@+id/iconFamicom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Famicom" />
+            <RadioButton android:id="@+id/iconGameBoy" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Game Boy" />
+        </RadioGroup>
         <TextView style="@style/StepHelp" android:text="Shizuku itself stops when the Thor reboots. In the Shizuku app, turn on “Start on boot (wireless debugging)” so both come back on their own; otherwise start Shizuku again from its app or from a computer with adb." />
     </LinearLayout>
 </ScrollView>
