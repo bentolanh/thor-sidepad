@@ -38,7 +38,8 @@ class PadLayout(val buttons: MutableList<PadButton>) {
 
         /**
          * One-handed default: the face diamond sits on the left half, just below where the left
-         * thumb rests on the stick, so the thumb drops down to it. Shoulders in the top corners.
+         * thumb rests on the stick, so the thumb drops down to it. Shoulders in the top corners,
+         * the two extra buttons (M1/M2) on the right where a second hand could reach them.
          */
         fun default(): PadLayout = PadLayout(mutableListOf(
             PadButton(Btn.Y, 0.30f, 0.30f, 0.17f),
@@ -47,8 +48,10 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             PadButton(Btn.A, 0.30f, 0.58f, 0.17f),
             PadButton(Btn.TL, 0.14f, 0.10f, 0.14f),
             PadButton(Btn.TR, 0.86f, 0.10f, 0.14f),
-            PadButton(Btn.SELECT, 0.62f, 0.80f, 0.12f),
-            PadButton(Btn.START, 0.82f, 0.80f, 0.12f),
+            PadButton(Btn.C, 0.70f, 0.40f, 0.15f),
+            PadButton(Btn.Z, 0.86f, 0.40f, 0.15f),
+            PadButton(Btn.SELECT, 0.62f, 0.82f, 0.12f),
+            PadButton(Btn.START, 0.82f, 0.82f, 0.12f),
         ))
     }
 }
