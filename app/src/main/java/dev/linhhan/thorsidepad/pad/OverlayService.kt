@@ -228,12 +228,29 @@ class OverlayService : Service() {
     }
 
     /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
-    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (hide), 3 pull up (show)
+    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (show), 3 pull up (hide)
+    private var saved: Triple<Boolean, String, Float>? = null   // shield, backdrop, opacity before the guide
+    private var savedVisible = false
 
-    /** Starts the interactive guide: the pad is shown first so every step acts on the real thing. */
+    /**
+     * Starts the interactive guide from a hidden pad. While it runs the pad wears its most
+     * legible look (shield on, frosted backdrop, fully opaque buttons); everything is put back
+     * when the guide ends.
+     */
     private fun showGuide() {
+        if (saved == null) { saved = Triple(prefs.shield, prefs.backdrop, prefs.opacity); savedVisible = visible }
+        prefs.shield = true; prefs.backdrop = Prefs.BACKDROP_FROSTED; prefs.opacity = 1f
+        if (visible) hide()
         guideStep = 1
-        if (!visible) { show(); main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 1500) } else showGuideStep(1)
+        main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 600)
+    }
+
+    /** Puts the pad's look and visibility back to what they were before the guide. */
+    private fun restoreAfterGuide() {
+        val s = saved ?: return
+        saved = null
+        prefs.shield = s.first; prefs.backdrop = s.second; prefs.opacity = s.third
+        if (savedVisible && !visible) show() else if (!savedVisible && visible) hide() else if (visible) rebuildPad()
     }
 
     private fun showGuideStep(step: Int) {
@@ -247,6 +264,7 @@ class OverlayService : Service() {
         guideStep = 0
         prefs.guideShown = true
         overlay?.removeGuide()
+        restoreAfterGuide()
     }
 
     /** Each step performs the real action at once; the next step follows after a short pause. */
@@ -254,8 +272,8 @@ class OverlayService : Service() {
         val ov = overlay ?: return
         when {
             guideStep == 1 && g == EdgeGesture.PULL_DOWN -> { ov.removeGuide(); guideStep = 2; showPanel() }   // step 2 resumes when the panel closes
-            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 1000) }
-            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); finishGuide() }
+            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 1000) }
+            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); finishGuide() }
         }
     }
 

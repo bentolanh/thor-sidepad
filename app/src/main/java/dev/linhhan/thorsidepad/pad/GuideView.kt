@@ -15,7 +15,7 @@ import kotlin.math.min
  * An interactive guide over the pad's screen. Each step asks for one real gesture and waits
  * for it; the service then performs the real action. A tap on "Skip" ends the guide.
  *
- * Steps: 1 pull down (panel), 2 pull up (hide), 3 pull up (show).
+ * Steps: 1 pull down (panel), 2 pull up (show the pad), 3 pull up (hide it again).
  */
 class GuideView(
     ctx: Context,
@@ -74,7 +74,7 @@ class GuideView(
             wantsUp -> {
                 arrow(c, w / 2, h * 0.94f, h * 0.76f, r, dragY.coerceIn(-h * 0.18f, 0f))
                 c.drawText("Pull up from the bottom edge", w / 2, h * 0.66f, title)
-                c.drawText(if (step == 2) "Try it now: it hides the pad" else "Once more: it brings the pad back", w / 2, h * 0.66f + r * 0.9f, text)
+                c.drawText(if (step == 2) "Try it now: it shows the pad" else "Once more: it hides the pad again", w / 2, h * 0.66f + r * 0.9f, text)
             }
         }
     }

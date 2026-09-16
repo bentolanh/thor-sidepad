@@ -44,8 +44,8 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   windows go up before the old come down, so there is no flash.
 - **Backdrop** (panel, shield mode): Clear, Dim, Dark (solid black, for playing in bed) or
   Frosted (real blur behind the window on devices whose compositor supports it, which the
-  Thor does; elsewhere a heavy dim). **Opacity** applies to the buttons only, never to the
-  backdrop.
+  Thor does; elsewhere a heavy dim). The **transparency** slider makes the buttons more see-through the further right it goes;
+  it never affects the backdrop.
 - The top screen keeps input focus while the pad is used.
 - Show/hide: pull up on the pad's screen, the Quick Settings tile, or the notification.
 - **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the
@@ -75,11 +75,13 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 
 ## First start
 
-The first time the service starts, an interactive three-step guide covers the pad's screen
-and waits for the real gestures: pull down (the panel really opens; close it to continue),
-pull up (the pad really hides), pull up again (it comes back), with a one-second pause
-between steps. "Skip the guide" ends it. The app has a button to run it again, which starts
-SidePad and shows the pad first if needed.
+SidePad starts with the pad hidden: only the two edge strips are there. The first time it
+starts, an interactive three-step guide covers the pad's screen and waits for the real
+gestures: pull down (the panel really opens; close it to continue), pull up (the pad really
+appears), pull up again (it hides), with a one-second pause between steps. During the guide
+the pad wears its most legible look (shield on, frosted backdrop, opaque buttons) and
+everything is put back afterwards. "Skip the guide" ends it. The app has a button to run it
+again.
 
 ## The app screen vs the panel
 
