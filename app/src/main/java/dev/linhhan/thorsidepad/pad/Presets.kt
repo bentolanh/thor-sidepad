@@ -38,6 +38,19 @@ object PresetStore {
 
     fun all(ctx: Context): List<Preset> = builtins + customs(ctx)
 
+    fun find(ctx: Context, name: String): Preset? = all(ctx).firstOrNull { it.name == name }
+    fun isBuiltin(name: String) = builtins.any { it.name == name }
+
+    /** Writes a custom preset, replacing one with the same name. */
+    fun upsert(ctx: Context, preset: Preset) {
+        val list = customs(ctx)
+        val i = list.indexOfFirst { it.name == preset.name }
+        if (i >= 0) list[i] = preset else list.add(preset)
+        saveCustoms(ctx, list)
+    }
+
+    fun delete(ctx: Context, name: String) = saveCustoms(ctx, customs(ctx).filter { it.name != name })
+
     fun nextName(ctx: Context): String {
         val names = customs(ctx).map { it.name }.toSet()
         var n = 1

@@ -37,10 +37,10 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("gestures", true)
         set(v) = sp.edit().putBoolean("gestures", v).apply()
 
-    /** Pull-up goes Home on the top (main) screen; off = press the Thor's Home key, which follows its own focus rules. */
-    var pullUpTop: Boolean
-        get() = sp.getBoolean("pullUpTop", true)
-        set(v) = sp.edit().putBoolean("pullUpTop", v).apply()
+    /** Name of the preset the pad's layout came from. Save in the editor writes back into it. */
+    var activePreset: String
+        get() = sp.getString("activePreset", "Left hand") ?: "Left hand"
+        set(v) = sp.edit().putString("activePreset", v).apply()
 
     var startAtBoot: Boolean
         get() = sp.getBoolean("startAtBoot", true)

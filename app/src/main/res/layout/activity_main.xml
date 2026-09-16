@@ -34,7 +34,7 @@
         <Switch android:id="@+id/shieldSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Shield: block touches to the app behind the pad (off = only the buttons are covered)" />
         <Switch android:id="@+id/gestureSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Edge swipes on the shield: pull up = Home, from left edge = Back (pull down always opens the SidePad panel)" />
+            android:text="Edge swipes on the shield: pull up = Home on the second screen, from left edge = Back (pull down always opens the SidePad panel)" />
         <Switch android:id="@+id/bootSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Start in the background at boot (the pull-down panel is then always available)" />
         <Switch android:id="@+id/chordSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"

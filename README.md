@@ -25,22 +25,23 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   show/hide, edit layout, shield, edge swipes, opacity, a button for the Thor Control Center
   (it presses the AYN key), stop. While the pad is hidden a thin strip stays parked on the top
   edge so the pull-down still works; with start-at-boot on, it is always there.
-- **Pull up from the bottom edge** goes Home on the top screen (the game's screen), run as
-  `am start` by the shell user because a service may not launch activities on Android 13. A
-  panel switch makes it press the Thor's Home key instead, which the Thor routes to the screen
-  last touched. **Swipe in from the left** presses the Thor's Back key.
+- **Pull up from the bottom edge** presses the Thor's Home key and **swipe in from the left**
+  its Back key, both through the controller's input node. The Thor routes them to the screen
+  last touched, which is the pad's, so they act on the second screen: pull-up returns it to
+  its home app.
 - The top screen keeps input focus while the pad is used.
 - Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
 - **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the
   controller's own stick axes (X/Y, and Z/RZ for the right stick as the Thor reports it), so in
   same-controller mode a virtual stick is the same stick the game already reads.
-- **Presets.** Cards with a miniature of each layout. Built in: "Left hand" (you hold the left
-  side; the screen shows A/B/X/Y, the right stick, R1/R2, Start and M1/M2 on the left half,
-  under the same thumb), "Right hand" (the mirror: d-pad, left stick, L1/L2, Select on the
-  right half) and "Face buttons". Left hand is the default. "Save current as new" stores your
-  own preset under a name; your presets can be used, overwritten with the current layout, or
-  deleted. The name box is the one moment the pad takes keyboard focus on the bottom screen;
-  an invisible hand-off activity gives focus back to the top screen afterwards.
+- **Presets.** The pad always has an active preset and the editor shows its name. Built in:
+  "Left hand" (you hold the left side; the screen shows A/B/X/Y, the right stick, R1/R2, Start
+  and M1/M2 on the left half, under the same thumb), "Right hand" (the mirror) and "Face
+  buttons". **Save** in the editor writes into the active preset. When the active one is
+  built-in, Save asks for a name and creates your own copy, which becomes active. The Presets
+  chooser shows cards with a miniature of each layout, marks the active one, switches with Use,
+  and deletes your own. The name box is the one moment the pad takes keyboard focus on the
+  bottom screen; an invisible hand-off activity gives focus back to the top screen afterwards.
 - **Editor** (Edit layout in the pull-down panel, the app, or the notification): opens on the
   pad's screen. Tap to select, drag to move, pinch to resize, Add / − / + / Delete / Presets in
   the toolbar; choosers can be cancelled or dismissed by tapping outside.

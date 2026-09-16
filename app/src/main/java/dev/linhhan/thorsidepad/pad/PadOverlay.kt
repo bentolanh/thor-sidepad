@@ -126,9 +126,15 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
     }
 
-    fun showEdit(layout: PadLayout, onSave: (PadLayout) -> Unit, onCancel: () -> Unit) {
+    /**
+     * The editor. `activeName` is the preset the layout came from. Save writes the layout back
+     * into that preset when it is the user's own; for a built-in it asks for a name and creates
+     * the user's copy. `onSaved` receives the layout and the (possibly new) active preset name.
+     */
+    fun showEdit(layout: PadLayout, activeName: String, onSaved: (PadLayout, String) -> Unit, onCancel: () -> Unit) {
         removeAll()
         val working = layout.copy()
+        var active = activeName
         val root = FrameLayout(themed)
         val editor = EditPadView(ctx, working)
         root.addView(editor, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -143,10 +149,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             setOnClickListener { onClick() }
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        val hint = TextView(themed).apply {
-            text = "Tap to select. Drag to move, pinch to resize, − / + and Delete above. Presets: left-hand, right-hand, face buttons."
-            setTextColor(Color.WHITE); setPadding(16, 8, 16, 8)
+        val hint = TextView(themed).apply { setTextColor(Color.WHITE); setPadding(16, 8, 16, 8) }
+        fun refreshHint() {
+            hint.text = if (PresetStore.isBuiltin(active))
+                "Editing \"$active\" (built-in). Save will ask for a name and keep your copy. Tap to select; drag to move; pinch to resize."
+            else
+                "Editing \"$active\". Save writes your changes into it. Tap to select; drag to move; pinch to resize."
         }
+        refreshHint()
         btn("Add") { showChoice("Add a button or stick", Catalog.all.map { "${it.label}   (${it.androidName})" }) { pos ->
             val code = Catalog.all[pos].code
             working.buttons.add(PadButton(code, 0.5f, 0.5f, if (code < 0) 0.28f else 0.15f))
@@ -155,11 +165,22 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }
         val bigger = btn("+") { sel(editor)?.let { it.size = (it.size + 0.02f).coerceAtMost(0.6f); editor.invalidate() } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
-        btn("Presets") { showPresets(working) { chosen ->
-            working.buttons.clear(); working.buttons.addAll(chosen.buttons.map { it.copy() }); editor.selected = -1; editor.invalidate()
-        } }
+        btn("Presets") { showPresets(active,
+            onUse = { p -> active = p.name; working.buttons.clear(); working.buttons.addAll(p.layout.buttons.map { it.copy() }); editor.selected = -1; editor.invalidate(); refreshHint() },
+            onDeletedActive = { active = PresetStore.builtins[0].name; working.buttons.clear(); working.buttons.addAll(PresetStore.builtins[0].layout.buttons.map { it.copy() }); editor.selected = -1; editor.invalidate(); refreshHint() })
+        }
         btn("Cancel") { removeAll(); onCancel() }
-        btn("Save") { removeAll(); onSave(working) }
+        btn("Save") {
+            if (PresetStore.isBuiltin(active)) {
+                askName(PresetStore.nextName(app)) { name ->
+                    PresetStore.upsert(app, Preset(name, "Your preset", working.copy(), false))
+                    removeAll(); onSaved(working, name)
+                }
+            } else {
+                PresetStore.upsert(app, Preset(active, "Your preset", working.copy(), false))
+                removeAll(); onSaved(working, active)
+            }
+        }
         editor.onSelectionChanged = { i -> val has = i >= 0; smaller.isEnabled = has; bigger.isEnabled = has; delete.isEnabled = has }
         editor.selected = -1
 
@@ -175,10 +196,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private fun sel(editor: EditPadView): PadButton? = editor.layout.buttons.getOrNull(editor.selected)
 
     /**
-     * The preset chooser: one card per preset with a miniature, name and description. Built-ins
-     * can be used; the user's own can be used, overwritten with the current layout, or deleted.
+     * The preset chooser: one card per preset with a miniature, name and description. Use
+     * switches the editor to it; the user's own presets can also be deleted. The active one is marked.
      */
-    private fun showPresets(current: PadLayout, onUse: (PadLayout) -> Unit) {
+    private fun showPresets(active: String, onUse: (Preset) -> Unit, onDeletedActive: () -> Unit) {
         val root = FrameLayout(themed)
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
@@ -193,15 +214,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val header = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 8, 8, 8) }
         header.addView(TextView(themed).apply { text = "Presets"; setTextColor(Color.WHITE); textSize = 18f },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
-        header.addView(Button(themed).apply { text = "Save current as new"; isAllCaps = false; setOnClickListener {
-            dismiss()
-            askName(PresetStore.nextName(app)) { name ->
-                val list = PresetStore.customs(app)
-                list.add(Preset(name, "Your preset", current.copy(), false))
-                PresetStore.saveCustoms(app, list)
-                showPresets(current, onUse)
-            }
-        } })
         header.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } })
         card.addView(header)
 
@@ -210,26 +222,23 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         fun rebuild() {
             list.removeAllViews()
             for (p in PresetStore.all(app)) {
+                val isActive = p.name == active
                 val row = LinearLayout(themed).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    setBackgroundColor(0xFF24282C.toInt())
+                    setBackgroundColor(if (isActive) 0xFF2A3A2E.toInt() else 0xFF24282C.toInt())
                     setPadding(16, 12, 16, 12)
                 }
                 row.addView(LayoutPreviewView(themed, p.layout, aspect), LinearLayout.LayoutParams(220, ViewGroup.LayoutParams.WRAP_CONTENT))
                 val text = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 0, 12, 0) }
-                text.addView(TextView(themed).apply { this.text = p.name; setTextColor(Color.WHITE); textSize = 17f; isAllCaps = false; setTypeface(typeface, android.graphics.Typeface.BOLD) })
-                text.addView(TextView(themed).apply { this.text = p.description; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
+                text.addView(TextView(themed).apply { this.text = p.name + (if (isActive) "   • active" else ""); setTextColor(Color.WHITE); textSize = 17f; setTypeface(typeface, android.graphics.Typeface.BOLD) })
+                text.addView(TextView(themed).apply { this.text = if (p.builtin) p.description else "Your preset. Save in the editor writes into it."; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
                 row.addView(text, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
                 val actions = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL }
-                actions.addView(Button(themed).apply { this.text = "Use"; isAllCaps = false; setOnClickListener { dismiss(); onUse(p.layout) } })
+                actions.addView(Button(themed).apply { this.text = "Use"; isAllCaps = false; isEnabled = !isActive; setOnClickListener { dismiss(); onUse(p) } })
                 if (!p.builtin) {
-                    actions.addView(Button(themed).apply { this.text = "Overwrite"; isAllCaps = false; setOnClickListener {
-                        val cs = PresetStore.customs(app)
-                        val i = cs.indexOfFirst { it.name == p.name }
-                        if (i >= 0) { cs[i] = Preset(p.name, p.description, current.copy(), false); PresetStore.saveCustoms(app, cs); rebuild() }
-                    } })
                     actions.addView(Button(themed).apply { this.text = "Delete"; isAllCaps = false; setOnClickListener {
-                        PresetStore.saveCustoms(app, PresetStore.customs(app).filter { it.name != p.name }); rebuild()
+                        PresetStore.delete(app, p.name)
+                        if (isActive) { dismiss(); onDeletedActive() } else rebuild()
                     } })
                 }
                 row.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_VERTICAL })

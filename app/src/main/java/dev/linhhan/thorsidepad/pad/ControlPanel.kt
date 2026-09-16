@@ -13,7 +13,7 @@ import android.widget.Switch
 import android.widget.TextView
 
 /** What the panel shows. */
-data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float, val pullUpTop: Boolean)
+data class PanelState(val padVisible: Boolean, val shield: Boolean, val gestures: Boolean, val opacity: Float)
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
 interface PanelActions {
@@ -21,7 +21,6 @@ interface PanelActions {
     fun editLayout()
     fun setShield(on: Boolean)
     fun setGestures(on: Boolean)
-    fun setPullUpTop(on: Boolean)
     fun setOpacity(value: Float)
     fun openThorControlCenter()
     fun stopService()
@@ -66,8 +65,7 @@ object ControlPanel {
             btn("Edit layout") { actions.editLayout() },
         ))
         card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
-        card.addView(sw("Edge swipes: pull up = Home, from left = Back", state.gestures) { actions.setGestures(it) })
-        card.addView(sw("Pull up goes Home on the top screen (off: presses the Thor's Home key)", state.pullUpTop) { actions.setPullUpTop(it) })
+        card.addView(sw("Edge swipes: pull up = Home on this screen, from left = Back", state.gestures) { actions.setGestures(it) })
         card.addView(label("Opacity", 14f))
         card.addView(SeekBar(themed).apply {
             max = 100; progress = (state.opacity * 100).toInt()
