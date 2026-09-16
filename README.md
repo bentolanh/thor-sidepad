@@ -1,143 +1,85 @@
 # Thor SidePad
 
-Virtual controller buttons on the AYN Thor's bottom screen that the game on the top screen
-receives as real gamepad input. Made for one-handed RPG play: the left thumb stays near the
-left stick and drops down to A/B/X/Y on the lower screen.
+Play one-handed on the AYN Thor. SidePad puts controller buttons on the bottom screen, and
+the game on the top screen reads them as presses on the Thor's own controller.
 
-No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging).
+Hold the Thor with your left hand, thumb on the left stick, and tap A, B, X and Y right
+below it on the touchscreen. No reaching across for the face buttons, no root.
 
-## How it works
+## What it is for
 
-- A Shizuku user service runs as the shell user, which on the Thor can open the controller's
-  `/dev/input/event*` node and `/dev/uinput`.
-- **Presses go to** a controller of your choice, picked in the pull-down panel: the Thor's own
-  controller (default), any other gamepad Android sees such as a Bluetooth pad, or a separate
-  virtual pad "Thor SidePad" that shows up as a second player. Writing into a real controller's
-  node means games keep seeing one pad; it is limited to buttons that controller advertises.
-  Controllers are remembered by name and re-found each time the pad shows, because node
-  numbers change when the Thor switches controller style or a Bluetooth pad reconnects.
-- **Thor controller style** (Control Center: Standard / Xbox / Ban): the Thor recreates its
-  controller node under a new name ("Odin Controller" or "Xbox Wireless Controller"); buttons
-  and axes are the same. The service listens for input-device changes and reopens its target
-  on the spot (a failed write triggers the same), so a style change or a Bluetooth reconnect
-  while the pad is up needs no action. The panel shows the built-in pad as "Thor controller".
-- **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
-  map to Android `BUTTON_C` / `BUTTON_Z`. They work in both modes. (The Thor kernel stamps
-  every uinput pad with AYN's vendor/product ids, so stock `BUTTON_1..` codes are unmapped.)
-- **Shield mode**: one full-screen non-focusable overlay on the second display owns every
-  touch. SidePad always starts with the shield off; turn it on per session from the panel or
-  the on-pad toggle. Nothing behind the pad can be tapped by accident, a thumb can slide from one
-  button to the next, and edge swipes become gestures. Islands mode (one small window per
-  button) is the alternative when the app under the pad should stay usable.
-- **Pull down from the top edge** of the second screen opens SidePad's own control panel, which
-  follows the finger down like the notification shade and settles open, or springs back if the
-  pull was too short; it slides away on close. The panel is one
-  quick-settings page (controller, show/hide, edit layout, shield, backdrop, opacity, stop)
-  plus a Controller page, opened from its
-  "Controller: …" row, where presses are routed. While the pad is hidden thin strips stay
-  parked on the top and bottom edges so the pulls still work; with start-at-boot on, they are
-  always there.
-- **Pull up from the bottom edge** shows or hides the pad. While hidden, thin strips stay on
-  the top and bottom edges, so both pulls keep working. The app never listens to controller
-  buttons, so it cannot interfere with a key mapper.
-- **Shield toggle.** Every built-in preset carries a small shield-shaped toggle that switches
-  shield mode from the pad itself: filled with a tick while on, outlined while off. Delete it in
-  the editor if unwanted. Switching rebuilds only the windows, not the injector, and the new
-  windows go up before the old come down, so there is no flash.
-- **Backdrop** (panel, shield mode): Clear, Dim, Dark (solid black, for playing in bed) or
-  Frosted (real blur behind the window on devices whose compositor supports it, which the
-  Thor does; elsewhere a heavy dim). The **transparency** slider makes the buttons more see-through the further right it goes;
-  it never affects the backdrop.
-- The top screen keeps input focus while the pad is used.
-- Show/hide: pull up on the pad's screen, the Quick Settings tile, or the notification.
-- **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the
-  controller's own stick axes (X/Y, and Z/RZ for the right stick as the Thor reports it), so in
-  same-controller mode a virtual stick is the same stick the game already reads.
-- **Presets.** The pad always has an active preset and the editor shows its name. Built in:
-  "Left hand" (you hold the left side; the screen shows A/B/X/Y, the right stick, R1/R2, Start
-  and M1/M2 on the left half, under the same thumb), "Right hand" (the mirror) and "Face
-  buttons". **Save** in the editor writes into the active preset. When the active one is
-  built-in, Save asks for a name and creates your own copy, which becomes active. The Presets
-  chooser shows cards with a miniature of each layout, marks the active one, switches with Use,
-  and deletes your own. The name box is the one moment the pad takes keyboard focus on the
-  bottom screen; an invisible hand-off activity gives focus back to the top screen afterwards.
-- **Editor** (Edit layout in the pull-down panel, the app, or the notification): opens on the
-  pad's screen. Tap to select, drag to move, pinch to resize, Add / − / + / Delete / Presets in
-  the toolbar; choosers can be cancelled or dismissed by tapping outside.
+- **One-handed play.** Lying in bed, holding a drink, or just resting the other arm. The
+  buttons your free hand would press sit under the thumb you still have on the device.
+- **Any button, anywhere.** Put A/B/X/Y, shoulders, triggers, Start, Select, a d-pad or a
+  virtual stick wherever your thumb lands. Drag, resize, save it as a preset.
+- **Extra buttons the Thor does not have.** M1 and M2 appear to games as two more buttons,
+  handy for quick-save, fast-forward or menu shortcuts in emulators.
+- **Bluetooth controllers too.** Presses can go into a connected Bluetooth pad instead of the
+  built-in one, for the same trick on any controller Android sees.
 
-## Layout
+## What you need
 
-| Path | What |
-| --- | --- |
-| `app/src/main/jni/sidepad_native.c` | evdev/uinput JNI: open, capabilities, write, read, create |
-| `app/src/main/aidl/.../IInjector.aidl` | Binder contract between the app and the shell-side service |
-| `app/src/main/java/.../inject/` | `InjectorService` (runs under Shizuku), `Injector` (client), `Codes` catalogue |
-| `app/src/main/java/.../pad/` | layout model, press planning, overlay windows, editor, foreground service, QS tile |
-| `app/src/main/java/.../MainActivity.kt` | permissions, target/device/display choice, test buttons |
+- An AYN Thor. Other dual-screen Android 11+ handhelds should work, with the notes at the end.
+- [Shizuku](https://shizuku.rikka.app/), a free app that gives SidePad the access it needs.
+  Android does not let one app press buttons for another; Shizuku lends SidePad the same
+  access a computer has over USB debugging. SidePad walks you through installing and
+  starting it.
 
-## First start
+## Install
 
-SidePad starts with the pad hidden: only the two edge strips are there. The first time it
-starts, an interactive guide runs with the shield on (frosted backdrop, opaque buttons) but
-the pad hidden, and waits for the real gestures: pull down (the panel really opens; close it
-to continue), pull up (the pad appears, shielded), pull up again (it hides), then an end
-screen. Everything is put back afterwards, including whether the pad was
-showing. "Skip the guide" ends it early. The app has a button to run it again.
+1. Download the latest APK from the Releases page and open it on the Thor. Allow installs
+   from your browser or file manager if asked. Obtainium can track releases here for updates.
+2. Open Thor SidePad. The setup screen is a short checklist and each step unlocks the next:
+   Shizuku, draw over other apps, notifications (optional), Start.
+3. Press Start. A short guide appears on the bottom screen and teaches the two gestures by
+   having you do them.
 
-## The app screen vs the panel
+## Everyday use
 
-The app on the main screen is setup only, as an ordered checklist where each step unlocks
-the next: 1 Shizuku (three states with their own action: not installed → Install from the
-store, installed but not running → Open Shizuku with a short explanation of Wireless
-debugging and pairing, running → Grant SidePad access), 2 draw over other apps, 3
-notifications (marked optional: they add Show / Edit / Stop to the notification), 4 Start,
-plus which display hosts the pad and start at boot. It also says that Shizuku stops at
-reboot and points at Shizuku's own "Start on boot (wireless debugging)" option. Everything
-about the pad itself is in the pull-down panel on the pad's screen: target controller, show /
-hide, edit layout, shield, backdrop, transparency, stop.
+Everything happens on the bottom screen.
 
-## Starting Shizuku from a computer
+- **Pull up from the bottom edge** to show the pad. Pull up again to hide it.
+- **Pull down from the top edge** to open the SidePad panel: choose which controller receives
+  the presses, show or hide the pad, edit the layout, turn the shield on, pick a backdrop,
+  set button transparency, stop SidePad.
+- **The shield.** When it is on, nothing behind the pad can be touched by accident, and your
+  thumb can slide from one button to the next. When it is off, only the buttons are covered
+  and the app under the pad stays usable. There is a shield button on the pad itself.
+- **Playing in bed.** With the shield on, choose a backdrop: Dim, Dark for a plain black
+  bottom screen, or Frosted to blur whatever is behind the pad. The transparency slider
+  makes the buttons more see-through.
+- **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
+  drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
+  Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
+  changes as a preset of your own.
+- **Where presses go.** The panel's Controller page lists the Thor's own controller, any
+  Bluetooth pad that is connected, and a separate virtual pad that games see as a second
+  player.
+- **Quick Settings tile** and the notification also show or hide the pad.
 
-Shizuku must be running (it stops on reboot). From a Mac with adb:
+## Good to know
 
-```bash
-adb shell 'cp /data/app/*/moe.shizuku.privileged.api-*/lib/arm64/libshizuku.so /data/local/tmp/shizuku_starter && chmod 755 /data/local/tmp/shizuku_starter && /data/local/tmp/shizuku_starter --apk=$(pm path moe.shizuku.privileged.api | sed s/package://)'
-```
+- Shizuku stops when the Thor reboots. In the Shizuku app, turn on "Start on boot (wireless
+  debugging)" so it comes back on its own; otherwise start it again from the Shizuku app.
+  SidePad tells you when Shizuku is not running and opens it for you.
+- Switching the Thor's controller style (Standard, Xbox) while playing is fine; SidePad
+  follows the change on its own.
+- SidePad never reads your controller's buttons, so it does not interfere with key mappers.
+- The app icon can be switched between a Famicom and a Game Boy look in the settings.
 
-Driving the pad from adb, Tasker or a launcher shortcut:
+## Other devices
 
-```bash
-adb shell am start -n dev.lbento.thorsidepad/.TriggerActivity -a dev.lbento.thorsidepad.TOGGLE
-```
+SidePad was built and tested on the AYN Thor. On another Android 11+ device with a second
+touch screen, expect the following:
 
-(actions: SHOW, HIDE, TOGGLE, EDIT, PANEL, START, STOP)
-
-## Release builds
-
-Release APKs are signed with a key that lives outside the repo and outside Dropbox:
-`~/Library/Application Support/thor-sidepad/release.keystore`, with its passwords in
-`keystore.properties` next to it. Back both up somewhere private (a password manager entry
-with the file attached is ideal). Losing them means existing installs can never be updated;
-leaking them lets someone else publish "updates". Without that file a release build falls
-back to the debug key, which is fine for your own device only.
-
-```bash
-./gradlew :app:assembleRelease
-# -> app/build/outputs/apk/release/app-release.apk, attach it to a GitHub Release
-```
-
-A debug-signed install cannot be updated by a release-signed APK (or vice versa): uninstall
-first, once.
-
-## Build and install
-
-```bash
-./gradlew :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-Notes, plans and status live in the Obsidian vault under `Claude/thor-sidepad/`, not here.
+- Sending presses into a real controller works wherever Shizuku runs.
+- The virtual second-player pad needs the device to allow Shizuku access to uinput; many do
+  not, in which case only real controllers are offered.
+- M1 and M2 depend on the controller advertising two spare buttons; if it does not, they show
+  as disabled on the pad.
+- The frosted backdrop needs a device that can blur behind windows; otherwise it falls back
+  to a heavy dim.
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See `LICENSE`. Developer notes are in `DEVELOPMENT.md`.
