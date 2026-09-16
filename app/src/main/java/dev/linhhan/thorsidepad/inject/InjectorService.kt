@@ -108,20 +108,22 @@ class InjectorService() : IInjector.Stub() {
 
     private val pressed = HashSet<Int>()
 
-    override fun key(code: Int, down: Boolean) {
+    override fun key(code: Int, down: Boolean): Int {
         synchronized(lock) {
-            if (fd < 0) return
-            Native.writeEvent(fd, Ev.KEY, code, if (down) 1 else 0)
+            if (fd < 0) return -1
+            val r = Native.writeEvent(fd, Ev.KEY, code, if (down) 1 else 0)
             Native.writeEvent(fd, Ev.SYN, Ev.SYN_REPORT, 0)
             if (down) pressed.add(code) else pressed.remove(code)
+            return r
         }
     }
 
-    override fun abs(code: Int, value: Int) {
+    override fun abs(code: Int, value: Int): Int {
         synchronized(lock) {
-            if (fd < 0) return
-            Native.writeEvent(fd, Ev.ABS, code, value)
+            if (fd < 0) return -1
+            val r = Native.writeEvent(fd, Ev.ABS, code, value)
             Native.writeEvent(fd, Ev.SYN, Ev.SYN_REPORT, 0)
+            return r
         }
     }
 

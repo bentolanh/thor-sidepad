@@ -13,8 +13,21 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 
-/** One controller the pad can write into. */
-data class TargetChoice(val name: String, val path: String)
+/** One controller the pad can write into. `name` is the kernel name; `label` is what the user sees. */
+data class TargetChoice(val name: String, val path: String) {
+    val label: String get() = thorLabel(name) ?: name
+}
+
+/**
+ * The Thor's built-in controller reports one of two names depending on the Control Center's
+ * "Handle Style". Both mean the same physical pad, so both are shown as "Thor controller".
+ */
+fun thorLabel(name: String): String? = when (name) {
+    "Xbox Wireless Controller" -> "Thor controller (Xbox style)"
+    "Odin Controller" -> "Thor controller (Standard style)"
+    else -> null
+}
+fun isThorName(name: String) = thorLabel(name) != null
 
 data class PanelState(
     val padVisible: Boolean, val shield: Boolean, val opacity: Float,
@@ -90,7 +103,7 @@ object ControlPanel {
                     btn(if (state.padVisible) "Hide pad" else "Show pad") { actions.togglePad() },
                     btn("Edit layout") { actions.editLayout() },
                 ))
-                val target = if (state.virtual) "Virtual pad (2nd player)" else state.targetName.ifEmpty { "no controller found" }
+                val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
                 card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
@@ -115,7 +128,7 @@ object ControlPanel {
                 card.addView(label("Presses go to", 14f, grey))
                 for (t in state.targets) {
                     val active = !state.virtual && t.name == state.targetName
-                    card.addView(btn((if (active) "●  " else "") + t.name, !active) { actions.setTarget(t) })
+                    card.addView(btn((if (active) "●  " else "") + t.label, !active) { actions.setTarget(t) })
                 }
                 card.addView(btn((if (state.virtual) "●  " else "") + "Virtual pad (shows up as a 2nd player)", !state.virtual) { actions.setTarget(null) })
                 if (state.targets.isEmpty()) card.addView(label("No controller found. Is Shizuku running?", 12f, grey))

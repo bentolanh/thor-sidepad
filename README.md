@@ -16,9 +16,11 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   node means games keep seeing one pad; it is limited to buttons that controller advertises.
   Controllers are remembered by name and re-found each time the pad shows, because node
   numbers change when the Thor switches controller style or a Bluetooth pad reconnects.
-- **Thor controller style** (Control Center: Standard / Xbox / Ban): only the device name
-  changes ("Odin Controller" vs "Xbox Wireless Controller"); buttons and axes are the same, so
-  the pad keeps working, re-finding the controller by name or falling back to the first gamepad.
+- **Thor controller style** (Control Center: Standard / Xbox / Ban): the Thor recreates its
+  controller node under a new name ("Odin Controller" or "Xbox Wireless Controller"); buttons
+  and axes are the same. The service listens for input-device changes and reopens its target
+  on the spot (a failed write triggers the same), so a style change or a Bluetooth reconnect
+  while the pad is up needs no action. The panel shows the built-in pad as "Thor controller".
 - **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
   map to Android `BUTTON_C` / `BUTTON_Z`. They work in both modes. (The Thor kernel stamps
   every uinput pad with AYN's vendor/product ids, so stock `BUTTON_1..` codes are unmapped.)

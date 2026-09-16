@@ -76,10 +76,16 @@ fun stickPlanFor(code: Int, caps: Caps): StickPlan? {
 }
 
 /** Sends press/release plans to the injector off the UI thread, in order. */
-class PadEngine(private val injector: IInjector, val caps: Caps) {
+class PadEngine(private val injector: IInjector, val caps: Caps, private val onTargetLost: () -> Unit = {}) {
     private val thread = HandlerThread("sidepad-engine").apply { start() }
     private val handler = Handler(thread.looper)
     private val plans = HashMap<Int, List<Emit>>()
+    @Volatile private var lost = false
+
+    /** A write into a recreated node fails with -ENODEV; tell the service once so it reopens. */
+    private fun check(r: Int) {
+        if (r < 0 && !lost) { lost = true; Log.w("SidePadEngine", "target lost (${r})"); onTargetLost() }
+    }
 
     fun plan(code: Int): List<Emit> = plans.getOrPut(code) { planFor(code, caps) }
     private val sticks = HashMap<Int, StickPlan?>()
@@ -102,7 +108,7 @@ class PadEngine(private val injector: IInjector, val caps: Caps) {
         }
         val x = map(nx, sp.xr); val y = map(ny, sp.yr)
         handler.post {
-            try { injector.abs(sp.ax, x); injector.abs(sp.ay, y) } catch (ex: Exception) { Log.w("SidePadEngine", "stick failed", ex) }
+            try { check(injector.abs(sp.ax, x)); check(injector.abs(sp.ay, y)) } catch (ex: Exception) { Log.w("SidePadEngine", "stick failed", ex) }
         }
     }
 
@@ -115,7 +121,7 @@ class PadEngine(private val injector: IInjector, val caps: Caps) {
             try {
                 for (e in plan) {
                     val v = if (down) e.down else e.up
-                    if (e.type == Ev.KEY) injector.key(e.code, v != 0) else injector.abs(e.code, v)
+                    check(if (e.type == Ev.KEY) injector.key(e.code, v != 0) else injector.abs(e.code, v))
                 }
             } catch (ex: Exception) { Log.w("SidePadEngine", "inject failed", ex) }
         }

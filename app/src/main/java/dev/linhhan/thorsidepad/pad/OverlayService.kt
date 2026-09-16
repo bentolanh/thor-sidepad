@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.hardware.input.InputManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -31,6 +32,38 @@ class OverlayService : Service() {
     private var overlay: PadOverlay? = null
     private var engine: PadEngine? = null
     private var gpioPath: String? = null
+    private var reopenScheduled = false
+
+    /**
+     * The Thor recreates its controller node when its style changes, and a Bluetooth pad comes
+     * and goes; an open descriptor to the old node then writes into nothing. Reopen the target
+     * whenever Android reports an input device change while the pad is up.
+     */
+    private val deviceListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(id: Int) = scheduleReopen("added $id")
+        override fun onInputDeviceRemoved(id: Int) = scheduleReopen("removed $id")
+        override fun onInputDeviceChanged(id: Int) = scheduleReopen("changed $id")
+    }
+
+    private fun scheduleReopen(why: String) {
+        if (!visible || reopenScheduled) return
+        reopenScheduled = true
+        main.postDelayed({ reopenScheduled = false; reopenTarget(why) }, 700)
+    }
+
+    /** Re-resolves and reopens the target, then re-lays the pad with a fresh engine. No flash. */
+    private fun reopenTarget(why: String) {
+        if (!visible) return
+        val svc = Injector.current() ?: return
+        try {
+            val err = openTarget(svc)
+            if (err.isNotEmpty()) { Log.w(TAG, "reopen ($why): $err"); toast(err); return }
+            engine?.shutdown()
+            engine = PadEngine(svc, Caps.fromJson(svc.targetCaps())) { main.post { scheduleReopen("write failed") } }
+            Log.i(TAG, "reopened target ($why): ${thorLabel(prefs.physicalName) ?: prefs.physicalName}")
+            rebuildPad()
+        } catch (e: Exception) { Log.w(TAG, "reopen failed", e) }
+    }
     private var targets: List<TargetChoice> = emptyList()   // controllers seen at the last probe
 
     /**
@@ -46,7 +79,9 @@ class OverlayService : Service() {
                 if (d.optBoolean("gamepad", false)) found.add(TargetChoice(d.getString("name"), d.getString("path")))
             }
             targets = found
+            // The Thor's own pad keeps its identity across style changes even though its name changes.
             val byName = found.firstOrNull { it.name == prefs.physicalName }
+                ?: if (isThorName(prefs.physicalName)) found.firstOrNull { isThorName(it.name) } else null
             val chosen = byName ?: found.firstOrNull { it.path == prefs.physicalPath } ?: found.firstOrNull()
             if (chosen != null) {
                 if (prefs.physicalName.isEmpty() || byName == null) prefs.physicalName = chosen.name
@@ -63,6 +98,7 @@ class OverlayService : Service() {
         prefs = Prefs(this)
         startForeground(NOTIF_ID, buildNotification())
         running = true
+        getSystemService(InputManager::class.java).registerInputDeviceListener(deviceListener, main)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -79,6 +115,7 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        try { getSystemService(InputManager::class.java).unregisterInputDeviceListener(deviceListener) } catch (_: Exception) {}
         hide()
         overlay?.tearDown()
         running = false
@@ -115,7 +152,7 @@ class OverlayService : Service() {
                 val err = openTarget(svc)
                 if (err.isNotEmpty()) { toast(err); return@withInjector }
                 engine?.shutdown()
-                val eng = PadEngine(svc, Caps.fromJson(svc.targetCaps()))
+                val eng = PadEngine(svc, Caps.fromJson(svc.targetCaps())) { main.post { scheduleReopen("write failed") } }
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()

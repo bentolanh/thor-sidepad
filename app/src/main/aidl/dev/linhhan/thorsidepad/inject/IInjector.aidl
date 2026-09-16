@@ -19,8 +19,9 @@ interface IInjector {
     // JSON: {"keys":[..],"abs":{"<code>":[min,max],..}} for the open target.
     String targetCaps() = 6;
 
-    void key(int code, boolean down) = 7;
-    void abs(int code, int value) = 8;
+    // Return bytes written, or -errno (e.g. -ENODEV once the node has been recreated).
+    int key(int code, boolean down) = 7;
+    int abs(int code, int value) = 8;
 
     // Press and release one key on any input node (e.g. the AYN key on gpio-keys). "" or error.
     String pressKeyOn(String path, int code, int holdMs) = 11;
