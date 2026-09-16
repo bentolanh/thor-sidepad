@@ -24,8 +24,10 @@ object Abs {
 object Btn {
     const val A = 0x130          // BTN_SOUTH
     const val B = 0x131          // BTN_EAST
+    const val C = 0x132          // BTN_C: the Thor's key layouts map it to BUTTON_C; used as M1
     const val X = 0x133          // BTN_NORTH
     const val Y = 0x134          // BTN_WEST
+    const val Z = 0x135          // BTN_Z: mapped to BUTTON_Z on the Thor; used as M2
     const val TL = 0x136
     const val TR = 0x137
     const val TL2 = 0x138
@@ -39,7 +41,6 @@ object Btn {
     const val DPAD_DOWN = 0x221
     const val DPAD_LEFT = 0x222
     const val DPAD_RIGHT = 0x223
-    const val TRIGGER_HAPPY1 = 0x2c0 // Android Generic.kl: BUTTON_1 .. BUTTON_16
 }
 
 /**
@@ -49,7 +50,7 @@ object Btn {
 data class PadCode(val code: Int, val label: String, val androidName: String) {
     val isDpad get() = code in Btn.DPAD_UP..Btn.DPAD_RIGHT
     val isTrigger get() = code == Btn.TL2 || code == Btn.TR2
-    val isExtra get() = code >= Btn.TRIGGER_HAPPY1
+    val isExtra get() = code == Btn.C || code == Btn.Z
 }
 
 object Catalog {
@@ -71,10 +72,12 @@ object Catalog {
         PadCode(Btn.DPAD_DOWN, "▼", "DPAD_DOWN"),
         PadCode(Btn.DPAD_LEFT, "◀", "DPAD_LEFT"),
         PadCode(Btn.DPAD_RIGHT, "▶", "DPAD_RIGHT"),
-        PadCode(Btn.TRIGGER_HAPPY1 + 0, "M1", "BUTTON_1"),
-        PadCode(Btn.TRIGGER_HAPPY1 + 1, "M2", "BUTTON_2"),
-        PadCode(Btn.TRIGGER_HAPPY1 + 2, "M3", "BUTTON_3"),
-        PadCode(Btn.TRIGGER_HAPPY1 + 3, "M4", "BUTTON_4"),
+        // Extra buttons the Thor has no physical key for. Its controller node still advertises
+        // BTN_C/BTN_Z and AYN's key layouts map them, so they work in both delivery modes.
+        // (BTN_TRIGGER_HAPPY1.. would be BUTTON_1.. on stock Android, but the Thor's kernel
+        // stamps every uinput pad with AYN's vendor/product ids, whose layout lacks them.)
+        PadCode(Btn.C, "M1", "BUTTON_C"),
+        PadCode(Btn.Z, "M2", "BUTTON_Z"),
     )
 
     fun byCode(code: Int): PadCode = all.firstOrNull { it.code == code } ?: PadCode(code, "0x%x".format(code), "KEY_$code")

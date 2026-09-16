@@ -22,6 +22,22 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".TriggerActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="dev.linhhan.thorsidepad.SHOW" />
+                <action android:name="dev.linhhan.thorsidepad.HIDE" />
+                <action android:name="dev.linhhan.thorsidepad.TOGGLE" />
+                <action android:name="dev.linhhan.thorsidepad.EDIT" />
+                <action android:name="dev.linhhan.thorsidepad.STOP" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".pad.OverlayService"
             android:exported="false" />

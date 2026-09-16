@@ -20,7 +20,7 @@
             <RadioButton android:id="@+id/modePhysical" android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="Same controller as the Thor's own buttons (games see one pad)" />
             <RadioButton android:id="@+id/modeVirtual" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Separate virtual pad (adds M1–M4; games may see a second pad)" />
+                android:text="Separate virtual pad (games may see a second pad)" />
         </RadioGroup>
         <TextView style="@style/StatusLine" android:text="Thor controller device (used for the same-controller mode and the Select+Start chord):" />
         <Spinner android:id="@+id/deviceSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
@@ -48,7 +48,7 @@
         <TextView style="@style/SectionHeader" android:text="5. Test (open a gamepad tester on the top screen first)" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
             <Button android:id="@+id/btnTestA" style="@style/Half" android:text="Send A" />
-            <Button android:id="@+id/btnTestM1" style="@style/Half" android:text="Send M1 (BUTTON_1)" />
+            <Button android:id="@+id/btnTestM1" style="@style/Half" android:text="Send M1 (BUTTON_C)" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

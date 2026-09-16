@@ -12,8 +12,11 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   `/dev/input/event*` node and `/dev/uinput`.
 - **Same-controller mode** writes key events straight into the Thor's own controller node, so
   games keep seeing one pad. Limited to buttons that controller physically has.
-- **Virtual pad mode** creates a separate uinput gamepad "Thor SidePad" that also carries
-  M1–M4 (Android `BUTTON_1..4`). Some games and emulators will treat it as a second player.
+- **Virtual pad mode** creates a separate uinput gamepad "Thor SidePad". Some games and
+  emulators will treat it as a second player, so the same-controller mode is the default.
+- **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
+  map to Android `BUTTON_C` / `BUTTON_Z`. They work in both modes. (The Thor kernel stamps
+  every uinput pad with AYN's vendor/product ids, so stock `BUTTON_1..` codes are unmapped.)
 - The pad is drawn as one small non-focusable overlay window per button on the second display,
   so the space between buttons still belongs to whatever app is on that screen and the top
   screen keeps input focus.
@@ -28,6 +31,22 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 | `app/src/main/java/.../inject/` | `InjectorService` (runs under Shizuku), `Injector` (client), `Codes` catalogue |
 | `app/src/main/java/.../pad/` | layout model, press planning, overlay windows, editor, foreground service, QS tile |
 | `app/src/main/java/.../MainActivity.kt` | permissions, target/device/display choice, test buttons |
+
+## Starting Shizuku from a computer
+
+Shizuku must be running (it stops on reboot). From a Mac with adb:
+
+```bash
+adb shell 'cp /data/app/*/moe.shizuku.privileged.api-*/lib/arm64/libshizuku.so /data/local/tmp/shizuku_starter && chmod 755 /data/local/tmp/shizuku_starter && /data/local/tmp/shizuku_starter --apk=$(pm path moe.shizuku.privileged.api | sed s/package://)'
+```
+
+Driving the pad from adb, Tasker or a launcher shortcut:
+
+```bash
+adb shell am start -n dev.linhhan.thorsidepad/.TriggerActivity -a dev.linhhan.thorsidepad.TOGGLE
+```
+
+(actions: SHOW, HIDE, TOGGLE, EDIT, STOP)
 
 ## Build and install
 

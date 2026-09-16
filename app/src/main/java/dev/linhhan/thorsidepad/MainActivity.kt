@@ -39,7 +39,10 @@ class MainActivity : AppCompatActivity() {
     private var devicePaths: List<String> = emptyList()
     private var displayIds: List<Int> = emptyList()
 
-    private val permListener = Shizuku.OnRequestPermissionResultListener { _, _ -> refreshStatus() }
+    private val permListener = Shizuku.OnRequestPermissionResultListener { _, _ ->
+        refreshStatus()
+        if (Injector.state() == Injector.ShizukuState.READY) probe()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +65,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnEdit).setOnClickListener { OverlayService.send(this, OverlayService.ACTION_EDIT) }
         findViewById<Button>(R.id.btnStop).setOnClickListener { OverlayService.send(this, OverlayService.ACTION_STOP) }
         findViewById<Button>(R.id.btnTestA).setOnClickListener { testPress(Btn.A) }
-        findViewById<Button>(R.id.btnTestM1).setOnClickListener { testPress(Btn.TRIGGER_HAPPY1) }
+        findViewById<Button>(R.id.btnTestM1).setOnClickListener { testPress(Btn.C) }
 
         val mode = findViewById<RadioGroup>(R.id.modeGroup)
         mode.check(if (prefs.targetMode == Prefs.MODE_VIRTUAL) R.id.modeVirtual else R.id.modePhysical)
