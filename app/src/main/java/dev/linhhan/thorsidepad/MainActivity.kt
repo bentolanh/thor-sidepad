@@ -50,6 +50,8 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.step1Button).setOnClickListener { shizukuAction() }
         findViewById<Button>(R.id.step2Button).setOnClickListener {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            // Some firmware (the Thor's included) opens the full app list instead of SidePad's own page.
+            Toast.makeText(this, "Find Thor SidePad in the list and turn it on, then come back.", Toast.LENGTH_LONG).show()
         }
         findViewById<Button>(R.id.step3Button).setOnClickListener {
             if (Build.VERSION.SDK_INT >= 33) ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
@@ -58,7 +60,8 @@ class MainActivity : AppCompatActivity() {
             val firstRun = !prefs.guideShown
             OverlayService.send(this, OverlayService.ACTION_START)
             if (firstRun) Toast.makeText(this, "Look at the bottom screen: the guide is waiting there.", Toast.LENGTH_LONG).show()
-            refresh()
+            // The service comes up a moment later; refresh once it has.
+            findViewById<View>(R.id.btnStart).postDelayed({ refresh() }, 900)
         }
         findViewById<Button>(R.id.btnGuide).setOnClickListener {
             OverlayService.send(this, OverlayService.ACTION_GUIDE)
@@ -164,6 +167,8 @@ class MainActivity : AppCompatActivity() {
         val title = findViewById<TextView>(titleId)
         val status = findViewById<TextView>(statusId)
         val base = title.text.toString().removeSuffix("  ✓")
+        // A locked step's buttons must not react either.
+        if (card is android.view.ViewGroup) for (i in 0 until card.childCount) (card.getChildAt(i) as? Button)?.let { b -> if (!done) b.isEnabled = !locked }
         when {
             done -> {
                 card.alpha = 1f; card.setBackgroundColor(0xFF1E3A2A.toInt())
