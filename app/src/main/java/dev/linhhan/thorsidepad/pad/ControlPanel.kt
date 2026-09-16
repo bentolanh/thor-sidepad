@@ -47,6 +47,7 @@ interface PanelActions {
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
     fun stopService()
     fun openApp()
+    fun startShizuku()
     fun close()
 }
 
@@ -113,10 +114,13 @@ object ControlPanel {
 
             if (page == Page.MAIN) {
                 if (!state.shizukuReady) {
-                    card.addView(TextView(themed).apply {
-                        text = "Shizuku is not running, so the pad cannot press anything. Start Shizuku, or tap Open app for help."
-                        setTextColor(0xFFFFB4A9.toInt()); textSize = 14f; setPadding(16, 10, 16, 10); setBackgroundColor(0x33FF6B5A)
+                    val notice = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0x33FF6B5A); setPadding(16, 10, 16, 10) }
+                    notice.addView(TextView(themed).apply {
+                        text = "Shizuku is not running, so the pad cannot press anything. Open Shizuku and tap Start there, then come back."
+                        setTextColor(0xFFFFB4A9.toInt()); textSize = 14f
                     })
+                    notice.addView(btn("Start Shizuku") { actions.startShizuku() })
+                    card.addView(notice)
                 }
                 // Quick settings: everything on one page, as before.
                 val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }

@@ -353,6 +353,15 @@ class OverlayService : Service() {
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun stopService() { ov.removePanel(); padDirty = false; hide(); stopSelf() }
             override fun openApp() { ov.removePanel(); applyDirty(); openApp(ov.displayId) }
+            override fun startShizuku() {
+                ov.removePanel(); applyDirty()
+                val launch = packageManager.getLaunchIntentForPackage(MainActivity.SHIZUKU_PACKAGE)
+                if (launch == null) { toast("Shizuku is not installed. Open the app to set it up."); return }
+                try {
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(launch, android.app.ActivityOptions.makeBasic().setLaunchDisplayId(ov.displayId).toBundle())
+                } catch (e: Exception) { Log.w(TAG, "open Shizuku failed", e); toast("Could not open Shizuku.") }
+            }
             override fun close() { ov.removePanel(); applyDirty(); panelClosed() }
         })
     }
