@@ -330,7 +330,7 @@ class OverlayService : Service() {
         if (!keepPage) ControlPanel.page = ControlPanel.Page.MAIN
         val ov = try { overlayOrCreate() } catch (e: Exception) { toast("No second screen: ${e.message}"); return }
         Injector.current()?.let { refreshTargets(it) }
-        ov.showPanel(panelState(ov), dragged = dragged, backdrop = if (prefs.shield && !ov.isShowing) prefs.backdrop else null, actions = object : PanelActions {
+        ov.showPanel(panelState(ov), dragged = dragged, shieldOn = prefs.shield, backdrop = prefs.backdrop, actions = object : PanelActions {
             override fun setTarget(choice: TargetChoice?) {
                 if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
                 else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }

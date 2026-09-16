@@ -112,19 +112,23 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * the screen and follows the finger through [dragPanel] until [endPanelDrag]; otherwise it
      * slides in on its own.
      */
-    fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false, backdrop: String? = null) {
+    fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false, shieldOn: Boolean = false, backdrop: String = "clear") {
         removePanel(animated = false)
         panelHeight = (height * 0.82f).roundToInt()
         val h = ControlPanel.build(themed, state, actions, panelHeight)
         val lp = fullScreenParams("SidePad panel")
         lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
-        // With the shield on but the pad hidden, the panel carries the shield's backdrop itself, so
-        // pulling it down looks the same whether or not the pad is up.
-        if (backdrop != null) {
-            val c = backdropColor(backdrop)
-            if (c != 0) h.scrim.setBackgroundColor(c or 0x88000000.toInt())
-            if (backdrop == "frosted" && blurSupported) { lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; lp.blurBehindRadius = 48 }
+        // One consistent look around the panel. Shield off: a plain dim. Shield on with the pad up: the
+        // shield window already supplies tint and blur, so the panel adds only a little. Shield on with
+        // the pad hidden: the panel supplies the shield's tint and blur itself, to the same total.
+        val frosted = backdrop == "frosted" && blurSupported
+        val scrim = when {
+            !shieldOn -> 0x88000000.toInt()
+            isShowing -> 0x44000000
+            else -> when (backdrop) { "dark" -> 0xFF000000.toInt(); "dim" -> 0xB0000000.toInt(); else -> 0x88000000.toInt() }
         }
+        h.scrim.setBackgroundColor(scrim)
+        if (shieldOn && !isShowing && frosted) { lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; lp.blurBehindRadius = 48 }
         h.sheet.translationY = -panelHeight.toFloat()
         h.scrim.alpha = 0f
         wm.addView(h.root, lp); panel = h.root; panelUpdate = h.update; panelSheet = h.sheet; panelScrim = h.scrim
