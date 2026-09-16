@@ -122,9 +122,9 @@ object Catalog {
         // BTN_C/BTN_Z and AYN's key layouts map them, so they work in both delivery modes.
         // (BTN_TRIGGER_HAPPY1.. would be BUTTON_1.. on stock Android, but the Thor's kernel
         // stamps every uinput pad with AYN's vendor/product ids, whose layout lacks them.)
+        PadCode(Dpad.PAD, "✚", "D-pad, DPAD_UP / DOWN / LEFT / RIGHT"),
         PadCode(Btn.C, "M1", "BUTTON_C"),
         PadCode(Btn.Z, "M2", "BUTTON_Z"),
-        PadCode(Dpad.PAD, "✚", "D-pad, DPAD_UP / DOWN / LEFT / RIGHT"),
         PadCode(Stick.LEFT, "LS", "left stick, AXIS_X / AXIS_Y"),
         PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
         PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
@@ -141,8 +141,9 @@ object Catalog {
 
     /** The Add picker's pages: one per kind of element, so the list stays short. */
     val groups: List<Pair<String, List<PadCode>>> = listOf(
-        "Buttons" to all.filter { it.code > 0 && !it.isStickClick && !it.isDpad },
-        "Sticks" to all.filter { it.isDpadElement } + all.filter { it.isStick } + all.filter { it.isStickClick },
+        // The four single-direction buttons stay out of the picker; the one-element D-pad replaces them.
+        "Buttons" to all.filter { (it.code > 0 && !it.isStickClick && !it.isDpad) || it.isDpadElement },
+        "Sticks" to all.filter { it.isStick } + all.filter { it.isStickClick },
         "Screen" to all.filter { it.isAction },
         "Sliders" to all.filter { it.isSlider },
     )

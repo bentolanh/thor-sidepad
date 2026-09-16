@@ -18,11 +18,13 @@ import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import dev.lbento.thorsidepad.inject.Injector
 import dev.lbento.thorsidepad.pad.OverlayService
+import dev.lbento.thorsidepad.pad.PresetStore
 import rikka.shizuku.Shizuku
 
 /**
@@ -83,6 +85,8 @@ class MainActivity : AppCompatActivity() {
             // The service comes up a moment later; refresh once it has.
             findViewById<View>(R.id.btnStart).postDelayed({ refresh() }, 900)
         }
+        findViewById<Button>(R.id.btnExport).setOnClickListener { exportPresets.launch("thor-sidepad-presets.json") }
+        findViewById<Button>(R.id.btnImport).setOnClickListener { importPresets.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*")) }
         findViewById<Button>(R.id.btnGuide).setOnClickListener {
             OverlayService.send(this, OverlayService.ACTION_GUIDE)
             Toast.makeText(this, "Look at the bottom screen.", Toast.LENGTH_SHORT).show()
@@ -210,6 +214,29 @@ class MainActivity : AppCompatActivity() {
                 card.alpha = 1f; card.setBackgroundColor(0xFF1F2F45.toInt())
                 title.text = base; title.setTextColor(0xFF8FC1FF.toInt()); status.setTextColor(0xFFFFFFFF.toInt())
             }
+        }
+    }
+
+    // ---- preset files. The system file picker does the choosing; we only read and write the bytes.
+    private val exportPresets = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            contentResolver.openOutputStream(uri, "wt")!!.use { it.write(PresetStore.exportJson(this).toByteArray()) }
+            Toast.makeText(this, "Presets exported.", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not write the file: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+    private val importPresets = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            val text = contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+            val n = PresetStore.importJson(this, text)
+            Toast.makeText(this, if (n == 1) "1 preset imported." else "$n presets imported.", Toast.LENGTH_SHORT).show()
+            // The pad reads its layout when it shows, so a running SidePad re-shows with the imported one.
+            if (OverlayService.running) OverlayService.send(this, OverlayService.ACTION_SHOW)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not read that file: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

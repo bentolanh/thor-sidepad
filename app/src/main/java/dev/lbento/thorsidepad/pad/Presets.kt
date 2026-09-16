@@ -52,6 +52,51 @@ object PresetStore {
 
     fun delete(ctx: Context, name: String) = saveCustoms(ctx, customs(ctx).filter { it.name != name })
 
+    /**
+     * Everything the user made, as one JSON document: their presets, the pad's current layout
+     * and which preset it came from. Meant to be written to a file of the user's choosing so
+     * it survives a reinstall or moves to another device.
+     */
+    fun exportJson(ctx: Context): String {
+        val prefs = dev.lbento.thorsidepad.Prefs(ctx)
+        val arr = JSONArray()
+        customs(ctx).forEach { p -> arr.put(JSONObject().put("name", p.name).put("layout", JSONObject(p.layout.toJson()))) }
+        return JSONObject()
+            .put("app", "Thor SidePad")
+            .put("format", 1)
+            .put("activePreset", prefs.activePreset)
+            .put("layout", JSONObject(PadLayout.fromJson(prefs.layoutJson).toJson()))
+            .put("presets", arr)
+            .toString(2)
+    }
+
+    /**
+     * Reads a document written by [exportJson]. Presets in the file replace ones of the same
+     * name and are added otherwise; the file's current layout becomes the pad's layout.
+     * Returns how many presets came in, or throws if the document is not ours.
+     */
+    fun importJson(ctx: Context, json: String): Int {
+        val o = JSONObject(json)
+        if (o.optString("app") != "Thor SidePad") throw IllegalArgumentException("not a Thor SidePad preset file")
+        val list = customs(ctx)
+        val arr = o.optJSONArray("presets") ?: JSONArray()
+        var n = 0
+        for (i in 0 until arr.length()) {
+            val p = arr.getJSONObject(i)
+            val name = p.getString("name")
+            if (isBuiltin(name)) continue
+            val preset = Preset(name, "Your preset", PadLayout.fromJson(p.getJSONObject("layout").toString()), false)
+            val at = list.indexOfFirst { it.name == name }
+            if (at >= 0) list[at] = preset else list.add(preset)
+            n++
+        }
+        saveCustoms(ctx, list)
+        val prefs = dev.lbento.thorsidepad.Prefs(ctx)
+        o.optJSONObject("layout")?.let { prefs.layoutJson = PadLayout.fromJson(it.toString()).toJson() }
+        o.optString("activePreset").takeIf { it.isNotEmpty() && (isBuiltin(it) || list.any { p -> p.name == it }) }?.let { prefs.activePreset = it }
+        return n
+    }
+
     fun nextName(ctx: Context): String {
         val names = customs(ctx).map { it.name }.toSet()
         var n = 1

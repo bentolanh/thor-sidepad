@@ -56,6 +56,11 @@
             <ImageView android:id="@+id/iconGameBoy" android:layout_width="72dp" android:layout_height="72dp" android:padding="6dp" android:layout_marginStart="16dp" android:contentDescription="Game Boy icon" />
         </LinearLayout>
         <TextView style="@style/StepHelp" android:text="Launchers that cache icons (Beacon, ES-DE, Daijishō) show the new one after they restart." />
+
+        <TextView style="@style/SectionHeader" android:text="Presets" />
+        <TextView style="@style/StepHelp" android:text="Your presets and the current layout live inside the app and are lost when it is uninstalled. Export writes them to a file you choose (Downloads, a cloud folder); Import reads such a file back, replacing presets of the same name." />
+        <Button android:id="@+id/btnExport" style="@style/Row" android:text="Export presets to a file" />
+        <Button android:id="@+id/btnImport" style="@style/Row" android:text="Import presets from a file" />
         <TextView style="@style/StepHelp" android:text="Shizuku itself stops when the Thor reboots. In the Shizuku app, turn on “Start on boot (wireless debugging)” so both come back on their own; otherwise start Shizuku again from its app or from a computer with adb." />
     </LinearLayout>
 </ScrollView>

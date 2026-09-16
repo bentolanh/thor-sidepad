@@ -52,13 +52,16 @@ Everything happens on the bottom screen.
 - **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
   drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
 - **Device controls on the pad.** Add has pages for Buttons, Sticks, Screen and Sliders.
-  Sticks also holds the D-pad, one cross you press in any of eight directions.
+  The D-pad is one cross you press in any of eight directions.
   Sliders set brightness and volume for each screen, plus one brightness slider that moves
   both screens together; Screen holds Home and Back for either screen and the shield toggle.
   So the things you would reach for the Thor's own keys or the Control Center for are one tap
   from the game.
   Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
   changes as a preset of your own.
+- **Keep your presets.** The app screen has Export and Import under Presets. Export writes
+  your presets and the current layout to a file you choose; Import reads one back. Do this
+  before uninstalling, and to carry layouts to another device.
 - **Where presses go.** The panel's Controller page lists the Thor's own controller, any
   Bluetooth pad that is connected, and a separate virtual pad that games see as a second
   player.
