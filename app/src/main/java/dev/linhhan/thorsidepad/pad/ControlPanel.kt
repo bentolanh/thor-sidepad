@@ -43,7 +43,7 @@ interface PanelActions {
  * fills the display; tapping it closes the panel. Everything here works without window focus.
  */
 object ControlPanel {
-    fun build(themed: Context, state: PanelState, actions: PanelActions): FrameLayout {
+    fun build(themed: Context, state: PanelState, actions: PanelActions, maxHeightPx: Int): FrameLayout {
         val root = FrameLayout(themed)
         root.setBackgroundColor(0x88000000.toInt())
         root.setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_DOWN) actions.close(); true }
@@ -70,7 +70,10 @@ object ControlPanel {
             }
         }
 
-        card.addView(label("Thor SidePad", 20f))
+        val title = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
+        title.addView(label("Thor SidePad", 20f), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+        title.addView(btn("Close") { actions.close() })
+        card.addView(title)
         card.addView(label("Presses go to", 14f))
         for (t in state.targets) {
             val active = !state.virtual && t.name == state.targetName
@@ -118,7 +121,7 @@ object ControlPanel {
         card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f))
 
         val scroll = ScrollView(themed).apply { addView(card); isClickable = true }
-        root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx, Gravity.TOP))
         return root
     }
 }

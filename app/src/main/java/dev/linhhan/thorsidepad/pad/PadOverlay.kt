@@ -94,7 +94,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun showPanel(state: PanelState, actions: PanelActions) {
         removePanel()
-        val v = ControlPanel.build(themed, state, actions)
+        val v = ControlPanel.build(themed, state, actions, (height * 0.82f).roundToInt())
         wm.addView(v, fullScreenParams("SidePad panel")); panel = v
     }
 
