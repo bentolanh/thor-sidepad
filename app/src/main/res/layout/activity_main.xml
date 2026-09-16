@@ -31,6 +31,10 @@
         <Spinner android:id="@+id/displaySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
         <TextView style="@style/StatusLine" android:text="Opacity" />
         <SeekBar android:id="@+id/opacity" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
+        <Switch android:id="@+id/shieldSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Shield: block touches to the app behind the pad (off = only the buttons are covered)" />
+        <Switch android:id="@+id/gestureSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Edge swipes on the shield: pull down = Control Center (AYN key), pull up = Home, from left edge = Back" />
         <Switch android:id="@+id/chordSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Hold Select + Start on the Thor to show/hide the pad" />
 
@@ -43,7 +47,7 @@
             <Button android:id="@+id/btnEdit" style="@style/Half" android:text="Edit layout" />
             <Button android:id="@+id/btnStop" style="@style/Half" android:text="Stop service" />
         </LinearLayout>
-        <TextView style="@style/StatusLine" android:text="A Quick Settings tile named Thor SidePad is also available: add it from the notification shade editor." />
+        <TextView style="@style/StatusLine" android:text="Edit layout opens the editor on the pad's screen: tap a button to select, drag to move, pinch to resize, Add / Delete / − / + in its toolbar. Also reachable from the notification. A Quick Settings tile named Thor SidePad toggles the pad." />
 
         <TextView style="@style/SectionHeader" android:text="5. Test (open a gamepad tester on the top screen first)" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">

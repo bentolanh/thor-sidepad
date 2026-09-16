@@ -2,15 +2,15 @@ package dev.linhhan.thorsidepad.pad
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import dev.linhhan.thorsidepad.inject.Catalog
 import kotlin.math.hypot
 import kotlin.math.min
 
-/** Full-screen layout editor: tap to select, drag to move. Toolbar actions live in [PadOverlay]. */
+/** Full-screen layout editor: tap to select, drag to move, pinch to resize. Toolbar actions live in [PadOverlay]. */
 class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
 
     var selected: Int = -1
@@ -21,11 +21,18 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
     private var dragDx = 0f
     private var dragDy = 0f
 
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xAA202020.toInt() }
-    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.WHITE }
-    private val selRing = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xFFFFC107.toInt() }
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
+    private val painter = ButtonPainter()
     private val grid = Paint().apply { color = 0x22FFFFFF; strokeWidth = 1f }
+    private var scaling = false
+    private val scaler = ScaleGestureDetector(ctx, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(d: ScaleGestureDetector): Boolean { scaling = selected >= 0; return scaling }
+        override fun onScale(d: ScaleGestureDetector): Boolean {
+            val b = layout.buttons.getOrNull(selected) ?: return false
+            b.size = (b.size * d.scaleFactor).coerceIn(0.06f, 0.6f)
+            invalidate(); return true
+        }
+        override fun onScaleEnd(d: ScaleGestureDetector) { scaling = false }
+    })
 
     private fun short() = min(width, height).toFloat()
 
@@ -35,14 +42,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         var x = step; while (x < width) { c.drawLine(x, 0f, x, height.toFloat(), grid); x += step }
         var y = step; while (y < height) { c.drawLine(0f, y, width.toFloat(), y, grid); y += step }
         layout.buttons.forEachIndexed { i, b ->
-            val r = b.size * short() / 2f
-            val cx = b.cx * width; val cy = b.cy * height
-            ring.strokeWidth = r * 0.08f; selRing.strokeWidth = r * 0.14f
-            c.drawCircle(cx, cy, r * 0.92f, fill)
-            c.drawCircle(cx, cy, r * 0.92f, if (i == selected) selRing else ring)
-            val label = Catalog.byCode(b.code).label
-            text.textSize = if (label.length > 2) r * 0.5f else r * 0.8f
-            c.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text)
+            painter.draw(c, b.cx * width, b.cy * height, b.size * short() / 2f, Catalog.byCode(b.code).label, true, false, i == selected)
         }
     }
 
@@ -57,6 +57,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        scaler.onTouchEvent(e)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val i = hit(e.x, e.y)
@@ -67,7 +68,8 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
                     dragDx = b.cx * width - e.x; dragDy = b.cy * height - e.y
                 }
             }
-            MotionEvent.ACTION_MOVE -> if (dragIndex >= 0) {
+            MotionEvent.ACTION_POINTER_DOWN -> dragIndex = -1   // second finger: pinch, not drag
+            MotionEvent.ACTION_MOVE -> if (dragIndex >= 0 && !scaling && e.pointerCount == 1) {
                 val b = layout.buttons[dragIndex]
                 b.cx = ((e.x + dragDx) / width).coerceIn(0.02f, 0.98f)
                 b.cy = ((e.y + dragDy) / height).coerceIn(0.02f, 0.98f)

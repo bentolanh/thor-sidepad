@@ -27,4 +27,7 @@ interface IInjector {
     // Watch a controller node for all `codes` held together for holdMs; fires listener.onChord().
     String watchChord(String path, in int[] codes, int holdMs, IInjectorListener listener) = 9;
     void stopWatch() = 10;
+
+    // Press and release one key on any input node (e.g. the AYN key on gpio-keys). "" or error.
+    String pressKeyOn(String path, int code, int holdMs) = 11;
 }

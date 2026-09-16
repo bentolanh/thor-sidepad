@@ -17,10 +17,18 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 - **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
   map to Android `BUTTON_C` / `BUTTON_Z`. They work in both modes. (The Thor kernel stamps
   every uinput pad with AYN's vendor/product ids, so stock `BUTTON_1..` codes are unmapped.)
-- The pad is drawn as one small non-focusable overlay window per button on the second display,
-  so the space between buttons still belongs to whatever app is on that screen and the top
-  screen keeps input focus.
+- **Shield mode (default)**: one full-screen non-focusable overlay on the second display owns
+  every touch. Nothing behind the pad can be tapped by accident, a thumb can slide from one
+  button to the next, and edge swipes become gestures. Islands mode (one small window per
+  button) is the alternative when the app under the pad should stay usable.
+- **Edge swipes** press the Thor's own keys through the same input nodes the hardware uses:
+  pull down from the top = the AYN key (opens the Control Center), pull up from the bottom =
+  Home, swipe in from the left = Back. The Thor routes them exactly as it routes the real keys,
+  so Home and Back act on the bottom screen when that is the screen last touched.
+- The top screen keeps input focus while the pad is used.
 - Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
+- **Editor** (Edit layout in the app, or Edit on the notification): opens on the pad's screen.
+  Tap to select, drag to move, pinch to resize, Add / − / + / Delete / Reset in the toolbar.
 
 ## Layout
 

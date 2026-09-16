@@ -64,8 +64,17 @@ class PadOverlay(app: Context, val displayId: Int) {
 
     val isShowing get() = views.isNotEmpty()
 
-    fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine) {
+    fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean, gestures: Boolean, onGesture: (EdgeGesture) -> Unit) {
         removeAll()
+        if (shield) {
+            val v = ShieldPadView(ctx, layout, engine, gestures, onGesture)
+            v.alpha = opacity
+            val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+            lp.title = "SidePad shield"
+            add(v, lp)
+            return
+        }
         val short = min(width, height)
         for (b in layout.buttons) {
             val px = (b.size * short).roundToInt().coerceAtLeast(48)
@@ -99,7 +108,7 @@ class PadOverlay(app: Context, val displayId: Int) {
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         val hint = TextView(themed).apply {
-            text = "Tap a button to select it, drag to move."
+            text = "Tap a button to select it. Drag to move, pinch to resize, or use − / + and Delete above."
             setTextColor(Color.WHITE); setPadding(16, 8, 16, 8)
         }
         btn("Add") { showPicker { code ->

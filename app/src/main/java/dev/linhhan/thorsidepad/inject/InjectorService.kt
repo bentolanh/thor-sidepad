@@ -164,6 +164,20 @@ class InjectorService() : IInjector.Stub() {
         return ""
     }
 
+    override fun pressKeyOn(path: String, code: Int, holdMs: Int): String {
+        val f = Native.openDevice(path, true)
+        if (f < 0) return "open $path: ${Native.strerror(f)}"
+        Thread({
+            try {
+                Native.writeEvent(f, Ev.KEY, code, 1); Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+                Thread.sleep(holdMs.toLong().coerceIn(20, 2000))
+                Native.writeEvent(f, Ev.KEY, code, 0); Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+            } catch (_: InterruptedException) {
+            } finally { Native.closeDevice(f) }
+        }, "sidepad-key").start()
+        return ""
+    }
+
     override fun stopWatch() {
         watching = false
         watchThread?.let { t -> try { t.join(500) } catch (_: InterruptedException) {} }

@@ -27,6 +27,16 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("chordEnabled", true)
         set(v) = sp.edit().putBoolean("chordEnabled", v).apply()
 
+    /** Shield: one full-screen window, nothing behind it is touchable. Off = one window per button. */
+    var shield: Boolean
+        get() = sp.getBoolean("shield", true)
+        set(v) = sp.edit().putBoolean("shield", v).apply()
+
+    /** Edge swipes on the shield: pull down = AYN key (Control Center), pull up = Home, left edge = Back. */
+    var gestures: Boolean
+        get() = sp.getBoolean("gestures", true)
+        set(v) = sp.edit().putBoolean("gestures", v).apply()
+
     var layoutJson: String?
         get() = sp.getString("layout", null)
         set(v) = sp.edit().putString("layout", v).apply()

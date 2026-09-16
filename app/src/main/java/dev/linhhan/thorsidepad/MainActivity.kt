@@ -81,6 +81,13 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
 
+        val shield = findViewById<Switch>(R.id.shieldSwitch)
+        shield.isChecked = prefs.shield
+        shield.setOnCheckedChangeListener { _, on -> prefs.shield = on }
+        val gestures = findViewById<Switch>(R.id.gestureSwitch)
+        gestures.isChecked = prefs.gestures
+        gestures.setOnCheckedChangeListener { _, on -> prefs.gestures = on }
+
         val chord = findViewById<Switch>(R.id.chordSwitch)
         chord.isChecked = prefs.chordEnabled
         chord.setOnCheckedChangeListener { _, on -> prefs.chordEnabled = on }

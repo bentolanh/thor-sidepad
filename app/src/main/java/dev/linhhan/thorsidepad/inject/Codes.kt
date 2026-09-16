@@ -21,6 +21,13 @@ object Abs {
     const val HAT0Y = 0x11
 }
 
+/** Keys outside the gamepad range that the gestures press. */
+object Key {
+    const val HOME = 0x66        // KEY_HOME on the Thor controller node: the Home button
+    const val BACK = 0x9e        // KEY_BACK on the Thor controller node: the Back button
+    const val F24 = 0xc2         // KEY_F24 on gpio-keys: the AYN key that opens the Control Center
+}
+
 object Btn {
     const val A = 0x130          // BTN_SOUTH
     const val B = 0x131          // BTN_EAST

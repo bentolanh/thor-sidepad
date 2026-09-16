@@ -20,6 +20,8 @@ import dev.linhhan.thorsidepad.inject.Catalog
 import dev.linhhan.thorsidepad.inject.IInjector
 import dev.linhhan.thorsidepad.inject.IInjectorListener
 import dev.linhhan.thorsidepad.inject.Injector
+import dev.linhhan.thorsidepad.inject.Key
+import org.json.JSONObject
 
 /**
  * Foreground service that keeps the pad alive: holds the injector connection, the overlay
@@ -31,6 +33,7 @@ class OverlayService : Service() {
     private var overlay: PadOverlay? = null
     private var engine: PadEngine? = null
     private var watching = false
+    private var gpioPath: String? = null
     private val main = Handler(Looper.getMainLooper())
 
     private val chordListener = object : IInjectorListener.Stub() {
@@ -97,7 +100,7 @@ class OverlayService : Service() {
                 val eng = PadEngine(svc, Caps.fromJson(svc.targetCaps()))
                 engine = eng
                 val ov = overlay ?: PadOverlay(this, PadOverlay.resolveDisplayId(this, prefs.displayId)).also { overlay = it }
-                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng)
+                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.gestures) { g -> onGesture(svc, g) }
                 visible = true
                 updateNotification()
                 ensureChord()
@@ -128,6 +131,32 @@ class OverlayService : Service() {
                 toast("Could not open editor: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Edge swipes press the Thor's own buttons: the AYN key (Control Center), Home, Back. Those
+     * go through the same nodes the physical keys use, so the Thor routes them exactly as usual.
+     */
+    private fun onGesture(svc: IInjector, g: EdgeGesture) {
+        try {
+            val err = when (g) {
+                EdgeGesture.PULL_DOWN -> gpioPath(svc)?.let { svc.pressKeyOn(it, Key.F24, 60) } ?: "gpio-keys device not found"
+                EdgeGesture.PULL_UP -> svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60)
+                EdgeGesture.LEFT_EDGE -> svc.pressKeyOn(prefs.physicalPath, Key.BACK, 60)
+            }
+            if (err.isNotEmpty()) toast(err)
+        } catch (e: Exception) { Log.w(TAG, "gesture failed", e) }
+    }
+
+    /** The node named "gpio-keys", where the AYN key lives; found once per service life. */
+    private fun gpioPath(svc: IInjector): String? {
+        gpioPath?.let { return it }
+        val devs = JSONObject(svc.probe()).getJSONArray("devices")
+        for (i in 0 until devs.length()) {
+            val d = devs.getJSONObject(i)
+            if (d.optString("name") == "gpio-keys") { gpioPath = d.getString("path"); return gpioPath }
+        }
+        return null
     }
 
     /** Select + Start held together toggles the pad, read straight from the controller node. */
