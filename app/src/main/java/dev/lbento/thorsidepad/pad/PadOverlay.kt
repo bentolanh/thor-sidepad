@@ -19,6 +19,7 @@ import android.widget.EditText
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
@@ -268,6 +269,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             return
         }
         val short = min(width, height)
+        val session = LatchSession()
+        val holdViews = ArrayList<View>()
+        session.onArmChanged = { holdViews.forEach { it.invalidate() } }
         for (b in layout.buttons) {
             val px = (b.size * short).roundToInt().coerceAtLeast(48)
             val enabled = engine.enabled(b.code)
@@ -275,8 +279,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isStickCode(b.code) -> StickView(ctx, b.code, enabled, engine)
                 isDpadCode(b.code) -> DpadView(ctx, enabled, engine)
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
+                b.code == Action.HOLD -> PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
-                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style)
+                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session)
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
@@ -331,6 +336,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }
         val bigger = btn("+") { sel(editor)?.let { it.size = (it.size + 0.02f).coerceAtMost(0.6f); editor.invalidate() } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
+        // Sticky: a tap holds the button down, the next tap releases it. Only for real buttons.
+        val sticky = btn("Sticky") { sel(editor)?.let { if (it.code > 0) { it.sticky = !it.sticky; editor.invalidate() } } }
         btn("Presets") { showPresets(active,
             onUse = { p -> active = p.name; working.buttons.clear(); working.buttons.addAll(p.layout.buttons.map { it.copy() }); working.style = p.layout.style; editor.selected = -1; editor.invalidate(); refreshHint() },
             onDeletedActive = { active = PresetStore.builtins[0].name; working.buttons.clear(); working.buttons.addAll(PresetStore.builtins[0].layout.buttons.map { it.copy() }); working.style = PresetStore.builtins[0].layout.style; editor.selected = -1; editor.invalidate(); refreshHint() })
@@ -359,7 +366,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 }
             }
         }
-        editor.onSelectionChanged = { i -> val has = i >= 0; smaller.isEnabled = has; bigger.isEnabled = has; delete.isEnabled = has }
+        editor.onSelectionChanged = { i -> val has = i >= 0; smaller.isEnabled = has; bigger.isEnabled = has; delete.isEnabled = has
+            sticky.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
         editor.selected = -1
 
         val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(hint) }

@@ -59,6 +59,10 @@ Everything happens on the bottom screen.
   from the game.
   Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
   changes as a preset of your own.
+- **Holding a button down.** Select a button in the editor and tap Sticky: from then on a
+  tap holds it and the next tap lets go. Or add a HOLD button to the pad: tap HOLD, then any
+  button, and that button stays down until you tap it again. A held button shows a yellow
+  dot. Hiding or stopping the pad releases everything.
 - **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation
   or Nintendo way. Only the labels change; A is still A to the game.
 - **Keep your presets.** The app screen has Export and Import under Presets. Export writes

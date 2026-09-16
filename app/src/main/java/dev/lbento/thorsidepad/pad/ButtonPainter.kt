@@ -127,7 +127,8 @@ class ButtonPainter {
         tri(cx + d + a * 0.6f, cy, cx + d - a * 0.6f, cy - a, cx + d - a * 0.6f, cy + a)
     }
 
-    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE) {
+    /** [mark]: 0 none, 1 a hollow dot (sticky, not held), 2 a filled dot (latched down). */
+    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0) {
         ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         ring.pathEffect = if (enabled) null else dash
@@ -142,5 +143,13 @@ class ButtonPainter {
         text.color = if (down) Color.WHITE else labelColor
         c.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text)
         text.color = Color.WHITE
+        if (mark != 0) {
+            // A small dot at the top right of the ring: hollow = sticky, filled = held down.
+            val mx = cx + r * 0.62f; val my = cy - r * 0.62f; val mr = r * 0.16f
+            fill.color = if (mark == 2) 0xFFFFC107.toInt() else 0xCC202020.toInt()
+            c.drawCircle(mx, my, mr, fill)
+            ring.pathEffect = null; ring.strokeWidth = r * 0.05f; ring.color = if (mark == 2) 0xFFFFC107.toInt() else Color.WHITE
+            c.drawCircle(mx, my, mr, ring)
+        }
     }
 }

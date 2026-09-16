@@ -16,9 +16,13 @@ class PadButtonView(
     private val onPress: (Int) -> Unit,
     private val onRelease: (Int) -> Unit,
     style: String = Glyphs.XBOX,
+    private val sticky: Boolean = false,
+    private val session: LatchSession? = null,
 ) : View(ctx) {
 
     private var down = false
+    private var toggled = false     // this touch latched or released the button; its lift must not send a release
+    private val latched get() = session?.latched?.contains(code) == true
     private val label = Glyphs.label(code, style)
     private val labelColor = Glyphs.color(code, style)
     private val painter = ButtonPainter()
@@ -27,16 +31,37 @@ class PadButtonView(
         val r = width / 2f
         when {
             code == Action.SHIELD -> painter.drawShieldToggle(c, r, r, r, false)
+            code == Action.HOLD -> painter.drawSysButton(c, r, r, r, label, null, down || session?.holdArmed == true)
             isActionCode(code) -> painter.drawSysButton(c, r, r, r, label, Catalog.screenTag(code), down)
-            else -> painter.draw(c, r, r, r, label, enabled, down, labelColor = labelColor)
+            else -> painter.draw(c, r, r, r, label, enabled, down || latched, labelColor = labelColor, mark = if (latched) 2 else if (sticky) 1 else 0)
         }
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> if (!down) { down = true; invalidate(); if (enabled) onPress(code) }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (down) { down = false; invalidate(); if (enabled) onRelease(code) }
+            MotionEvent.ACTION_DOWN -> if (!down) {
+                down = true; invalidate()
+                if (!enabled) return true
+                val s = session
+                when {
+                    code == Action.HOLD -> { s?.arm(!s.holdArmed); toggled = true }
+                    isActionCode(code) -> {}
+                    s != null && code in s.latched -> { s.latched.remove(code); toggled = true; onRelease(code) }
+                    s != null && (sticky || s.holdArmed) -> { s.arm(false); s.latched.add(code); toggled = true; onPress(code) }
+                    else -> onPress(code)
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (down) {
+                down = false; invalidate()
+                if (toggled) toggled = false else if (enabled) onRelease(code)
+            }
         }
         return true
+    }
+
+    override fun onDetachedFromWindow() {
+        // A held button must not stay down once its window is gone.
+        session?.let { if (code in it.latched) { it.latched.remove(code); onRelease(code) } }
+        super.onDetachedFromWindow()
     }
 }

@@ -56,6 +56,9 @@ class ShieldPadView(
     private val pressCount = HashMap<Int, Int>()     // button index -> pointers holding it
     private val stickBy = HashMap<Int, Int>()        // pointerId -> stick index it is steering
     private val knob = HashMap<Int, FloatArray>()    // stick index -> current knob offset (-1..1)
+    private val latched = HashSet<Int>()             // button indexes held down by a latch
+    private val latchTouch = HashSet<Int>()          // pointers whose touch-down toggled a latch
+    private var holdArmed = false                     // HOLD tapped: the next button latches
     private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
     private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
@@ -91,12 +94,15 @@ class ShieldPadView(
                 painter.drawStick(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), k?.get(0) ?: 0f, k?.get(1) ?: 0f)
             } else if (b.code == Action.SHIELD) {
                 painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, shieldOn)
+            } else if (b.code == Action.HOLD) {
+                painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, null, holdArmed || (pressCount[i] ?: 0) > 0)
             } else if (isActionCode(b.code)) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
             } else if (isSliderCode(b.code)) {
                 painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), levels[b.code] ?: 0.5f, sliderBy.containsValue(i))
             } else {
-                painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0, labelColor = Glyphs.color(b.code, layout.style))
+                painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0 || i in latched, labelColor = Glyphs.color(b.code, layout.style),
+                    mark = if (i in latched) 2 else if (b.sticky) 1 else 0)
             }
         }
         // Small pills marking the gesture edges: top (panel) and bottom (hide).
@@ -151,12 +157,26 @@ class ShieldPadView(
         engine.stick(layout.buttons[i].code, 0f, 0f)
     }
 
-    private fun press(i: Int, pid: Int) {
+    /**
+     * [initial] is the finger's touch-down; a finger sliding onto a button later is not.
+     * Latching happens only on touch-down: a latched button tapped again releases, a sticky
+     * button or any button tapped while HOLD is armed latches down.
+     */
+    private fun press(i: Int, pid: Int, initial: Boolean = false) {
         pressedBy[pid] = i
         val n = (pressCount[i] ?: 0) + 1
         pressCount[i] = n
-        val code = layout.buttons[i].code
-        if (n == 1 && !isActionCode(code)) engine.press(code)
+        val b = layout.buttons[i]
+        val code = b.code
+        if (code == Action.HOLD) { if (initial) holdArmed = !holdArmed; return }
+        if (isActionCode(code)) return
+        if (n != 1) return
+        if (i in latched) {
+            if (initial) { latched.remove(i); latchTouch.add(pid); engine.release(code) }
+            return                                   // sliding over a held button leaves it held
+        }
+        if (initial && (b.sticky || holdArmed)) { holdArmed = false; latched.add(i); latchTouch.add(pid); engine.press(code); return }
+        engine.press(code)
     }
 
     /** Action buttons fire on release, only if the finger is still on them. */
@@ -165,9 +185,12 @@ class ShieldPadView(
         val n = (pressCount[i] ?: 1) - 1
         pressCount[i] = n
         val code = layout.buttons[i].code
+        val toggled = latchTouch.remove(pid)
         if (n <= 0) {
             pressCount.remove(i)
-            if (isActionCode(code)) { if (fireAction) onAction(code) } else engine.release(code)
+            if (code == Action.HOLD) return
+            if (isActionCode(code)) { if (fireAction) onAction(code) }
+            else if (!toggled && i !in latched) engine.release(code)
         }
     }
 
@@ -195,7 +218,7 @@ class ShieldPadView(
                 else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
                 else if (i >= 0 && isDpadCode(layout.buttons[i].code)) { dpadBy[pid] = i; steerDpad(i, x, y) }
                 else if (i >= 0 && isSliderCode(layout.buttons[i].code)) { sliderBy[pid] = i; slide(i, y) }
-                else { tracked.add(pid); if (i >= 0) press(i, pid) }
+                else { tracked.add(pid); if (i >= 0) press(i, pid, initial = true) }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
@@ -252,6 +275,8 @@ class ShieldPadView(
 
     override fun onDetachedFromWindow() {
         pressedBy.keys.toList().forEach { release(it) }
+        latched.toList().forEach { i -> engine.release(layout.buttons[i].code) }
+        latched.clear()
         stickBy.keys.toList().forEach { releaseStick(it) }
         dpadBy.keys.toList().forEach { releaseDpad(it) }
         super.onDetachedFromWindow()
