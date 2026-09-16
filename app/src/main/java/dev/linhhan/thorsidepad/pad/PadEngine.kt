@@ -8,7 +8,9 @@ import dev.linhhan.thorsidepad.inject.Btn
 import dev.linhhan.thorsidepad.inject.Catalog
 import dev.linhhan.thorsidepad.inject.Ev
 import dev.linhhan.thorsidepad.inject.IInjector
+import dev.linhhan.thorsidepad.inject.Stick
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 /** What the open target can emit, parsed from IInjector.targetCaps(). */
 class Caps(val keys: Set<Int>, val abs: Map<Int, IntArray>, val virtual: Boolean) {
@@ -58,6 +60,19 @@ fun planFor(code: Int, caps: Caps): List<Emit> {
     return out
 }
 
+/** The two axes a virtual stick drives, with their ranges on the current target. */
+data class StickPlan(val ax: Int, val ay: Int, val xr: IntArray, val yr: IntArray)
+
+fun stickPlanFor(code: Int, caps: Caps): StickPlan? {
+    val pairs = when (code) {
+        Stick.LEFT -> listOf(Abs.X to Abs.Y)
+        Stick.RIGHT -> listOf(Abs.Z to Abs.RZ, Abs.RX to Abs.RY)   // Xbox-style first, then generic
+        else -> return null
+    }
+    val (ax, ay) = pairs.firstOrNull { caps.abs.containsKey(it.first) && caps.abs.containsKey(it.second) } ?: return null
+    return StickPlan(ax, ay, caps.abs.getValue(ax), caps.abs.getValue(ay))
+}
+
 /** Sends press/release plans to the injector off the UI thread, in order. */
 class PadEngine(private val injector: IInjector, val caps: Caps) {
     private val thread = HandlerThread("sidepad-engine").apply { start() }
@@ -65,6 +80,25 @@ class PadEngine(private val injector: IInjector, val caps: Caps) {
     private val plans = HashMap<Int, List<Emit>>()
 
     fun plan(code: Int): List<Emit> = plans.getOrPut(code) { planFor(code, caps) }
+    private val sticks = HashMap<Int, StickPlan?>()
+    fun stickPlan(code: Int): StickPlan? = sticks.getOrPut(code) { stickPlanFor(code, caps) }
+
+    /** Whether the current target can express this element at all. */
+    fun enabled(code: Int): Boolean = if (code < 0) stickPlan(code) != null else plan(code).isNotEmpty()
+
+    /** Moves a virtual stick; nx/ny are -1..1, y positive = down like a real pad. */
+    fun stick(code: Int, nx: Float, ny: Float) {
+        val sp = stickPlan(code) ?: return
+        fun map(n: Float, r: IntArray): Int {
+            val mid = (r[0] + r[1]) / 2f
+            val half = (r[1] - r[0]) / 2f
+            return (mid + n.coerceIn(-1f, 1f) * half).roundToInt()
+        }
+        val x = map(nx, sp.xr); val y = map(ny, sp.yr)
+        handler.post {
+            try { injector.abs(sp.ax, x); injector.abs(sp.ay, y) } catch (ex: Exception) { Log.w("SidePadEngine", "stick failed", ex) }
+        }
+    }
 
     fun press(code: Int) = send(plan(code), true)
     fun release(code: Int) = send(plan(code), false)

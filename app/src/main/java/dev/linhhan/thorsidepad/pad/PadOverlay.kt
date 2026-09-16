@@ -109,8 +109,8 @@ class PadOverlay(app: Context, val displayId: Int) {
         val short = min(width, height)
         for (b in layout.buttons) {
             val px = (b.size * short).roundToInt().coerceAtLeast(48)
-            val enabled = engine.plan(b.code).isNotEmpty()
-            val v = PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
+            val enabled = engine.enabled(b.code)
+            val v: View = if (b.code < 0) StickView(ctx, b.code, enabled, engine) else PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
             v.alpha = opacity
             val lp = WindowManager.LayoutParams(px, px, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
@@ -139,17 +139,20 @@ class PadOverlay(app: Context, val displayId: Int) {
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         val hint = TextView(themed).apply {
-            text = "Tap a button to select it. Drag to move, pinch to resize, or use − / + and Delete above."
+            text = "Tap to select. Drag to move, pinch to resize, − / + and Delete above. Presets: left-hand, right-hand, face buttons."
             setTextColor(Color.WHITE); setPadding(16, 8, 16, 8)
         }
-        btn("Add") { showPicker { code ->
-            working.buttons.add(PadButton(code, 0.5f, 0.5f, 0.15f))
+        btn("Add") { showChoice("Add a button or stick", Catalog.all.map { "${it.label}   (${it.androidName})" }) { pos ->
+            val code = Catalog.all[pos].code
+            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (code < 0) 0.28f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }
         val bigger = btn("+") { sel(editor)?.let { it.size = (it.size + 0.02f).coerceAtMost(0.6f); editor.invalidate() } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
-        btn("Reset") { working.buttons.clear(); working.buttons.addAll(PadLayout.default().buttons); editor.selected = -1 }
+        btn("Presets") { showChoice("Start from a preset", PadLayout.presets.map { it.first }) { pos ->
+            working.buttons.clear(); working.buttons.addAll(PadLayout.presets[pos].second().buttons); editor.selected = -1; editor.invalidate()
+        } }
         btn("Cancel") { removeAll(); onCancel() }
         btn("Save") { removeAll(); onSave(working) }
         editor.onSelectionChanged = { i -> val has = i >= 0; smaller.isEnabled = has; bigger.isEnabled = has; delete.isEnabled = has }
@@ -166,8 +169,8 @@ class PadOverlay(app: Context, val displayId: Int) {
 
     private fun sel(editor: EditPadView): PadButton? = editor.layout.buttons.getOrNull(editor.selected)
 
-    /** The catalogue picker: a card over a scrim. Pick an entry, or Cancel / tap outside to back out. */
-    private fun showPicker(onPick: (Int) -> Unit) {
+    /** A list chooser: a card over a scrim. Pick an entry, or Cancel / tap outside to back out. */
+    private fun showChoice(title: String, labels: List<String>, onPick: (Int) -> Unit) {
         val root = FrameLayout(themed)
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
@@ -180,15 +183,14 @@ class PadOverlay(app: Context, val displayId: Int) {
             isClickable = true
         }
         val header = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 8, 8, 8) }
-        header.addView(TextView(themed).apply { text = "Add a button"; setTextColor(Color.WHITE); textSize = 18f },
+        header.addView(TextView(themed).apply { text = title; setTextColor(Color.WHITE); textSize = 18f },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
         header.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } })
         card.addView(header)
 
         val list = ListView(themed)
-        val labels = Catalog.all.map { "${it.label}   (${it.androidName})" }
         list.adapter = ArrayAdapter(themed, android.R.layout.simple_list_item_1, labels)
-        list.setOnItemClickListener { _, _, pos, _ -> dismiss(); onPick(Catalog.all[pos].code) }
+        list.setOnItemClickListener { _, _, pos, _ -> dismiss(); onPick(pos) }
         card.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
         root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), (height * 0.85f).roundToInt(), Gravity.CENTER))

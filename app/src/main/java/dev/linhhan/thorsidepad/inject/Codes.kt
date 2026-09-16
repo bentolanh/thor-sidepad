@@ -28,6 +28,12 @@ object Key {
     const val F24 = 0xc2         // KEY_F24 on gpio-keys: the AYN key that opens the Control Center
 }
 
+/** Pseudo-codes for the two analogue sticks (negative so they never collide with a Linux key). */
+object Stick {
+    const val LEFT = -1
+    const val RIGHT = -2
+}
+
 object Btn {
     const val A = 0x130          // BTN_SOUTH
     const val B = 0x131          // BTN_EAST
@@ -58,6 +64,7 @@ data class PadCode(val code: Int, val label: String, val androidName: String) {
     val isDpad get() = code in Btn.DPAD_UP..Btn.DPAD_RIGHT
     val isTrigger get() = code == Btn.TL2 || code == Btn.TR2
     val isExtra get() = code == Btn.C || code == Btn.Z
+    val isStick get() = code < 0
 }
 
 object Catalog {
@@ -85,18 +92,20 @@ object Catalog {
         // stamps every uinput pad with AYN's vendor/product ids, whose layout lacks them.)
         PadCode(Btn.C, "M1", "BUTTON_C"),
         PadCode(Btn.Z, "M2", "BUTTON_Z"),
+        PadCode(Stick.LEFT, "LS", "left stick, AXIS_X / AXIS_Y"),
+        PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
     )
 
     fun byCode(code: Int): PadCode = all.firstOrNull { it.code == code } ?: PadCode(code, "0x%x".format(code), "KEY_$code")
 
-    /** Every key the virtual pad declares: the whole catalogue. */
-    val virtualKeys: IntArray = all.map { it.code }.toIntArray()
+    /** Every key the virtual pad declares: the whole button catalogue. */
+    val virtualKeys: IntArray = all.filter { !it.isStick }.map { it.code }.toIntArray()
 
-    /** Axes the virtual pad declares. Sticks are present but always centred; the Thor keeps its real sticks. */
+    /** Axes the virtual pad declares, laid out like the Thor's own controller: X/Y left stick, Z/RZ right stick, GAS/BRAKE triggers. */
     val virtualAbs = listOf(
-        Triple(Abs.X, -32768, 32767), Triple(Abs.Y, -32768, 32767),
-        Triple(Abs.RX, -32768, 32767), Triple(Abs.RY, -32768, 32767),
-        Triple(Abs.Z, 0, 255), Triple(Abs.RZ, 0, 255),
+        Triple(Abs.X, -32767, 32767), Triple(Abs.Y, -32767, 32767),
+        Triple(Abs.Z, -32767, 32767), Triple(Abs.RZ, -32767, 32767),
+        Triple(Abs.GAS, 0, 32767), Triple(Abs.BRAKE, 0, 32767),
         Triple(Abs.HAT0X, -1, 1), Triple(Abs.HAT0Y, -1, 1),
     )
 }

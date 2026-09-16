@@ -30,8 +30,16 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
   routes the real keys, so they act on the bottom screen when that is the screen last touched.
 - The top screen keeps input focus while the pad is used.
 - Show/hide: the app, a Quick Settings tile, the notification, or holding Select + Start.
-- **Editor** (Edit layout in the app, or Edit on the notification): opens on the pad's screen.
-  Tap to select, drag to move, pinch to resize, Add / − / + / Delete / Reset in the toolbar.
+- **Sticks.** The catalogue includes a left and a right virtual analogue stick. They drive the
+  controller's own stick axes (X/Y, and Z/RZ for the right stick as the Thor reports it), so in
+  same-controller mode a virtual stick is the same stick the game already reads.
+- **Presets.** "Left hand" (you hold the left side; the screen shows A/B/X/Y, the right stick,
+  R1/R2, Start and M1/M2 on the left half, under the same thumb), "Right hand" (the mirror:
+  d-pad, left stick, L1/L2, Select on the right half) and "Face buttons". Left hand is the
+  default; pick another from Presets in the editor.
+- **Editor** (Edit layout in the pull-down panel, the app, or the notification): opens on the
+  pad's screen. Tap to select, drag to move, pinch to resize, Add / − / + / Delete / Presets in
+  the toolbar; choosers can be cancelled or dismissed by tapping outside.
 
 ## Layout
 

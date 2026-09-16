@@ -42,7 +42,9 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         var x = step; while (x < width) { c.drawLine(x, 0f, x, height.toFloat(), grid); x += step }
         var y = step; while (y < height) { c.drawLine(0f, y, width.toFloat(), y, grid); y += step }
         layout.buttons.forEachIndexed { i, b ->
-            painter.draw(c, b.cx * width, b.cy * height, b.size * short() / 2f, Catalog.byCode(b.code).label, true, false, i == selected)
+            val label = Catalog.byCode(b.code).label
+            if (b.code < 0) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
+            else painter.draw(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, false, i == selected)
         }
     }
 

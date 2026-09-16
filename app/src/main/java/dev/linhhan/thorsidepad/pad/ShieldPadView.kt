@@ -30,6 +30,8 @@ class ShieldPadView(
     private val tracked = HashSet<Int>()             // pointers that may press buttons (not edge swipes)
     private val pressedBy = HashMap<Int, Int>()      // pointerId -> button index currently held
     private val pressCount = HashMap<Int, Int>()     // button index -> pointers holding it
+    private val stickBy = HashMap<Int, Int>()        // pointerId -> stick index it is steering
+    private val knob = HashMap<Int, FloatArray>()    // stick index -> current knob offset (-1..1)
 
     private class Swipe(val edge: EdgeGesture, val x0: Float, val y0: Float, val t0: Long)
     private val swipes = HashMap<Int, Swipe>()
@@ -47,8 +49,13 @@ class ShieldPadView(
     override fun onDraw(c: Canvas) {
         layout.buttons.forEachIndexed { i, b ->
             val r = b.size * short() / 2f
-            val enabled = engine.plan(b.code).isNotEmpty()
-            painter.draw(c, b.cx * width, b.cy * height, r, Catalog.byCode(b.code).label, enabled, (pressCount[i] ?: 0) > 0)
+            val label = Catalog.byCode(b.code).label
+            if (b.code < 0) {
+                val k = knob[i]
+                painter.drawStick(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), k?.get(0) ?: 0f, k?.get(1) ?: 0f)
+            } else {
+                painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0)
+            }
         }
         // Small pills marking the gesture edges: top always (our panel), others when enabled.
         val w = width * 0.18f; val h = 8f
@@ -57,6 +64,22 @@ class ShieldPadView(
             c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
             c.drawRoundRect(10f, (height - w) / 2, 10f + h, (height + w) / 2, h, h, hint)
         }
+    }
+
+    private fun steer(i: Int, x: Float, y: Float) {
+        val b = layout.buttons[i]
+        val r = b.size * short() / 2f * 0.95f
+        var dx = (x - b.cx * width) / r; var dy = (y - b.cy * height) / r
+        val len = hypot(dx, dy)
+        if (len > 1f) { dx /= len; dy /= len }
+        knob[i] = floatArrayOf(dx, dy)
+        engine.stick(b.code, dx, dy)
+    }
+
+    private fun releaseStick(pid: Int) {
+        val i = stickBy.remove(pid) ?: return
+        knob.remove(i)
+        engine.stick(layout.buttons[i].code, 0f, 0f)
     }
 
     private fun press(i: Int, pid: Int) {
@@ -93,10 +116,15 @@ class ShieldPadView(
                 val i = hit(x, y)
                 val edge = if (i < 0) edgeAt(x, y) else null
                 if (edge != null) swipes[pid] = Swipe(edge, x, y, e.eventTime)
+                else if (i >= 0 && layout.buttons[i].code < 0) { stickBy[pid] = i; steer(i, x, y) }
                 else { tracked.add(pid); if (i >= 0) press(i, pid) }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
+                for (idx in 0 until e.pointerCount) {
+                    val pid = e.getPointerId(idx)
+                    stickBy[pid]?.let { si -> steer(si, e.getX(idx), e.getY(idx)); invalidate() }
+                }
                 // A finger keeps being tracked while it crosses gaps, so it can slide A -> B.
                 for (idx in 0 until e.pointerCount) {
                     val pid = e.getPointerId(idx)
@@ -110,6 +138,7 @@ class ShieldPadView(
                 val idx = e.actionIndex
                 val pid = e.getPointerId(idx)
                 release(pid)
+                releaseStick(pid)
                 tracked.remove(pid)
                 swipes.remove(pid)?.let { s ->
                     val dx = e.getX(idx) - s.x0; val dy = e.getY(idx) - s.y0
@@ -126,6 +155,7 @@ class ShieldPadView(
             }
             MotionEvent.ACTION_CANCEL -> {
                 pressedBy.keys.toList().forEach { release(it) }
+                stickBy.keys.toList().forEach { releaseStick(it) }
                 tracked.clear()
                 swipes.clear()
                 invalidate()
@@ -136,6 +166,7 @@ class ShieldPadView(
 
     override fun onDetachedFromWindow() {
         pressedBy.keys.toList().forEach { release(it) }
+        stickBy.keys.toList().forEach { releaseStick(it) }
         super.onDetachedFromWindow()
     }
 

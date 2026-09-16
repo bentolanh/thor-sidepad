@@ -1,6 +1,7 @@
 package dev.linhhan.thorsidepad.pad
 
 import dev.linhhan.thorsidepad.inject.Btn
+import dev.linhhan.thorsidepad.inject.Stick
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -36,12 +37,48 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             } catch (e: Exception) { default() }
         }
 
+        /** Named starting layouts. The first is the default. */
+        val presets: List<Pair<String, () -> PadLayout>> = listOf(
+            "Left hand: you hold the left side, the screen shows the right-side controls" to ::leftHand,
+            "Right hand: you hold the right side, the screen shows the left-side controls" to ::rightHand,
+            "Face buttons only (A/B/X/Y, L1/R1, M1/M2, Select/Start)" to ::faceButtons,
+        )
+
+        fun default(): PadLayout = leftHand()
+
         /**
-         * One-handed default: the face diamond sits on the left half, just below where the left
-         * thumb rests on the stick, so the thumb drops down to it. Shoulders in the top corners,
-         * the two extra buttons (M1/M2) on the right where a second hand could reach them.
+         * Left hand on the Thor (left stick, d-pad, L1/L2 physical). Everything the right hand
+         * would do sits on the LEFT half of the bottom screen, under the same left thumb.
          */
-        fun default(): PadLayout = PadLayout(mutableListOf(
+        fun leftHand(): PadLayout = PadLayout(mutableListOf(
+            PadButton(Btn.TR, 0.10f, 0.10f, 0.12f),
+            PadButton(Btn.TR2, 0.26f, 0.10f, 0.12f),
+            PadButton(Btn.START, 0.42f, 0.10f, 0.11f),
+            PadButton(Btn.Y, 0.22f, 0.28f, 0.16f),
+            PadButton(Btn.X, 0.10f, 0.42f, 0.16f),
+            PadButton(Btn.B, 0.34f, 0.42f, 0.16f),
+            PadButton(Btn.A, 0.22f, 0.56f, 0.16f),
+            PadButton(Stick.RIGHT, 0.22f, 0.80f, 0.28f),
+            PadButton(Btn.C, 0.45f, 0.62f, 0.11f),
+            PadButton(Btn.Z, 0.45f, 0.82f, 0.11f),
+        ))
+
+        /** Mirror image: right hand on the Thor, the left-side controls on the RIGHT half of the screen. */
+        fun rightHand(): PadLayout = PadLayout(mutableListOf(
+            PadButton(Btn.TL, 0.90f, 0.10f, 0.12f),
+            PadButton(Btn.TL2, 0.74f, 0.10f, 0.12f),
+            PadButton(Btn.SELECT, 0.58f, 0.10f, 0.11f),
+            PadButton(Btn.DPAD_UP, 0.78f, 0.28f, 0.15f),
+            PadButton(Btn.DPAD_LEFT, 0.66f, 0.42f, 0.15f),
+            PadButton(Btn.DPAD_RIGHT, 0.90f, 0.42f, 0.15f),
+            PadButton(Btn.DPAD_DOWN, 0.78f, 0.56f, 0.15f),
+            PadButton(Stick.LEFT, 0.78f, 0.80f, 0.28f),
+            PadButton(Btn.C, 0.55f, 0.62f, 0.11f),
+            PadButton(Btn.Z, 0.55f, 0.82f, 0.11f),
+        ))
+
+        /** The original set: a face diamond on the left, shoulders in the corners, extras and Start/Select on the right. */
+        fun faceButtons(): PadLayout = PadLayout(mutableListOf(
             PadButton(Btn.Y, 0.30f, 0.30f, 0.17f),
             PadButton(Btn.X, 0.17f, 0.44f, 0.17f),
             PadButton(Btn.B, 0.43f, 0.44f, 0.17f),
