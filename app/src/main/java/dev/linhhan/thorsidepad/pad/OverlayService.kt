@@ -257,7 +257,7 @@ class OverlayService : Service() {
     }
 
     /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
-    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (hide), 3 pull up (show), 4 end screen
+    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (show), 3 pull up (hide), 4 end screen
     private var saved: Triple<Boolean, String, Float>? = null   // shield, backdrop, opacity before the guide
     private var savedVisible = false
 
@@ -301,14 +301,17 @@ class OverlayService : Service() {
         val ov = overlay ?: return
         when {
             guideStep == 1 && g == EdgeGesture.PULL_DOWN -> { ov.removeGuide(); guideStep = 2; showPanel() }   // step 2 resumes when the panel closes
-            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 1000) }
-            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); main.postDelayed({ if (guideStep == 3) showGuideStep(4) }, 1000) }
+            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 1000) }
+            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); main.postDelayed({ if (guideStep == 3) showGuideStep(4) }, 1000) }
         }
     }
 
-    /** Called whenever the panel goes away, so a guide waiting on it can continue. */
+    /** Called whenever the panel goes away. In the guide, the pad then hides so step 2 can bring it back. */
     private fun panelClosed() {
-        if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 1000)
+        if (guideStep == 2) {
+            main.postDelayed({ if (guideStep == 2) hide() }, 400)
+            main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 1400)
+        }
     }
 
     private fun showPanel(keepPage: Boolean = false) = openPanel(dragged = false, keepPage = keepPage)

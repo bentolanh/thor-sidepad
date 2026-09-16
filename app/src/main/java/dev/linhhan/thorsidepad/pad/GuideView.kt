@@ -15,7 +15,7 @@ import kotlin.math.min
  * An interactive guide over the pad's screen. Each step asks for one real gesture and waits
  * for it; the service then performs the real action. A tap on "Skip" ends the guide.
  *
- * Steps: 1 pull down (panel), 2 pull up (hide the pad), 3 pull up (show it again), 4 end screen.
+ * Steps: 1 pull down (panel; the pad then hides), 2 pull up (show the pad), 3 pull up (hide it), 4 end screen.
  */
 class GuideView(
     ctx: Context,
@@ -53,9 +53,9 @@ class GuideView(
     private fun skipRect(): FloatArray { val w = width.toFloat(); val y = labelY(); return floatArrayOf(w * 0.5f - 130f, y + 20f, w * 0.5f + 130f, y + 90f) }
 
     override fun onDraw(c: Canvas) {
-        // The pad is up (shield on, frosted) for most of the guide: keep the scrim light so it stays
-        // visible. Only step 3, where the pad is hidden, darkens the app behind.
-        c.drawColor(if (step == 3) 0xE0101418.toInt() else 0x50101418)
+        // Light while the pad is up (steps 1 and 3) so the frosted pad stays visible; dark while it is
+        // hidden (step 2 and the end screen) so the app behind does not distract.
+        c.drawColor(if (step == 2 || step == 4) 0xE0101418.toInt() else 0x50101418)
         val w = width.toFloat(); val h = height.toFloat()
         val r = min(w, h) * 0.06f
         title.textSize = r * 0.75f; text.textSize = r * 0.55f
@@ -87,7 +87,7 @@ class GuideView(
             wantsUp -> {
                 arrow(c, w / 2, h * 0.94f, h * 0.76f, r, dragY.coerceIn(-h * 0.18f, 0f))
                 c.drawText("Pull up from the bottom edge", w / 2, h * 0.66f, title)
-                c.drawText(if (step == 2) "Try it now: it hides the pad" else "Once more: it brings the pad back", w / 2, h * 0.66f + r * 0.9f, text)
+                c.drawText(if (step == 2) "Try it now: it shows the pad" else "Once more: it hides the pad", w / 2, h * 0.66f + r * 0.9f, text)
             }
         }
     }
