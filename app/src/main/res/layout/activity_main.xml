@@ -50,13 +50,11 @@
         <Switch android:id="@+id/bootSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Start in the background at boot" />
         <TextView style="@style/StatusLine" android:text="App icon" />
-        <!-- Each radio carries its icon preview above the label, so the picture and the choice line up. -->
-        <RadioGroup android:id="@+id/iconGroup" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
-            <RadioButton android:id="@+id/iconFamicom" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Famicom" android:drawablePadding="8dp" android:paddingEnd="32dp" />
-            <RadioButton android:id="@+id/iconGameBoy" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Game Boy" android:drawablePadding="8dp" />
-        </RadioGroup>
+        <!-- Two tappable icons; the chosen one is ringed. No names needed. -->
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp">
+            <ImageView android:id="@+id/iconFamicom" android:layout_width="72dp" android:layout_height="72dp" android:padding="6dp" android:contentDescription="Famicom icon" />
+            <ImageView android:id="@+id/iconGameBoy" android:layout_width="72dp" android:layout_height="72dp" android:padding="6dp" android:layout_marginStart="16dp" android:contentDescription="Game Boy icon" />
+        </LinearLayout>
         <TextView style="@style/StepHelp" android:text="Launchers that cache icons (Beacon, ES-DE, Daijishō) show the new one after they restart." />
         <TextView style="@style/StepHelp" android:text="Shizuku itself stops when the Thor reboots. In the Shizuku app, turn on “Start on boot (wireless debugging)” so both come back on their own; otherwise start Shizuku again from its app or from a computer with adb." />
     </LinearLayout>

@@ -14,7 +14,6 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.content.ComponentName
 import android.widget.Button
-import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
@@ -89,12 +88,12 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Look at the bottom screen.", Toast.LENGTH_SHORT).show()
         }
 
-        // Previews: the adaptive icons drawn the way a round launcher shows them, above each radio's label.
-        findViewById<android.widget.RadioButton>(R.id.iconFamicom).setCompoundDrawablesWithIntrinsicBounds(null, roundIcon(R.mipmap.ic_launcher_famicom), null, null)
-        findViewById<android.widget.RadioButton>(R.id.iconGameBoy).setCompoundDrawablesWithIntrinsicBounds(null, roundIcon(R.mipmap.ic_launcher_gameboy), null, null)
-        val icons = findViewById<RadioGroup>(R.id.iconGroup)
-        icons.check(if (iconEnabled("LauncherGameBoy")) R.id.iconGameBoy else R.id.iconFamicom)
-        icons.setOnCheckedChangeListener { _, id -> setIcon(if (id == R.id.iconGameBoy) "LauncherGameBoy" else "LauncherFamicom") }
+        // The two launcher icons, drawn the way a round launcher shows them; tap one to use it.
+        findViewById<android.widget.ImageView>(R.id.iconFamicom).setImageDrawable(roundIcon(R.mipmap.ic_launcher_famicom))
+        findViewById<android.widget.ImageView>(R.id.iconGameBoy).setImageDrawable(roundIcon(R.mipmap.ic_launcher_gameboy))
+        findViewById<android.widget.ImageView>(R.id.iconFamicom).setOnClickListener { setIcon("LauncherFamicom"); markIcon() }
+        findViewById<android.widget.ImageView>(R.id.iconGameBoy).setOnClickListener { setIcon("LauncherGameBoy"); markIcon() }
+        markIcon()
 
         val boot = findViewById<Switch>(R.id.bootSwitch)
         boot.isChecked = prefs.startAtBoot
@@ -242,6 +241,17 @@ class MainActivity : AppCompatActivity() {
         val full = (px * 1.5f).toInt(); val off = (full - px) / 2
         d.setBounds(-off, -off, full - off, full - off); d.draw(c)
         return android.graphics.drawable.BitmapDrawable(resources, bmp)
+    }
+
+    /** Rings the icon that is currently in use. */
+    private fun markIcon() {
+        val gb = iconEnabled("LauncherGameBoy")
+        fun ring(on: Boolean) = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(0x00000000); setStroke((3 * resources.displayMetrics.density).toInt(), if (on) 0xFF8FC1FF.toInt() else 0x00000000)
+        }
+        findViewById<android.widget.ImageView>(R.id.iconFamicom).background = ring(!gb)
+        findViewById<android.widget.ImageView>(R.id.iconGameBoy).background = ring(gb)
     }
 
     // ---- launcher icon: two aliases of the same activity, one enabled at a time
