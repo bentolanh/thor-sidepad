@@ -52,7 +52,9 @@ class GuideView(
     private fun skipRect(): FloatArray { val w = width.toFloat(); val y = labelY(); return floatArrayOf(w * 0.5f - 130f, y + 20f, w * 0.5f + 130f, y + 90f) }
 
     override fun onDraw(c: Canvas) {
-        c.drawColor(0xE0101418.toInt())
+        // Dark while the pad is hidden (the app behind must not distract); light once the pad is up,
+        // so the frosted pad and its buttons stay clearly visible under the instructions.
+        c.drawColor(if (step == 3) 0x50101418 else 0xE0101418.toInt())
         val w = width.toFloat(); val h = height.toFloat()
         val r = min(w, h) * 0.06f
         title.textSize = r * 0.75f; text.textSize = r * 0.55f
