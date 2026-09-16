@@ -83,11 +83,7 @@ touch screen, expect the following:
 
 ## Built with Claude Code
 
-This app was written with Claude Code, Anthropic's AI coding tool, working from a person's
-requests and corrections. Every feature was tried on a real Thor before it went in, and the
-git history records the AI as co-author on each commit. The code is small, MIT-licensed and
-open to anyone who wants to read it or check it. If AI-written code is not for you, that is
-a fair position, and now you know before installing.
+This app is developed using Claude Code.
 
 ## License
 
