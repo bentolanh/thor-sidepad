@@ -84,7 +84,7 @@ class OverlayService : Service() {
                 ?: if (isThorName(prefs.physicalName)) found.firstOrNull { isThorName(it.name) } else null
             val chosen = byName ?: found.firstOrNull { it.path == prefs.physicalPath } ?: found.firstOrNull()
             if (chosen != null) {
-                if (prefs.physicalName.isEmpty() || byName == null) prefs.physicalName = chosen.name
+                if (prefs.physicalName != chosen.name) prefs.physicalName = chosen.name
                 if (prefs.physicalPath != chosen.path) prefs.physicalPath = chosen.path
             }
         } catch (e: Exception) { Log.w(TAG, "probe failed", e) }
