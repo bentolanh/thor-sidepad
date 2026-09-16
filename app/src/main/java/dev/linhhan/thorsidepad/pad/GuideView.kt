@@ -29,6 +29,7 @@ class GuideView(
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFD0D6DC.toInt(); textAlign = Paint.Align.CENTER }
     private val pill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCCFFFFFF.toInt() }
     private val skipBox = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33FFFFFF }
+    private val band = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE0101418.toInt() }
     private val path = Path()
 
     private var x0 = 0f; private var y0 = 0f; private var t0 = 0L
@@ -73,6 +74,9 @@ class GuideView(
             c.drawText("Done", w / 2, (s[1] + s[3]) / 2 + text.textSize * 0.35f, text)
             return
         }
+        // With the pad showing under a light scrim, give the words a dark band so the buttons do not
+        // compete with them; the arrow zone below stays clear.
+        if (step == 3) c.drawRoundRect(w * 0.06f, h * 0.43f, w * 0.94f, h * 0.745f, 24f, 24f, band)
         c.drawText("Step $step of 3", w / 2, labelY(), text)
         val s = skipRect()
         c.drawRoundRect(s[0], s[1], s[2], s[3], 16f, 16f, skipBox)
