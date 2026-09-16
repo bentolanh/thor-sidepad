@@ -3,13 +3,10 @@
 Play one-handed on the AYN Thor. SidePad puts controller buttons on the bottom screen, and
 the game on the top screen reads them as presses on the Thor's own controller.
 
-Hold the Thor with your left hand, thumb on the left stick, and tap A, B, X and Y right
-below it on the touchscreen. No reaching across for the face buttons, no root.
-
 ## What it is for
 
-- **One-handed play.** Lying in bed, holding a drink, or just resting the other arm. The
-  buttons your free hand would press sit under the thumb you still have on the device.
+- **One-handed play.** Holding a drink, or just resting the other arm. The buttons your free
+  hand would press sit under the thumb you still have on the device.
 - **Any button, anywhere.** Put A/B/X/Y, shoulders, triggers, Start, Select, a d-pad or a
   virtual stick wherever your thumb lands. Drag, resize, save it as a preset.
 - **Extra buttons the Thor does not have.** M1 and M2 appear to games as two more buttons,
@@ -45,8 +42,8 @@ Everything happens on the bottom screen.
 - **The shield.** When it is on, nothing behind the pad can be touched by accident, and your
   thumb can slide from one button to the next. When it is off, only the buttons are covered
   and the app under the pad stays usable. There is a shield button on the pad itself.
-- **Playing in bed.** With the shield on, choose a backdrop: Dim, Dark for a plain black
-  bottom screen, or Frosted to blur whatever is behind the pad. The transparency slider
+- **Playing in a dark room.** With the shield on, choose a backdrop: Dim, Dark for a plain
+  black bottom screen, or Frosted to blur whatever is behind the pad. The transparency slider
   makes the buttons more see-through.
 - **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
   drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
