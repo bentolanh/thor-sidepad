@@ -227,7 +227,7 @@ class OverlayService : Service() {
     }
 
     /** Opens the panel. A fresh open starts on the main page; a re-render after a setting change keeps its page. */
-    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (hide), 3 pull up (show)
+    private var guideStep = 0   // 0 = not running; 1 pull down, 2 pull up (hide), 3 pull up (show), 4 shield off, 5 shield on
 
     /** Starts the interactive guide: the pad is shown first so every step acts on the real thing. */
     private fun showGuide() {
@@ -237,9 +237,28 @@ class OverlayService : Service() {
 
     private fun showGuideStep(step: Int) {
         val ov = try { overlayOrCreate() } catch (e: Exception) { guideStep = 0; return }
+        val spot = ov.shieldSpot(PadLayout.fromJson(prefs.layoutJson))
+        if (step >= 4 && spot == null) { finishGuide(); return }   // no shield button in this layout
+        // The shield steps narrate "on, then off, then on": make sure the pad really starts with the shield on.
+        if (step == 4 && !prefs.shield) { prefs.shield = true; rebuildPad() }
         guideStep = step
         ov.removePanel()
-        ov.showGuide(step, onGesture = { g -> onGuideGesture(g) }, onSkip = { finishGuide() })
+        ov.showGuide(step, spot, onGesture = { g -> onGuideGesture(g) }, onSpotTap = { onGuideSpotTap() }, onSkip = { finishGuide() })
+    }
+
+    /** Steps 4 and 5: the tap on the highlighted shield button really toggles the shield. */
+    private fun onGuideSpotTap() {
+        val ov = overlay ?: return
+        when (guideStep) {
+            4 -> {
+                ov.guideDone("Shield off")
+                main.postDelayed({ if (guideStep == 4) { prefs.shield = false; rebuildPad(); showGuideStep(5) } }, 900)
+            }
+            5 -> {
+                ov.guideDone("All set")
+                main.postDelayed({ if (guideStep == 5) { prefs.shield = true; rebuildPad(); finishGuide() } }, 1100)
+            }
+        }
     }
 
     private fun finishGuide() {
@@ -248,19 +267,28 @@ class OverlayService : Service() {
         overlay?.removeGuide()
     }
 
-    /** Each step performs the real action, then the next step appears when that action is over. */
+    /** Each step performs the real action after a short "Good" beat; the next step follows when the action is over. */
     private fun onGuideGesture(g: EdgeGesture) {
         val ov = overlay ?: return
         when {
-            guideStep == 1 && g == EdgeGesture.PULL_DOWN -> { ov.removeGuide(); guideStep = 2; showPanel() }   // step 2 resumes when the panel closes
-            guideStep == 2 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); hide(); main.postDelayed({ showGuideStep(3) }, 400) }
-            guideStep == 3 && g == EdgeGesture.PULL_UP -> { ov.removeGuide(); show(); finishGuide() }
+            guideStep == 1 && g == EdgeGesture.PULL_DOWN -> {
+                ov.guideDone("Good. Here comes the panel.")
+                main.postDelayed({ if (guideStep == 1) { ov.removeGuide(); guideStep = 2; showPanel() } }, 1100)   // step 2 resumes when the panel closes
+            }
+            guideStep == 2 && g == EdgeGesture.PULL_UP -> {
+                ov.guideDone("Good. The pad hides.")
+                main.postDelayed({ if (guideStep == 2) { ov.removeGuide(); hide(); main.postDelayed({ if (guideStep == 2) showGuideStep(3) }, 700) } }, 1000)
+            }
+            guideStep == 3 && g == EdgeGesture.PULL_UP -> {
+                ov.guideDone("And it comes back.")
+                main.postDelayed({ if (guideStep == 3) { ov.removeGuide(); show(); main.postDelayed({ if (guideStep == 3) showGuideStep(4) }, 900) } }, 1000)
+            }
         }
     }
 
     /** Called whenever the panel goes away, so a guide waiting on it can continue. */
     private fun panelClosed() {
-        if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 300)
+        if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 900)
     }
 
     private fun showPanel(keepPage: Boolean = false) {

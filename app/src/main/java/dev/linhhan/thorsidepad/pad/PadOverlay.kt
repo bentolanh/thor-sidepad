@@ -151,16 +151,26 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     private var guide: View? = null
 
+    /** Where the shield toggle sits on screen for the current layout, or null if the layout has none. */
+    fun shieldSpot(layout: PadLayout): FloatArray? {
+        val b = layout.buttons.firstOrNull { isActionCode(it.code) } ?: return null
+        val short = min(width, height).toFloat()
+        return floatArrayOf(b.cx * width, b.cy * height, b.size * short / 2f)
+    }
+
     /** One step of the interactive guide over the whole pad screen. */
-    fun showGuide(step: Int, onGesture: (EdgeGesture) -> Unit, onSkip: () -> Unit) {
+    fun showGuide(step: Int, spot: FloatArray?, onGesture: (EdgeGesture) -> Unit, onSpotTap: () -> Unit, onSkip: () -> Unit) {
         removeGuide()
-        val v = GuideView(ctx, step, onGesture, onSkip)
+        val v = GuideView(ctx, step, spot, onGesture, onSpotTap, onSkip)
         val lp = fullScreenParams("SidePad guide")
         lp.windowAnimations = dev.linhhan.thorsidepad.R.style.NoWindowAnimation
         wm.addView(v, lp); guide = v
     }
 
     fun removeGuide() { guide?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; guide = null }
+
+    /** Shows the green tick on the current guide step. */
+    fun guideDone(msg: String) { (guide as? GuideView)?.showDone(msg) }
 
     fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide() }
 

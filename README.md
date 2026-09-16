@@ -74,10 +74,12 @@ No root. Needs [Shizuku](https://shizuku.rikka.app/) running (wireless debugging
 
 ## First start
 
-The first time the service starts, an interactive guide covers the pad's screen and waits
-for the real gestures: pull down (the panel really opens; close it to continue), pull up
-(the pad really hides), pull up again (it comes back). A tap in the middle skips it. The app
-has a button to run it again, which starts SidePad and shows the pad first if needed.
+The first time the service starts, an interactive five-step guide covers the pad's screen
+and waits for the real gestures, with a short "Good" beat after each: pull down (the panel
+really opens; close it to continue), pull up (the pad really hides), pull up again (it comes
+back), tap the highlighted shield button (the shield really turns off and the text explains
+what changed), tap it again (back on). "Skip the guide" ends it. The app has a button to run
+it again, which starts SidePad and shows the pad first if needed.
 
 ## The app screen vs the panel
 
