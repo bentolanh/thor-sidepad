@@ -126,22 +126,22 @@ class MainActivity : AppCompatActivity() {
             }
             else -> {
                 shizukuReady = true
-                s1status.text = "Ready."
+                s1status.text = "Running, access granted."
                 s1help.text = "Shizuku stops when the Thor reboots. In Shizuku, turn on “Start on boot (wireless debugging)” so it comes back on its own."
-                s1btn.text = "Open Shizuku"
             }
         }
-        setDone(R.id.step1, R.id.step1Title, shizukuReady, locked = false)
+        s1btn.visibility = if (shizukuReady) View.GONE else View.VISIBLE
+        setDone(R.id.step1, R.id.step1Title, R.id.step1Status, shizukuReady, locked = false)
 
         // Step 2: overlay.
         findViewById<TextView>(R.id.step2Status).text = if (overlayOk()) "Allowed." else "Not allowed yet."
-        findViewById<Button>(R.id.step2Button).isEnabled = !overlayOk()
-        setDone(R.id.step2, R.id.step2Title, overlayOk(), locked = !shizukuReady)
+        findViewById<Button>(R.id.step2Button).visibility = if (overlayOk()) View.GONE else View.VISIBLE
+        setDone(R.id.step2, R.id.step2Title, R.id.step2Status, overlayOk(), locked = !shizukuReady)
 
         // Step 3: notifications, optional; never locks anything.
-        findViewById<TextView>(R.id.step3Status).text = if (notifOk()) "Allowed." else "Not allowed. Optional."
-        findViewById<Button>(R.id.step3Button).isEnabled = !notifOk()
-        setDone(R.id.step3, R.id.step3Title, notifOk(), locked = !(shizukuReady && overlayOk()))
+        findViewById<TextView>(R.id.step3Status).text = if (notifOk()) "Allowed." else "Not allowed. You can skip this."
+        findViewById<Button>(R.id.step3Button).visibility = if (notifOk()) View.GONE else View.VISIBLE
+        setDone(R.id.step3, R.id.step3Title, R.id.step3Status, notifOk(), locked = !(shizukuReady && overlayOk()))
 
         // Step 4: start, needs 1 and 2.
         val canRun = shizukuReady && overlayOk()
@@ -152,16 +152,32 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnStart).isEnabled = canRun
         findViewById<Button>(R.id.btnGuide).isEnabled = canRun
-        setDone(R.id.step4, R.id.step4Title, canRun && OverlayService.running, locked = !canRun)
+        setDone(R.id.step4, R.id.step4Title, R.id.serviceStatus, canRun && OverlayService.running, locked = !canRun)
     }
 
-    /** Greys a step that is locked, and marks a finished one with a tick in its title. */
-    private fun setDone(cardId: Int, titleId: Int, done: Boolean, locked: Boolean) {
+    /**
+     * Three clear looks: a finished step is green with a tick and no button, the step to do next is
+     * highlighted in blue, and a locked step is greyed out.
+     */
+    private fun setDone(cardId: Int, titleId: Int, statusId: Int, done: Boolean, locked: Boolean) {
         val card = findViewById<View>(cardId)
         val title = findViewById<TextView>(titleId)
-        card.alpha = if (locked) 0.45f else 1f
+        val status = findViewById<TextView>(statusId)
         val base = title.text.toString().removeSuffix("  ✓")
-        title.text = if (done) "$base  ✓" else base
+        when {
+            done -> {
+                card.alpha = 1f; card.setBackgroundColor(0xFF1E3A2A.toInt())
+                title.text = "$base  ✓"; title.setTextColor(0xFF7BE495.toInt()); status.setTextColor(0xFF7BE495.toInt())
+            }
+            locked -> {
+                card.alpha = 0.4f; card.setBackgroundColor(0xFF1F262B.toInt())
+                title.text = base; title.setTextColor(0xFFFFFFFF.toInt()); status.setTextColor(0xFFB0B8C0.toInt())
+            }
+            else -> {
+                card.alpha = 1f; card.setBackgroundColor(0xFF1F2F45.toInt())
+                title.text = base; title.setTextColor(0xFF8FC1FF.toInt()); status.setTextColor(0xFFFFFFFF.toInt())
+            }
+        }
     }
 
     private fun shizukuAction() {
