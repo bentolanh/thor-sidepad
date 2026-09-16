@@ -9,6 +9,7 @@ import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
+import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -55,6 +56,8 @@ class ShieldPadView(
     private val pressCount = HashMap<Int, Int>()     // button index -> pointers holding it
     private val stickBy = HashMap<Int, Int>()        // pointerId -> stick index it is steering
     private val knob = HashMap<Int, FloatArray>()    // stick index -> current knob offset (-1..1)
+    private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
+    private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
     private class Swipe(val edge: EdgeGesture, val x0: Float, val y0: Float, val t0: Long)
     private val swipes = HashMap<Int, Swipe>()
@@ -81,7 +84,9 @@ class ShieldPadView(
         layout.buttons.forEachIndexed { i, b ->
             val r = b.size * short() / 2f
             val label = Catalog.byCode(b.code).label
-            if (isStickCode(b.code)) {
+            if (isDpadCode(b.code)) {
+                painter.drawDpad(c, b.cx * width, b.cy * height, r, engine.enabled(b.code), dpadMask[i] ?: 0)
+            } else if (isStickCode(b.code)) {
                 val k = knob[i]
                 painter.drawStick(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), k?.get(0) ?: 0f, k?.get(1) ?: 0f)
             } else if (b.code == Action.SHIELD) {
@@ -118,6 +123,19 @@ class ShieldPadView(
         val lv = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
         levels[b.code] = lv
         onSlider(b.code, lv)
+    }
+
+    private fun steerDpad(i: Int, x: Float, y: Float) {
+        val b = layout.buttons[i]
+        val r = b.size * short() / 2f * 0.95f
+        val m = DpadMath.maskAt((x - b.cx * width) / r, (y - b.cy * height) / r)
+        val old = dpadMask[i] ?: 0
+        if (m != old) { DpadMath.apply(engine, old, m); dpadMask[i] = m }
+    }
+
+    private fun releaseDpad(pid: Int) {
+        val i = dpadBy.remove(pid) ?: return
+        DpadMath.apply(engine, dpadMask.remove(i) ?: 0, 0)
     }
 
     private fun releaseStick(pid: Int) {
@@ -168,6 +186,7 @@ class ShieldPadView(
                     if (edge == EdgeGesture.PULL_DOWN && onPullDown != null && swipes.size == 1) onPullDown.onPullStart()
                 }
                 else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
+                else if (i >= 0 && isDpadCode(layout.buttons[i].code)) { dpadBy[pid] = i; steerDpad(i, x, y) }
                 else if (i >= 0 && isSliderCode(layout.buttons[i].code)) { sliderBy[pid] = i; slide(i, y) }
                 else { tracked.add(pid); if (i >= 0) press(i, pid) }
                 invalidate()
@@ -176,6 +195,7 @@ class ShieldPadView(
                 for (idx in 0 until e.pointerCount) {
                     val pid = e.getPointerId(idx)
                     stickBy[pid]?.let { si -> steer(si, e.getX(idx), e.getY(idx)); invalidate() }
+                    dpadBy[pid]?.let { di -> steerDpad(di, e.getX(idx), e.getY(idx)); invalidate() }
                     sliderBy[pid]?.let { si -> slide(si, e.getY(idx)); invalidate() }
                     swipes[pid]?.let { s -> if (s.edge == EdgeGesture.PULL_DOWN) onPullDown?.onPullMove(e.getY(idx) - s.y0) }
                 }
@@ -193,6 +213,7 @@ class ShieldPadView(
                 val pid = e.getPointerId(idx)
                 release(pid, fireAction = pressedBy[pid]?.let { it == hit(e.getX(idx), e.getY(idx)) } == true)
                 releaseStick(pid)
+                releaseDpad(pid)
                 sliderBy.remove(pid)
                 tracked.remove(pid)
                 swipes.remove(pid)?.let { s ->
@@ -212,6 +233,7 @@ class ShieldPadView(
                 if (swipes.values.any { it.edge == EdgeGesture.PULL_DOWN }) onPullDown?.onPullEnd(false)
                 pressedBy.keys.toList().forEach { release(it) }
                 stickBy.keys.toList().forEach { releaseStick(it) }
+                dpadBy.keys.toList().forEach { releaseDpad(it) }
                 sliderBy.clear()
                 tracked.clear()
                 swipes.clear()
@@ -224,6 +246,7 @@ class ShieldPadView(
     override fun onDetachedFromWindow() {
         pressedBy.keys.toList().forEach { release(it) }
         stickBy.keys.toList().forEach { releaseStick(it) }
+        dpadBy.keys.toList().forEach { releaseDpad(it) }
         super.onDetachedFromWindow()
     }
 

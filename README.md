@@ -52,6 +52,7 @@ Everything happens on the bottom screen.
 - **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
   drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
 - **Device controls on the pad.** Add has pages for Buttons, Sticks, Screen and Sliders.
+  Sticks also holds the D-pad, one cross you press in any of eight directions.
   Sliders set brightness and volume for each screen, plus one brightness slider that moves
   both screens together; Screen holds Home and Back for either screen and the shield toggle.
   So the things you would reach for the Thor's own keys or the Control Center for are one tap

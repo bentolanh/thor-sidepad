@@ -11,6 +11,7 @@ import dev.lbento.thorsidepad.inject.IInjector
 import dev.lbento.thorsidepad.inject.Stick
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
+import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
 import org.json.JSONObject
 import kotlin.math.roundToInt
@@ -106,6 +107,7 @@ class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private v
     fun enabled(code: Int): Boolean = when {
         isActionCode(code) || isSliderCode(code) -> true
         isStickCode(code) -> stickPlan(code) != null
+        isDpadCode(code) -> plan(Btn.DPAD_UP).isNotEmpty()
         else -> plan(code).isNotEmpty()
     }
 

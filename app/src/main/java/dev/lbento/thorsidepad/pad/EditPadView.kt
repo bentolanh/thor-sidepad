@@ -10,6 +10,7 @@ import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
+import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.hypot
 import kotlin.math.min
@@ -47,7 +48,8 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         var y = step; while (y < height) { c.drawLine(0f, y, width.toFloat(), y, grid); y += step }
         layout.buttons.forEachIndexed { i, b ->
             val label = Catalog.byCode(b.code).label
-            if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
+            if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, 0, i == selected)
+            else if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, i == selected)
             else if (isActionCode(b.code)) painter.drawSysButton(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, Catalog.screenTag(b.code), false, i == selected)
             else if (isSliderCode(b.code)) painter.drawSlider(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, Catalog.screenTag(b.code), 0.6f, false, i == selected)

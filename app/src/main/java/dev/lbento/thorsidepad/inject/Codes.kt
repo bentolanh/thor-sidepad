@@ -34,6 +34,11 @@ object Stick {
     const val RIGHT = -2
 }
 
+/** One D-pad element: a cross pressed in any of eight directions, delivered as the four DPAD buttons. */
+object Dpad {
+    const val PAD = -19
+}
+
 /** Pseudo-codes for pad buttons that act on the pad or the device instead of the game. */
 object Action {
     const val SHIELD = -3       // toggle shield / islands mode
@@ -54,6 +59,7 @@ object Slider {
 
 fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
 fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND
+fun isDpadCode(code: Int) = code == Dpad.PAD
 fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME || code == Slider.VOLUME_2ND || code == Slider.BRIGHT_BOTH
 
 object Btn {
@@ -87,6 +93,7 @@ data class PadCode(val code: Int, val label: String, val androidName: String) {
     val isTrigger get() = code == Btn.TL2 || code == Btn.TR2
     val isExtra get() = code == Btn.C || code == Btn.Z
     val isStick get() = isStickCode(code)
+    val isDpadElement get() = isDpadCode(code)
     val isStickClick get() = code == Btn.THUMBL || code == Btn.THUMBR   // L3 / R3: pressing a stick in
     val isAction get() = isActionCode(code)
     val isSlider get() = isSliderCode(code)
@@ -117,6 +124,7 @@ object Catalog {
         // stamps every uinput pad with AYN's vendor/product ids, whose layout lacks them.)
         PadCode(Btn.C, "M1", "BUTTON_C"),
         PadCode(Btn.Z, "M2", "BUTTON_Z"),
+        PadCode(Dpad.PAD, "✚", "D-pad, DPAD_UP / DOWN / LEFT / RIGHT"),
         PadCode(Stick.LEFT, "LS", "left stick, AXIS_X / AXIS_Y"),
         PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
         PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
@@ -133,8 +141,8 @@ object Catalog {
 
     /** The Add picker's pages: one per kind of element, so the list stays short. */
     val groups: List<Pair<String, List<PadCode>>> = listOf(
-        "Buttons" to all.filter { it.code > 0 && !it.isStickClick },
-        "Sticks" to all.filter { it.isStick } + all.filter { it.isStickClick },
+        "Buttons" to all.filter { it.code > 0 && !it.isStickClick && !it.isDpad },
+        "Sticks" to all.filter { it.isDpadElement } + all.filter { it.isStick } + all.filter { it.isStickClick },
         "Screen" to all.filter { it.isAction },
         "Sliders" to all.filter { it.isSlider },
     )

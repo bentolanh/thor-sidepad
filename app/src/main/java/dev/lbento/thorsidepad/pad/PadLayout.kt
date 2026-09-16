@@ -1,6 +1,7 @@
 package dev.lbento.thorsidepad.pad
 
 import dev.lbento.thorsidepad.inject.Btn
+import dev.lbento.thorsidepad.inject.Dpad
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.Stick
 import org.json.JSONArray
@@ -63,10 +64,7 @@ class PadLayout(val buttons: MutableList<PadButton>) {
             PadButton(Btn.TL, 0.90f, 0.10f, 0.12f),
             PadButton(Btn.TL2, 0.74f, 0.10f, 0.12f),
             PadButton(Btn.SELECT, 0.58f, 0.10f, 0.11f),
-            PadButton(Btn.DPAD_UP, 0.78f, 0.28f, 0.15f),
-            PadButton(Btn.DPAD_LEFT, 0.66f, 0.42f, 0.15f),
-            PadButton(Btn.DPAD_RIGHT, 0.90f, 0.42f, 0.15f),
-            PadButton(Btn.DPAD_DOWN, 0.78f, 0.56f, 0.15f),
+            PadButton(Dpad.PAD, 0.78f, 0.42f, 0.30f),
             PadButton(Stick.LEFT, 0.78f, 0.80f, 0.28f),
             PadButton(Btn.C, 0.55f, 0.62f, 0.11f),
             PadButton(Btn.Z, 0.55f, 0.82f, 0.11f),

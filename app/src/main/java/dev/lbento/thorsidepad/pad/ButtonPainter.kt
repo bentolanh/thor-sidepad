@@ -95,6 +95,38 @@ class ButtonPainter {
         c.drawText(label, kcx, kcy - (text.descent() + text.ascent()) / 2, text)
     }
 
+    /** A D-pad cross; [mask] holds the DpadMath direction bits currently pressed. */
+    fun drawDpad(c: Canvas, cx: Float, cy: Float, r: Float, enabled: Boolean, mask: Int, selected: Boolean = false) {
+        val rr = r * 0.95f; val w = r * 0.62f; val h = w / 2f
+        ring.strokeWidth = r * (if (selected) 0.10f else 0.05f)
+        ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
+        ring.pathEffect = if (enabled) null else dash
+        val cross = android.graphics.Path().apply {
+            moveTo(cx - h, cy - rr); lineTo(cx + h, cy - rr); lineTo(cx + h, cy - h); lineTo(cx + rr, cy - h)
+            lineTo(cx + rr, cy + h); lineTo(cx + h, cy + h); lineTo(cx + h, cy + rr); lineTo(cx - h, cy + rr)
+            lineTo(cx - h, cy + h); lineTo(cx - rr, cy + h); lineTo(cx - rr, cy - h); lineTo(cx - h, cy - h); close()
+        }
+        fill.color = if (enabled) 0xAA202020.toInt() else 0x44444444
+        c.drawPath(cross, fill)
+        fill.color = 0xDD2E7DFF.toInt()
+        val g = r * 0.06f
+        if (mask and DpadMath.UP != 0) c.drawRect(cx - h + g, cy - rr + g, cx + h - g, cy - h, fill)
+        if (mask and DpadMath.DOWN != 0) c.drawRect(cx - h + g, cy + h, cx + h - g, cy + rr - g, fill)
+        if (mask and DpadMath.LEFT != 0) c.drawRect(cx - rr + g, cy - h + g, cx - h, cy + h - g, fill)
+        if (mask and DpadMath.RIGHT != 0) c.drawRect(cx + h, cy - h + g, cx + rr - g, cy + h - g, fill)
+        c.drawPath(cross, ring)
+        // Arrow heads near the four ends.
+        fill.color = Color.WHITE
+        val a = r * 0.16f; val d = rr - r * 0.22f
+        fun tri(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) {
+            c.drawPath(android.graphics.Path().apply { moveTo(x1, y1); lineTo(x2, y2); lineTo(x3, y3); close() }, fill)
+        }
+        tri(cx, cy - d - a * 0.6f, cx - a, cy - d + a * 0.6f, cx + a, cy - d + a * 0.6f)
+        tri(cx, cy + d + a * 0.6f, cx - a, cy + d - a * 0.6f, cx + a, cy + d - a * 0.6f)
+        tri(cx - d - a * 0.6f, cy, cx - d + a * 0.6f, cy - a, cx - d + a * 0.6f, cy + a)
+        tri(cx + d + a * 0.6f, cy, cx + d - a * 0.6f, cy - a, cx + d - a * 0.6f, cy + a)
+    }
+
     fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false) {
         ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE

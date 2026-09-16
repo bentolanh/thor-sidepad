@@ -22,6 +22,7 @@ import android.widget.TextView
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
+import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -272,6 +273,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             val enabled = engine.enabled(b.code)
             val v: View = when {
                 isStickCode(b.code) -> StickView(ctx, b.code, enabled, engine)
+                isDpadCode(b.code) -> DpadView(ctx, enabled, engine)
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release)
@@ -300,8 +302,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val working = layout.copy()
         var active = activeName
         val root = FrameLayout(themed)
-        val editor = EditPadView(ctx, working)
-        root.addView(editor, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        root.setBackgroundColor(0xE0101010.toInt())
+        val editor = EditPadView(ctx, working).apply { setBackgroundColor(0xFF1A1A1A.toInt()) }
 
         val bar = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -323,7 +325,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         refreshHint()
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
             val code = Catalog.groups[g].second[pos].code
-            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else 0.15f))
+            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code) || isDpadCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
         val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }
@@ -350,6 +352,17 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
         val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(hint) }
         root.addView(top, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+
+        // The whole pad area, scaled to fit under the toolbar, so a button placed near the top
+        // of the screen is still reachable in the editor. A thin frame marks the screen edge.
+        top.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED)
+        val gap = 12
+        val avail = height - top.measuredHeight - gap * 2
+        val scale = min(avail.toFloat() / height, 1f)
+        val frame = FrameLayout(themed).apply { setBackgroundColor(Color.WHITE); setPadding(2, 2, 2, 2) }
+        frame.addView(editor, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        root.addView(frame, FrameLayout.LayoutParams((width * scale).roundToInt() + 4, (height * scale).roundToInt() + 4, Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+            .apply { topMargin = top.measuredHeight + gap })
 
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
