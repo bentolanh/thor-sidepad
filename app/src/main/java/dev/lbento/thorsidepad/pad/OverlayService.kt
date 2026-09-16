@@ -35,6 +35,51 @@ class OverlayService : Service() {
     private var reopenScheduled = false
     private var padDirty = false     // a shield/islands switch made from the panel; applied when the panel closes
 
+    // ---- keyboard: our windows draw above the on-screen keyboard on the Thor's second screen, and
+    // non-focusable overlays are never told the keyboard is up. So while the pad is showing, the
+    // shell side asks the input-method service twice a second and the pad steps aside for the keyboard.
+    @Volatile private var imeWatching = false
+    private var imeThread: Thread? = null
+    private var imeSuspended = false
+
+    private fun startImeWatch() {
+        if (imeWatching) return
+        imeWatching = true
+        val t = Thread({
+            var lastShown = false
+            while (imeWatching) {
+                val svc = Injector.current()
+                if (svc != null) {
+                    try {
+                        val out = svc.shell("dumpsys input_method 2>/dev/null | grep -m2 -o -E 'mCurTokenDisplayId=[0-9]+|mInputShown=[a-z]+'")
+                        val shown = out.contains("mInputShown=true")
+                        val onPadDisplay = Regex("mCurTokenDisplayId=(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull()?.let { it == (overlay?.displayId ?: -1) } ?: true
+                        val active = shown && onPadDisplay
+                        if (active != lastShown) { lastShown = active; main.post { onImeVisible(active) } }
+                    } catch (e: Exception) { Log.w(TAG, "ime poll failed", e) }
+                }
+                try { Thread.sleep(500) } catch (_: InterruptedException) { break }
+            }
+        }, "sidepad-ime")
+        t.isDaemon = true; imeThread = t; t.start()
+    }
+
+    private fun stopImeWatch() { imeWatching = false; imeThread?.interrupt(); imeThread = null }
+
+    /** Keyboard up on the pad's screen: take the pad windows down; keyboard gone: put them back. */
+    private fun onImeVisible(shown: Boolean) {
+        val ov = overlay ?: return
+        if (shown && visible && !imeSuspended) {
+            imeSuspended = true
+            ov.removePanel(); ov.removeAll(); ov.removeCatchers()
+            Log.i(TAG, "keyboard up: pad set aside")
+        } else if (!shown && imeSuspended) {
+            imeSuspended = false
+            Log.i(TAG, "keyboard gone: pad back")
+            if (visible) rebuildPad() else ensureCatcher()
+        }
+    }
+
     /**
      * The Thor recreates its controller node when its style changes, and a Bluetooth pad comes
      * and goes; an open descriptor to the old node then writes into nothing. Reopen the target
@@ -139,6 +184,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         try { getSystemService(InputManager::class.java).unregisterInputDeviceListener(deviceListener) } catch (_: Exception) {}
         hide()
+        stopImeWatch()
         overlay?.tearDown()
         running = false
         visible = false
@@ -184,6 +230,7 @@ class OverlayService : Service() {
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
                 updateNotification()
+                startImeWatch()
             } catch (e: Exception) {
                 Log.e(TAG, "show failed", e)
                 toast("Could not show pad: ${e.message}")
@@ -192,6 +239,7 @@ class OverlayService : Service() {
     }
 
     private fun hide() {
+        stopImeWatch(); imeSuspended = false
         overlay?.removeAll()
         engine?.shutdown(); engine = null
         try { Injector.current()?.closeTarget() } catch (_: Exception) {}
