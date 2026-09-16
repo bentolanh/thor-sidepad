@@ -79,6 +79,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() { super.onResume(); refreshStatus() }
 
+    /** Leaving the app on the second screen would leave focus there; hand it back to the game's screen. */
+    override fun onPause() {
+        super.onPause()
+        val onSecondScreen = (display?.displayId ?: Display.DEFAULT_DISPLAY) != Display.DEFAULT_DISPLAY
+        if (onSecondScreen && OverlayService.running) OverlayService.send(this, OverlayService.ACTION_FOCUS_TOP)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         refreshStatus()

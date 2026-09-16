@@ -120,6 +120,7 @@ class OverlayService : Service() {
             ACTION_EDIT -> edit()
             ACTION_STOP -> { hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
+            ACTION_FOCUS_TOP -> returnFocusToTopScreen()
             else -> ensureCatcher()
         }
         return START_STICKY
@@ -242,6 +243,13 @@ class OverlayService : Service() {
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)) }
             override fun stopService() { ov.removePanel(); padDirty = false; hide(); stopSelf() }
+            override fun openApp() {
+                ov.removePanel(); applyDirty()
+                val svc = Injector.current()
+                if (svc == null) { toast("Shizuku not ready"); return }
+                // Started by the shell user (a service may not launch activities itself), on the pad's screen.
+                Thread { try { svc.shell("am start --display ${ov.displayId} -n $packageName/.MainActivity") } catch (e: Exception) { Log.w(TAG, "open app failed", e) } }.start()
+            }
             override fun close() { ov.removePanel(); applyDirty() }
         })
     }
@@ -317,6 +325,7 @@ class OverlayService : Service() {
         const val ACTION_EDIT = "dev.linhhan.thorsidepad.EDIT"
         const val ACTION_STOP = "dev.linhhan.thorsidepad.STOP"
         const val ACTION_PANEL = "dev.linhhan.thorsidepad.PANEL"
+        const val ACTION_FOCUS_TOP = "dev.linhhan.thorsidepad.FOCUS_TOP"
         const val ACTION_START = "dev.linhhan.thorsidepad.START"
 
         @Volatile var running = false

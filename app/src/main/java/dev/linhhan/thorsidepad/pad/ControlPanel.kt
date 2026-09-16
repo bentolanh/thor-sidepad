@@ -44,6 +44,7 @@ interface PanelActions {
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
     fun stopService()
+    fun openApp()
     fun close()
 }
 
@@ -99,7 +100,10 @@ object ControlPanel {
             if (page == Page.CONTROLLER) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
             bar.addView(label(if (page == Page.MAIN) "Thor SidePad" else "Controller", 20f),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page == Page.CONTROLLER) 16 else 0 })
-            if (page == Page.MAIN) bar.addView(btn("Stop SidePad") { actions.stopService() })
+            if (page == Page.MAIN) {
+                bar.addView(btn("Open app") { actions.openApp() })
+                bar.addView(btn("Stop SidePad") { actions.stopService() })
+            }
             card.addView(bar)
 
             if (page == Page.MAIN) {
