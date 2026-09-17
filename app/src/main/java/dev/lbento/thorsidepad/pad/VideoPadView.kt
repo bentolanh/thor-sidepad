@@ -58,7 +58,11 @@ class VideoPadView(
             MotionEvent.ACTION_MOVE -> if (row == 1 || row == 3) {
                 if (!dragging && abs(e.x - downX) > slop) dragging = true
                 if (dragging) {
-                    if (row == 1) scrubFrac = frac(e.x, ButtonPainter.VIDEO_TRACK_L, ButtonPainter.VIDEO_TRACK_R)
+                    if (row == 1) {
+                        val (tl, tr) = ButtonPainter.videoTrackSpan(
+                            width.toFloat(), height.toFloat(), NowPlaying.time(now.duration))
+                        scrubFrac = frac(e.x, tl, tr)
+                    }
                     else {
                         volume = frac(e.x, ButtonPainter.VIDEO_VOL_L, ButtonPainter.VIDEO_VOL_R)
                         onSlider(Slider.VOLUME_MEDIA, volume, false)

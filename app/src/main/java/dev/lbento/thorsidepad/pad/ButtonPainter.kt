@@ -245,7 +245,8 @@ class ButtonPainter {
         small.textAlign = Paint.Align.RIGHT
         c.drawText(total, right - padX, ty + small.textSize * 0.36f, small)
         small.textAlign = Paint.Align.CENTER
-        val tl = left + w * VIDEO_TRACK_L; val tr = left + w * VIDEO_TRACK_R
+        val (trackL, trackR) = videoTrackSpan(w, h, total)
+        val tl = left + w * trackL; val tr = left + w * trackR
         val th = h * 0.036f
         fill.color = 0x88101010.toInt()
         c.drawRoundRect(tl, ty - th / 2, tr, ty + th / 2, th / 2, th / 2, fill)
@@ -471,11 +472,26 @@ class ButtonPainter {
         const val VIDEO_ROW_APP = 0.19f
         const val VIDEO_ROW_TIME = 0.44f
         const val VIDEO_ROW_CTRL = 0.76f
-        /** The timeline's ends and the volume track's ends, as fractions of the unit's width. */
-        const val VIDEO_TRACK_L = 0.145f
-        const val VIDEO_TRACK_R = 0.855f
+        /** The volume track's ends, as fractions of the unit's width. */
         const val VIDEO_VOL_L = 0.150f
         const val VIDEO_VOL_R = 0.940f
+
+        private val clock = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        /**
+         * Where the timeline runs inside a video unit of this size, as fractions of its width.
+         * The clock is measured rather than guessed at, so neither the track nor its knob ever
+         * runs under the time on either side. The same room is kept on both ends, and it is the
+         * total running time that is measured, never the elapsed one: the elapsed time is never
+         * the wider of the two, so the track cannot shift about while a scrub is in progress.
+         */
+        fun videoTrackSpan(w: Float, h: Float, total: String): Pair<Float, Float> {
+            clock.textSize = h * 0.085f
+            val room = clock.measureText(total.ifEmpty { "0:00" })
+            val inset = (w * 0.028f + room + w * 0.022f + h * 0.052f) / w
+            val l = inset.coerceIn(0.10f, 0.40f)
+            return l to 1f - l
+        }
 
         const val MEDIA_HALF_W = 2.3f
         /** How much of the unit's width the three transport zones take; the rest is the volume track. */

@@ -197,8 +197,10 @@ class ShieldPadView(
         val r = b.size * short() / 2f
         val w = 2f * r * ButtonPainter.VIDEO_HALF_W
         val left = b.cx * width - r * ButtonPainter.VIDEO_HALF_W
-        val tl = left + w * ButtonPainter.VIDEO_TRACK_L
-        val tr = left + w * ButtonPainter.VIDEO_TRACK_R
+        val h = 2f * r * ButtonPainter.VIDEO_HALF_H
+        val (fl, fr) = ButtonPainter.videoTrackSpan(w, h, NowPlaying.time(video.duration))
+        val tl = left + w * fl
+        val tr = left + w * fr
         return ((x - tl) / (tr - tl)).coerceIn(0f, 1f)
     }
 
