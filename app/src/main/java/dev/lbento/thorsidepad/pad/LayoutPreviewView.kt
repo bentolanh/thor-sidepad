@@ -35,7 +35,7 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, true)
             else if (isActionCode(b.code)) painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), false)
             else if (isSliderCode(b.code)) painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), 0.6f, false)
-            else painter.draw(c, b.cx * width, b.cy * height, r, label, true, false, labelColor = Glyphs.color(b.code, layout.style), mark = if (b.sticky) 1 else 0, icon = Glyphs.icon(b.code, layout.style))
+            else painter.draw(c, b.cx * width, b.cy * height, r, label, true, false, labelColor = Glyphs.color(b.code, layout.style), mark = if (b.sticky) 1 else 0, icon = Glyphs.icon(b.code, layout.style), turbo = b.turbo)
         }
     }
 }

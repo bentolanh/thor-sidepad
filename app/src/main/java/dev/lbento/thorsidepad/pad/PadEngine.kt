@@ -16,6 +16,9 @@ import dev.lbento.thorsidepad.inject.isStickCode
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
+/** Half a turbo cycle: the button is down for this long, then up for this long (about 12 a second). */
+private const val TURBO_HALF_MS = 40L
+
 /** What the open target can emit, parsed from IInjector.targetCaps(). */
 class Caps(val keys: Set<Int>, val abs: Map<Int, IntArray>, val virtual: Boolean) {
     companion object {
@@ -127,6 +130,34 @@ class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private v
 
     fun press(code: Int) = send(plan(code), true)
     fun release(code: Int) = send(plan(code), false)
+
+    // ---- turbo: a button that presses itself over and over for as long as it is held.
+    private val turbo = HashMap<Int, Runnable>()
+
+    /** Starts [code] pulsing until [stopTurbo]. Calling it twice for one code does nothing. */
+    fun startTurbo(code: Int) {
+        synchronized(turbo) {
+            if (turbo.containsKey(code)) return
+            var isDown = false
+            val pulse = object : Runnable {
+                override fun run() {
+                    isDown = !isDown
+                    if (isDown) press(code) else release(code)
+                    handler.postDelayed(this, TURBO_HALF_MS)
+                }
+            }
+            turbo[code] = pulse
+            handler.post(pulse)
+        }
+    }
+
+    fun stopTurbo(code: Int) {
+        val pulse = synchronized(turbo) { turbo.remove(code) } ?: return
+        handler.removeCallbacks(pulse)
+        release(code)       // whatever half of the pulse it stopped on, it must not stay held
+    }
+
+    fun stopAllTurbo() = synchronized(turbo) { turbo.keys.toList() }.forEach { stopTurbo(it) }
 
     private fun send(plan: List<Emit>, down: Boolean) {
         if (plan.isEmpty()) return

@@ -172,7 +172,7 @@ class ButtonPainter {
      * [icon]: 0 draw [label] as text, 1 the View panes, 2 the Menu bars, 3 the Select oval,
      * 4 the Start triangle.
      */
-    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0, icon: Int = 0) {
+    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0, icon: Int = 0, turbo: Boolean = false) {
         ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         ring.pathEffect = if (enabled) null else dash
@@ -205,6 +205,17 @@ class ButtonPainter {
             c.drawCircle(mx, my, mr, fill)
             ring.pathEffect = null; ring.strokeWidth = r * 0.05f; ring.color = if (mark == 2) 0xFFFFC107.toInt() else Color.WHITE
             c.drawCircle(mx, my, mr, ring)
+        }
+        if (turbo) {
+            // Two chevrons at the top left, the other corner from the hold dot, so a button can show both.
+            fill.color = 0xFF8AB4F8.toInt()
+            val mx = cx - r * 0.72f; val my = cy - r * 0.60f; val t = r * 0.15f
+            for (k in 0..1) {
+                val x = mx + k * t
+                c.drawPath(android.graphics.Path().apply {
+                    moveTo(x - t * 0.5f, my - t); lineTo(x + t * 0.5f, my); lineTo(x - t * 0.5f, my + t); close()
+                }, fill)
+            }
         }
     }
 }

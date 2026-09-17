@@ -68,8 +68,10 @@ Everything happens on the bottom screen.
   from the game.
   Three profiles come built in: Left hand, Right hand and Face buttons. A built-in cannot be
   written over, so saving while on one asks for a name and keeps your copy instead.
-- **Holding a button down.** Select a button in the editor and tap Sticky: from then on a
-  tap holds it and the next tap lets go. Or add a HOLD button to the pad: tap HOLD, then any
+- **How a button presses.** Select a button in the editor and tap Behavior: Sticky means a
+  tap holds it down and the next tap lets go, Turbo means it presses itself about twelve times
+  a second for as long as you hold it, and the two together mean a tap starts it repeating
+  until you tap again. A turbo button shows two chevrons. Or add a HOLD button to the pad: tap HOLD, then any
   button, and that button stays down until you tap it again. A held button shows a yellow
   dot. Hiding or stopping the pad releases everything.
 - **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation

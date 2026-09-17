@@ -59,7 +59,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, i == selected)
             else if (isActionCode(b.code)) painter.drawSysButton(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, Catalog.screenTag(b.code), false, i == selected)
             else if (isSliderCode(b.code)) painter.drawSlider(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, Catalog.screenTag(b.code), 0.6f, false, i == selected)
-            else painter.draw(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, false, i == selected, Glyphs.color(b.code, layout.style), if (b.sticky) 1 else 0, Glyphs.icon(b.code, layout.style))
+            else painter.draw(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, false, i == selected, Glyphs.color(b.code, layout.style), if (b.sticky) 1 else 0, Glyphs.icon(b.code, layout.style), b.turbo)
         }
     }
 

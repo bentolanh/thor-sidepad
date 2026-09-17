@@ -118,7 +118,7 @@ class ShieldPadView(
                 painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), levels[b.code] ?: 0.5f, sliderBy.containsValue(i))
             } else {
                 painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0 || i in latched, labelColor = Glyphs.color(b.code, layout.style),
-                    mark = if (i in latched) 2 else if (b.sticky) 1 else 0, icon = Glyphs.icon(b.code, layout.style))
+                    mark = if (i in latched) 2 else if (b.sticky) 1 else 0, icon = Glyphs.icon(b.code, layout.style), turbo = b.turbo)
             }
         }
         // Small pills marking the gesture edges: top (panel) and bottom (hide).
@@ -178,6 +178,10 @@ class ShieldPadView(
      * Latching happens only on touch-down: a latched button tapped again releases, a sticky
      * button or any button tapped while HOLD is armed latches down.
      */
+    /** A turbo button pulses instead of simply going down, but is started and stopped the same way. */
+    private fun fire(b: PadButton) { if (b.turbo) engine.startTurbo(b.code) else engine.press(b.code) }
+    private fun unfire(b: PadButton) { if (b.turbo) engine.stopTurbo(b.code) else engine.release(b.code) }
+
     private fun press(i: Int, pid: Int, initial: Boolean = false) {
         pressedBy[pid] = i
         val n = (pressCount[i] ?: 0) + 1
@@ -188,11 +192,11 @@ class ShieldPadView(
         if (isActionCode(code)) return
         if (n != 1) return
         if (i in latched) {
-            if (initial) { latched.remove(i); latchTouch.add(pid); engine.release(code) }
+            if (initial) { latched.remove(i); latchTouch.add(pid); unfire(b) }
             return                                   // sliding over a held button leaves it held
         }
-        if (initial && (b.sticky || holdArmed)) { holdArmed = false; latched.add(i); latchTouch.add(pid); engine.press(code); return }
-        engine.press(code)
+        if (initial && (b.sticky || holdArmed)) { holdArmed = false; latched.add(i); latchTouch.add(pid); fire(b); return }
+        fire(b)
     }
 
     /** Action buttons fire on release, only if the finger is still on them. */
@@ -206,7 +210,7 @@ class ShieldPadView(
             pressCount.remove(i)
             if (code == Action.HOLD) return
             if (isActionCode(code)) { if (fireAction) onAction(code) }
-            else if (!toggled && i !in latched) engine.release(code)
+            else if (!toggled && i !in latched) unfire(layout.buttons[i])
         }
     }
 
@@ -291,8 +295,9 @@ class ShieldPadView(
 
     override fun onDetachedFromWindow() {
         pressedBy.keys.toList().forEach { release(it) }
-        latched.toList().forEach { i -> engine.release(layout.buttons[i].code) }
+        latched.toList().forEach { i -> unfire(layout.buttons[i]) }
         latched.clear()
+        engine.stopAllTurbo()
         stickBy.keys.toList().forEach { releaseStick(it) }
         dpadBy.keys.toList().forEach { releaseDpad(it) }
         super.onDetachedFromWindow()

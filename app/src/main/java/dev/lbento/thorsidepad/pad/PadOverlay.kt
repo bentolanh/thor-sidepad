@@ -313,7 +313,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 b.code == Action.HOLD -> PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
-                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session)
+                else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session,
+                    b.turbo, engine::startTurbo, engine::stopTurbo)
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
@@ -459,8 +460,24 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             editor.selected = working.buttons.size - 1
         } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
-        // Sticky: a tap holds the button down, the next tap releases it. Only for real buttons.
-        val sticky = btn("Sticky") { sel(editor)?.let { if (it.code > 0) { it.sticky = !it.sticky; editor.invalidate() } } }
+        // How a button presses: normally, held by a tap, repeating while held, or both. One chooser
+        // rather than a toggle each, so the toolbar stays on a single row.
+        val behavior = btn("Behavior") {
+            val b = sel(editor)
+            if (b == null || b.code <= 0) return@btn
+            val now = (if (b.sticky) 1 else 0) + (if (b.turbo) 2 else 0)
+            val labels = listOf(
+                "Normal",
+                "Sticky · a tap holds it down",
+                "Turbo · repeats while held",
+                "Sticky + Turbo · a tap starts it repeating",
+            )
+            showChoice("How this button presses", labels.mapIndexed { i, t -> (if (i == now) "●  " else "") + t }) { pick ->
+                b.sticky = pick == 1 || pick == 3
+                b.turbo = pick == 2 || pick == 3
+                editor.invalidate()
+            }
+        }
         // Per-preset button glyphs: the presses stay the same, the labels read like that console's pad.
         btn("Glyphs") { showChoice("Button glyphs for this preset", Glyphs.styles.map { (key, name) -> (if (key == working.style) "●  " else "") + name }) { pos ->
             working.style = Glyphs.styles[pos].first; editor.invalidate()
@@ -468,7 +485,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         btn("Exit") { exit() }
         btn("Save") { saveCurrent { flash("Saved to \"$active\"") } }
         editor.onSelectionChanged = { i -> val has = i >= 0; delete.isEnabled = has
-            sticky.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
+            behavior.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
         editor.selected = -1
 
         val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar) }
