@@ -39,7 +39,7 @@ class OverlayService : Service() {
 
     // ---- keyboard: our windows draw above the on-screen keyboard on the Thor's second screen, and
     // non-focusable overlays are never told the keyboard is up. So while the pad is showing, the
-    // shell side asks the input-method service twice a second and the pad steps aside for the keyboard.
+    // shell side asks twice a second and the pad steps aside for the keyboard.
     @Volatile private var imeWatching = false
     private var imeThread: Thread? = null
     private var imeSuspended = false
@@ -53,15 +53,32 @@ class OverlayService : Service() {
                 val svc = Injector.current()
                 if (svc != null) {
                     try {
-                        // Step aside only when the keyboard is up AND the text field being typed into is
-                        // on the pad's own screen. The Thor pins the IME token to the second screen even
-                        // for a top-screen app (e.g. the Claude app), so the token display is not a reliable
-                        // signal; the focused input client's display is. Uncertain -> keep the pad up.
-                        val out = svc.shell("dumpsys input_method 2>/dev/null | grep -m3 -oE 'mInputShown=[a-z]+|mCurFocusedWindow=.*'")
-                        val shown = out.contains("mInputShown=true")
-                        val focusDisplay = Regex("mCurFocusedWindow=.*?displayId=(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull()
-                        val onPadDisplay = focusDisplay?.let { it == (overlay?.displayId ?: -1) } ?: false
-                        val active = shown && onPadDisplay
+                        // Ask the window manager about the keyboard's own window, not the input-method
+                        // service. Asking that service makes it turn round and ask the current keyboard
+                        // app to dump itself, which wakes a sleeping app roughly once a second for as
+                        // long as the pad is up and costs about half a core; the window manager answers
+                        // out of its own state in a tenth of the time and leaves the keyboard alone.
+                        //
+                        // The window is also the better answer. The old question, whether the service
+                        // considers input shown, says yes for a text field on the top screen where no
+                        // keyboard ever appears, which is why it had to be paired with a guess about
+                        // which screen the field was on. A window that is ready for display on the pad's
+                        // own screen is a keyboard the pad is actually covering, and nothing else is.
+                        val out = svc.shell(
+                            "dumpsys window InputMethod 2>/dev/null | grep -oE 'mDisplayId=[0-9]+|isReadyForDisplay\\(\\)=[a-z]+'")
+                        val padDisplay = overlay?.displayId ?: -1
+                        var display = -1
+                        var active = false
+                        // The fields come out in document order, so each window's display is followed by
+                        // its own readiness; a display with no window after it simply never matches.
+                        for (line in out.lineSequence()) {
+                            val t = line.trim()
+                            when {
+                                t.startsWith("mDisplayId=") ->
+                                    display = t.removePrefix("mDisplayId=").toIntOrNull() ?: -1
+                                t == "isReadyForDisplay()=true" -> if (display == padDisplay) active = true
+                            }
+                        }
                         if (active != lastShown) { lastShown = active; main.post { onImeVisible(active) } }
                     } catch (e: Exception) { Log.w(TAG, "ime poll failed", e) }
                 }

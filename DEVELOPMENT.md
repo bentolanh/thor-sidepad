@@ -104,6 +104,25 @@ the app.
   (`system_gesture_exclusion_limit_dp=200` on the Thor), but the full height of both side edges
   was accepted on the device: `SkRegion((0,0,73,1080)(1167,0,1240,1080))`.
 
+- **Stepping aside for the keyboard.** Overlay windows draw above the on-screen keyboard and a
+  non-focusable window is never told the keyboard is up, so the service polls twice a second while
+  the pad is showing and takes the pad down when a keyboard appears on the pad's screen. It asks
+  the window manager for the keyboard's own window (`dumpsys window InputMethod`) and steps aside
+  when one is `isReadyForDisplay()` on the pad's `mDisplayId`. Which screen the text field is on
+  does not come into it, and must not: the Thor can be set to send the keyboard to the second
+  screen whenever it is called (`settings get system ime_show_on_second`), so a field on the top
+  screen raises a keyboard on the pad's screen, and a rule that waited for the field to be on the
+  pad's screen left the pad sitting over it. Verified on the device with that setting on, typing
+  into Chrome on the top screen: the keyboard appears on the second screen and the pad comes down
+  for it.
+
+  Do not ask the input-method service instead. `dumpsys input_method` makes that service turn
+  round and ask the current keyboard app to dump itself, waking a sleeping app once a second for
+  as long as the pad is up; measured on the Thor that put the Google keyboard at 1086 ticks of
+  processor time per 20 seconds, about half a core, against 0 for the window query, and a call
+  costs 401 ms against 35 ms. Its `mInputShown` is not trustworthy either: it was seen true with
+  no keyboard window in existence, and false while a keyboard was up and drawn.
+
 ## Layout
 
 | Path | What |
