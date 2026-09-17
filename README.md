@@ -71,7 +71,8 @@ Everything happens on the bottom screen.
   button, and that button stays down until you tap it again. A held button shows a yellow
   dot. Hiding or stopping the pad releases everything.
 - **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation
-  or Nintendo way. Only the labels change; A is still A to the game.
+  or Nintendo way, including the shapes those pads print for Select and Start rather than
+  words. Only the labels change; A is still A to the game.
 - **Keep your presets.** The app screen has Export and Import under Presets. Export writes
   your presets and the current layout to a file you choose; Import reads one back. Do this
   before uninstalling, and to carry layouts to another device.

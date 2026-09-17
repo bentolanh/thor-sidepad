@@ -21,7 +21,7 @@ object Glyphs {
         PLAYSTATION -> when (code) {
             Btn.A -> "✕"; Btn.B -> "○"; Btn.X -> "□"; Btn.Y -> "△"
             Btn.TL -> "L1"; Btn.TR -> "R1"; Btn.TL2 -> "L2"; Btn.TR2 -> "R2"
-            Btn.SELECT -> "SHARE"; Btn.START -> "OPT"; Btn.MODE -> "PS"
+            Btn.SELECT -> "SELECT"; Btn.START -> "START"; Btn.MODE -> "PS"
             else -> Catalog.byCode(code).label
         }
         NINTENDO -> when (code) {
@@ -36,6 +36,15 @@ object Glyphs {
             Btn.SELECT -> "VIEW"; Btn.START -> "MENU"
             else -> Catalog.byCode(code).label
         }
+    }
+
+    /** 0 = draw the label, 1 = the View panes, 2 = the Menu bars. Xbox prints icons, not words. */
+    fun icon(code: Int, style: String): Int = when {
+        style == XBOX && code == Btn.SELECT -> 1          // the View panes
+        style == XBOX && code == Btn.START -> 2           // the Menu bars
+        style == PLAYSTATION && code == Btn.SELECT -> 3   // the Select oval
+        style == PLAYSTATION && code == Btn.START -> 4    // the Start triangle
+        else -> 0
     }
 
     fun color(code: Int, style: String): Int = when (style) {

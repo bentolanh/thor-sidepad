@@ -118,7 +118,7 @@ class ShieldPadView(
                 painter.drawSlider(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), levels[b.code] ?: 0.5f, sliderBy.containsValue(i))
             } else {
                 painter.draw(c, b.cx * width, b.cy * height, r, label, engine.enabled(b.code), (pressCount[i] ?: 0) > 0 || i in latched, labelColor = Glyphs.color(b.code, layout.style),
-                    mark = if (i in latched) 2 else if (b.sticky) 1 else 0)
+                    mark = if (i in latched) 2 else if (b.sticky) 1 else 0, icon = Glyphs.icon(b.code, layout.style))
             }
         }
         // Small pills marking the gesture edges: top (panel) and bottom (hide).

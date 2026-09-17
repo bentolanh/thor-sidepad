@@ -127,8 +127,48 @@ class ButtonPainter {
         tri(cx + d + a * 0.6f, cy, cx + d - a * 0.6f, cy - a, cx + d - a * 0.6f, cy + a)
     }
 
-    /** [mark]: 0 none, 1 a hollow dot (sticky, not held), 2 a filled dot (latched down). */
-    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0) {
+    /** The Xbox View button: two overlapping panes, drawn rather than spelled out. */
+    private fun drawViewIcon(c: Canvas, cx: Float, cy: Float, r: Float, color: Int, bg: Int) {
+        val w = r * 0.50f; val h = r * 0.38f; val off = r * 0.13f; val rad = r * 0.07f
+        ring.pathEffect = null; ring.strokeWidth = r * 0.085f; ring.color = color
+        c.drawRoundRect(cx - w / 2 - off, cy - h / 2 - off, cx + w / 2 - off, cy + h / 2 - off, rad, rad, ring)
+        fill.color = bg     // the front pane occludes the back one
+        c.drawRoundRect(cx - w / 2 + off, cy - h / 2 + off, cx + w / 2 + off, cy + h / 2 + off, rad, rad, fill)
+        c.drawRoundRect(cx - w / 2 + off, cy - h / 2 + off, cx + w / 2 + off, cy + h / 2 + off, rad, rad, ring)
+    }
+
+    /** The Xbox Menu button: three stacked bars. */
+    private fun drawMenuIcon(c: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        fill.color = color
+        val w = r * 0.62f; val t = r * 0.11f; val gap = r * 0.20f
+        for (i in -1..1) {
+            val y = cy + i * gap
+            c.drawRoundRect(cx - w / 2, y - t / 2, cx + w / 2, y + t / 2, t / 2, t / 2, fill)
+        }
+    }
+
+    /** PlayStation Select: the small oval the hardware carries. */
+    private fun drawSelectIcon(c: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        ring.pathEffect = null; ring.strokeWidth = r * 0.10f; ring.color = color
+        val w = r * 0.60f; val h = r * 0.30f
+        c.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, h / 2, h / 2, ring)
+    }
+
+    /** PlayStation Start: a right-pointing triangle. */
+    private fun drawStartIcon(c: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        fill.color = color
+        val w = r * 0.46f; val h = r * 0.52f
+        c.drawPath(android.graphics.Path().apply {
+            moveTo(cx - w / 2, cy - h / 2); lineTo(cx + w / 2, cy); lineTo(cx - w / 2, cy + h / 2); close()
+        }, fill)
+    }
+
+    /**
+     * [mark]: 0 none, 1 a hollow dot (sticky, not held), 2 a filled dot (latched down).
+     * [icon]: 0 draw [label] as text, 1 the View panes, 2 the Menu bars, 3 the Select oval,
+     * 4 the Start triangle.
+     */
+    fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0, icon: Int = 0) {
         ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         ring.pathEffect = if (enabled) null else dash
@@ -139,10 +179,21 @@ class ButtonPainter {
         }
         c.drawCircle(cx, cy, r * 0.92f, fill)
         c.drawCircle(cx, cy, r * 0.92f, ring)
-        text.textSize = if (label.length > 4) r * 0.42f else if (label.length > 2) r * 0.5f else r * 0.8f
-        text.color = if (down) Color.WHITE else labelColor
-        c.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text)
-        text.color = Color.WHITE
+        val bg = fill.color
+        if (icon != 0) {
+            val ink = if (down) Color.WHITE else labelColor
+            when (icon) {
+                1 -> drawViewIcon(c, cx, cy, r, ink, bg)
+                2 -> drawMenuIcon(c, cx, cy, r, ink)
+                3 -> drawSelectIcon(c, cx, cy, r, ink)
+                else -> drawStartIcon(c, cx, cy, r, ink)
+            }
+        } else {
+            text.textSize = if (label.length > 4) r * 0.42f else if (label.length > 2) r * 0.5f else r * 0.8f
+            text.color = if (down) Color.WHITE else labelColor
+            c.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text)
+            text.color = Color.WHITE
+        }
         if (mark != 0) {
             // A small dot at the top right of the ring: hollow = sticky, filled = held down.
             val mx = cx + r * 0.62f; val my = cy - r * 0.62f; val mr = r * 0.16f

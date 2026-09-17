@@ -25,6 +25,7 @@ class PadButtonView(
     private val latched get() = session?.latched?.contains(code) == true
     private val label = Glyphs.label(code, style)
     private val labelColor = Glyphs.color(code, style)
+    private val icon = Glyphs.icon(code, style)
     private val painter = ButtonPainter()
 
     override fun onDraw(c: Canvas) {
@@ -33,7 +34,7 @@ class PadButtonView(
             code == Action.SHIELD -> painter.drawShieldToggle(c, r, r, r, false)
             code == Action.HOLD -> painter.drawSysButton(c, r, r, r, label, null, down || session?.holdArmed == true)
             isActionCode(code) -> painter.drawSysButton(c, r, r, r, label, Catalog.screenTag(code), down)
-            else -> painter.draw(c, r, r, r, label, enabled, down || latched, labelColor = labelColor, mark = if (latched) 2 else if (sticky) 1 else 0)
+            else -> painter.draw(c, r, r, r, label, enabled, down || latched, labelColor = labelColor, mark = if (latched) 2 else if (sticky) 1 else 0, icon = icon)
         }
     }
 
