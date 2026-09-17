@@ -346,6 +346,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xCC101010.toInt())
             setPadding(6, 4, 6, 4)
+            gravity = Gravity.CENTER_VERTICAL
         }
         fun btn(label: String, onClick: () -> Unit): Button = Button(themed).apply {
             text = label; isAllCaps = false; textSize = 13f
@@ -353,26 +354,29 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             setOnClickListener { onClick() }
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        // The profile picker: a settings row, not another button, matching the one in the panel.
+        // The profile picker rides in the toolbar row itself, so it costs no extra height. The
+        // background and chevron keep it reading as a picker rather than another button.
         val profileValue = TextView(themed).apply {
-            setTextColor(Color.WHITE); textSize = 15f
-            gravity = Gravity.END; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(Color.WHITE); textSize = 13f
+            maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
         }
         val profileChip = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(0xFF2A2D31.toInt())
-            setPadding(20, 7, 18, 7)
-            addView(TextView(themed).apply { text = "Profile"; setTextColor(0xFFB0B8C0.toInt()); textSize = 12f })
-            addView(profileValue, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 20 })
-            addView(TextView(themed).apply { text = "›"; setTextColor(0xFF8AB4F8.toInt()); textSize = 18f },
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = 14 })
+            setPadding(14, 8, 12, 8)
+            addView(profileValue, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(TextView(themed).apply { text = "▾"; setTextColor(0xFF8AB4F8.toInt()); textSize = 14f },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = 10 })
         }
+        bar.addView(profileChip, 0, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f).apply { marginEnd = 8 })
         val hintText = "Tap to select · drag to move · pinch to resize"
         val hint = TextView(themed).apply {
-            setTextColor(0xFFB8C0C8.toInt()); textSize = 11f; setPadding(16, 2, 16, 5)
+            setTextColor(0xFFDCE4EC.toInt()); textSize = 11f; setPadding(20, 7, 20, 7)
+            setBackgroundColor(0xCC0E1114.toInt())
             text = hintText
         }
+        fun fadeHint(after: Long) { hint.animate().cancel(); hint.animate().alpha(0f).setStartDelay(after).setDuration(500).start() }
         fun refreshProfile() {
             profileValue.text = if (PresetStore.isBuiltin(active)) "$active  (built-in)" else active
         }
@@ -383,7 +387,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         fun stored(): PadLayout? = PresetStore.find(app, active)?.layout
         /** Does the pad on screen differ from the profile it came from? */
         fun dirty(): Boolean = stored()?.toJson() != working.toJson()
-        fun flash(msg: String) { hint.text = msg; hint.postDelayed({ hint.text = hintText }, 1500) }
+        fun flash(msg: String) {
+            hint.animate().cancel(); hint.alpha = 1f; hint.text = msg
+            hint.animate().alpha(0f).setStartDelay(1600).setDuration(500).withEndAction { hint.text = hintText }.start()
+        }
         /**
          * Save into the profile being edited. A built-in cannot be written to, so that one case asks
          * for a name and the new copy becomes the profile you are editing.
@@ -455,7 +462,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             sticky.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
         editor.selected = -1
 
-        val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(profileChip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(8, 2, 8, 0) }); addView(hint) }
+        val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar) }
         root.addView(top, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
 
         // The whole pad area, scaled to fit under the toolbar, so a button placed near the top
@@ -468,6 +475,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         frame.addView(editor, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         root.addView(frame, FrameLayout.LayoutParams((width * scale).roundToInt() + 4, (height * scale).roundToInt() + 4, Gravity.TOP or Gravity.CENTER_HORIZONTAL)
             .apply { topMargin = top.measuredHeight + gap })
+        root.addView(hint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 18 })
+        fadeHint(4500)
 
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
