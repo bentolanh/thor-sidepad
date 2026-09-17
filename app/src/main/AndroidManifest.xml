@@ -67,6 +67,21 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".TriggerReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.lbento.thorsidepad.SHOW" />
+                <action android:name="dev.lbento.thorsidepad.HIDE" />
+                <action android:name="dev.lbento.thorsidepad.TOGGLE" />
+                <action android:name="dev.lbento.thorsidepad.EDIT" />
+                <action android:name="dev.lbento.thorsidepad.STOP" />
+                <action android:name="dev.lbento.thorsidepad.PANEL" />
+                <action android:name="dev.lbento.thorsidepad.START" />
+                <action android:name="dev.lbento.thorsidepad.GUIDE" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".FocusHandoffActivity"
             android:exported="true"

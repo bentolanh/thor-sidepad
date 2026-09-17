@@ -5,10 +5,12 @@ import android.os.Bundle
 import dev.lbento.thorsidepad.pad.OverlayService
 
 /**
- * Invisible, exported entry point so other things can drive the pad: adb, Tasker, launcher
- * shortcuts, or a vendor panel. It forwards its action to the service and finishes at once.
+ * Invisible, exported entry point for launcher shortcuts, which can start an activity and nothing
+ * else. Everything that can send a broadcast should use [TriggerReceiver] instead: starting an
+ * activity pauses the app on the top screen with userLeaving set, and a video app takes that as
+ * the user walking away and drops into picture-in-picture.
  *
- *   am start -n dev.lbento.thorsidepad/.TriggerActivity -a dev.lbento.thorsidepad.SHOW
+ *   am start -f 0x10040000 -n dev.lbento.thorsidepad/.TriggerActivity -a dev.lbento.thorsidepad.SHOW
  */
 class TriggerActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {

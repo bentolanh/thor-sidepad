@@ -21,10 +21,10 @@ the app.
   islands mode is one small window per button. All overlay windows stay non-focusable so the
   top screen keeps input focus, which is where gamepad events are delivered. The one
   exception is the preset name box; a transparent hand-off activity returns focus afterwards.
-- **Focus and the guide.** The service resets shield off at every start. The interactive
-  guide forces shield on, frosted backdrop and full opacity while it runs and restores the
-  user's look afterwards, persisting the snapshot so an interrupted guide is undone on the
-  next start.
+- **Focus and the guide.** The shield is remembered between sessions; the service starts it
+  in whatever state it was left. The interactive guide forces shield on, frosted backdrop and
+  full opacity while it runs and restores the user's look afterwards, persisting the snapshot
+  so an interrupted guide is undone on the next start (shield included).
 - **Panel.** Pulled down like the notification shade (finger-tracked, settles or springs
   back), re-rendered in place on setting changes, restyled in place when the shield or
   backdrop changes. With the shield on but the pad hidden, the panel carries the shield's
@@ -138,13 +138,22 @@ debug-signed install and a release-signed one cannot update each other.
 
 ## Driving the pad from outside
 
-Exported trigger activity, usable from adb, Tasker or a launcher shortcut:
+Send a broadcast, from adb, Tasker or a vendor panel:
 
 ```bash
-adb shell am start -n dev.lbento.thorsidepad/.TriggerActivity -a dev.lbento.thorsidepad.TOGGLE
+adb shell am broadcast -a dev.lbento.thorsidepad.TOGGLE -n dev.lbento.thorsidepad/.TriggerReceiver
 ```
 
 Actions: SHOW, HIDE, TOGGLE, EDIT, PANEL, GUIDE, START, STOP.
+
+`TriggerActivity` accepts the same actions and is kept only for launcher shortcuts, which can
+launch an activity and nothing else. Prefer the broadcast. Starting any activity on the top
+screen pauses the app playing there with `userLeaving` set, which a video app reads as the user
+walking away: YouTube and Netflix drop into picture-in-picture, and the launcher then takes the
+screen because the video's task is no longer a full-screen one. A shortcut has to live with
+that; anything that can send a broadcast should. A caller stuck with `am start` can soften it
+with `-f 0x10040000` (`NEW_TASK | NO_USER_ACTION`), which is what the pad's own focus hand-off
+uses.
 
 ## Starting Shizuku from a computer
 

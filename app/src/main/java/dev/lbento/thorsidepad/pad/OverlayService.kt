@@ -712,7 +712,15 @@ class OverlayService : Service() {
         @Volatile var visible = false
 
         fun send(ctx: Context, action: String) {
-            ctx.startForegroundService(Intent(ctx, OverlayService::class.java).setAction(action))
+            val i = Intent(ctx, OverlayService::class.java).setAction(action)
+            try {
+                // Android only lets a background app start a foreground service in narrow cases,
+                // and a broadcast from Tasker is not one of them. Once the service is up, a plain
+                // start is always allowed, so only the first one has to go the restricted way.
+                if (running) ctx.startService(i) else ctx.startForegroundService(i)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not deliver $action", e)
+            }
         }
     }
 }
