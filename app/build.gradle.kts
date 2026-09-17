@@ -15,8 +15,8 @@ android {
         applicationId = "dev.lbento.thorsidepad"
         minSdk = 30
         targetSdk = 33
-        versionCode = 4
-        versionName = "0.9.3"
+        versionCode = 5
+        versionName = "0.9.4"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
