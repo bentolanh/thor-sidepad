@@ -76,7 +76,8 @@ Everything happens on the bottom screen.
   until you tap it again.
 - **Simple media controller.** System holds a media unit: one bar with previous, play or pause,
   and next, plus a volume track. It reaches whatever is playing, whichever app that is, and the
-  track moves that same audio. Or add a HOLD button to the pad: tap HOLD, then any
+  track moves that app's own audio: the Thor scales the second screen's sound separately, so the
+  track follows the screen the player is on rather than always moving the main one. Or add a HOLD button to the pad: tap HOLD, then any
   button, and that button stays down until you tap it again. A held button shows a yellow
   dot. Hiding or stopping the pad releases everything.
 - **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation

@@ -74,6 +74,12 @@ object Slider {
     const val VOLUME = -12
     const val VOLUME_2ND = -17   // the Thor's second-screen volume (AYN's secondary_screen_volume_level setting)
     const val BRIGHT_BOTH = -18  // one slider that moves both screens' brightness together
+    /**
+     * The media unit's own track. Not a placeable element: it stands for "the volume of whatever
+     * is playing", which the service resolves to this screen's volume or the main screen's,
+     * depending on which screen the app holding the media keys is on.
+     */
+    const val VOLUME_MEDIA = -26
 }
 
 fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT

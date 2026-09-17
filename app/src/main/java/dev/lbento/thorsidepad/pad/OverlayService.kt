@@ -322,6 +322,7 @@ class OverlayService : Service() {
         val svc = Injector.current()
         if (svc == null) { toast("Shizuku not ready"); return }
         Thread { try { svc.mediaKey(action) } catch (e: Exception) { Log.w(TAG, "media key failed", e) } }.start()
+        resolveMediaTarget()    // whoever answered that key is what the track should move
     }
 
     private fun shellAsync(cmd: String) {
@@ -340,6 +341,8 @@ class OverlayService : Service() {
             levels[dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP]?.let { levels[dev.lbento.thorsidepad.inject.Slider.BRIGHT_BOTH] = it }
             svc.getVolume().let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] = it }
             svc.getVolume2nd().let { if (it >= 0f) levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND] = it }
+            levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] = levels[mediaVolumeTarget] ?: 0.5f
+            resolveMediaTarget()
         } catch (e: Exception) { Log.w(TAG, "levels", e) }
     }
 
@@ -357,6 +360,11 @@ class OverlayService : Service() {
     private val lastApplied = HashMap<Int, Long>()
 
     private fun onSlider(code: Int, level: Float, final: Boolean) {
+        if (code == dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA) {
+            // Check which screen is playing once per drag, not on every move.
+            if (!mediaDragging) { mediaDragging = true; resolveMediaTarget() }
+            if (final) mediaDragging = false
+        }
         val delay: Long
         synchronized(pendingLevel) {
             val had = pendingLevel[code]
@@ -374,9 +382,41 @@ class OverlayService : Service() {
         }, delay)
     }
 
+    /**
+     * Which volume the media unit's track moves. The Thor scales the audio of apps on the second
+     * screen separately from the main stream, so a track that always moved the main stream would
+     * turn down the wrong app whenever the player sits on the pad's own screen.
+     */
+    @Volatile private var mediaVolumeTarget = dev.lbento.thorsidepad.inject.Slider.VOLUME
+    @Volatile private var mediaDragging = false
+
+    /** Asks the system which app holds the media keys and which screen its window is on. */
+    private fun resolveMediaTarget() {
+        val svc = Injector.current() ?: return
+        Thread {
+            try {
+                val out = svc.shell(
+                    "p=\$(dumpsys media_session 2>/dev/null | grep -m1 'Media button session is' | sed -E 's|.*is ([^/]+)/.*|\\1|'); " +
+                    "[ -n \"\$p\" ] && dumpsys window displays 2>/dev/null | awk -v p=\"\$p\" " +
+                    "'/Display: mDisplayId=/{d=\$0; sub(/.*mDisplayId=/,\"\",d); sub(/ .*/,\"\",d)} index(\$0,p){print d; exit}' 2>/dev/null"
+                )
+                val display = out.trim().lines().lastOrNull()?.trim()?.toIntOrNull()
+                val target = if (display != null && display == overlay?.displayId)
+                    dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND else dev.lbento.thorsidepad.inject.Slider.VOLUME
+                mediaVolumeTarget = target
+                main.post {
+                    levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] = levels[target] ?: 0.5f
+                    overlay?.invalidatePad()
+                }
+            } catch (e: Exception) { Log.w(TAG, "media target", e) }
+        }.start()
+    }
+
     private fun applyLevel(code: Int, level: Float, final: Boolean) {
         val svc = Injector.current() ?: return
         val second = overlay?.displayId ?: 0
+        // The media unit's track stands for whichever volume the playing app actually uses.
+        val code = if (code == dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA) mediaVolumeTarget else code
         // setTemporaryBrightness exists on the Thor but never reaches its display controller and
         // stalls the real change for seconds, so every update is a plain setBrightness.
         fun bright(display: Int) = svc.setBrightness(display, level)

@@ -32,7 +32,7 @@ class MediaPadView(
     private fun setLevel(x: Float, final: Boolean) {
         val f = frac(x)
         level = ((f - ButtonPainter.MEDIA_BUTTONS_FRAC) / (1f - ButtonPainter.MEDIA_BUTTONS_FRAC)).coerceIn(0f, 1f)
-        onSlider(Slider.VOLUME, level, final)
+        onSlider(Slider.VOLUME_MEDIA, level, final)
         invalidate()
     }
 
@@ -48,7 +48,7 @@ class MediaPadView(
                 zone = -1; invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
-                if (sliding) { onSlider(Slider.VOLUME, level, true); sliding = false }
+                if (sliding) { onSlider(Slider.VOLUME_MEDIA, level, true); sliding = false }
                 zone = -1; invalidate()
             }
         }

@@ -56,6 +56,14 @@ the app.
   guard, so edits are never dropped silently. Leaving always adopts the profile being edited,
   either as just saved or as stored.
 
+- **The media unit's volume.** The Thor scales the audio of apps on the second screen apart from
+  the main stream, so "the volume of what is playing" depends on which screen the player sits on.
+  The unit's track sends `Slider.VOLUME_MEDIA`, which the service resolves: it asks
+  `dumpsys media_session` which package holds the media keys, finds that package under a display
+  in `dumpsys window displays`, and then moves either the second screen's level or the media
+  stream. It resolves when the pad shows, when a transport key is pressed, and once per drag, so
+  the lookup never runs per touch move.
+
 - **The Back key and the back gesture.** SidePad holds Back only when the user is configuring,
   never while the buttons are driving the game, because the focused screen is where injected
   presses land. The panel, editor and pickers take window focus (`focusableFlags`) and swallow

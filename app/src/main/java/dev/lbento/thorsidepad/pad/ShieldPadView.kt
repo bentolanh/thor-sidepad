@@ -128,7 +128,7 @@ class ShieldPadView(
                 val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
                     mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, mediaZone[i] ?: -1,
-                    false, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] ?: 0.5f)
+                    false, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] ?: 0.5f)
             } else if (isActionCode(b.code)) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
             } else if (isSliderCode(b.code)) {
@@ -166,8 +166,8 @@ class ShieldPadView(
     private fun mediaSlide(i: Int, x: Float, final: Boolean) {
         val f = mediaFrac(i, x)
         val lv = ((f - ButtonPainter.MEDIA_BUTTONS_FRAC) / (1f - ButtonPainter.MEDIA_BUTTONS_FRAC)).coerceIn(0f, 1f)
-        levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] = lv
-        onSlider(dev.lbento.thorsidepad.inject.Slider.VOLUME, lv, final)
+        levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] = lv
+        onSlider(dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA, lv, final)
     }
 
     private fun slide(i: Int, y: Float) {
