@@ -334,7 +334,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         profileChip.setOnClickListener {
             showPresets(active,
                 onUse = { p -> switchTo(p.name, p.layout) },
-                onDeletedActive = { switchTo(PresetStore.builtins[0].name, PresetStore.builtins[0].layout) })
+                onDeletedActive = { switchTo(PresetStore.builtins[0].name, PresetStore.builtins[0].layout) },
+                onNew = { name ->
+                    // A brand-new, empty profile the user builds from scratch. Persist it so it is a
+                    // real profile straight away; editing and Save write into it.
+                    val blank = PadLayout(mutableListOf(), working.style)
+                    PresetStore.upsert(app, Preset(name, "Your preset", blank, false))
+                    switchTo(name, blank)
+                })
         }
         refreshProfile = {
             profileChip.text = if (PresetStore.isBuiltin(active)) "Profile:  $active  (built-in)  ▾" else "Profile:  $active  ▾"
@@ -342,7 +349,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         refreshProfile()
         val hint = TextView(themed).apply {
             setTextColor(0xFFB8C0C8.toInt()); textSize = 12f; setPadding(16, 4, 16, 8)
-            text = "Tap an item to select it, drag to move it, pinch anywhere to resize the selected one. Save keeps your work; use Profile to switch or start a new one."
+            text = "Tap to select · drag to move · pinch to resize"
         }
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
             val code = Catalog.groups[g].second[pos].code
@@ -356,7 +363,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         btn("Glyphs") { showChoice("Button glyphs for this preset", Glyphs.styles.map { (key, name) -> (if (key == working.style) "●  " else "") + name }) { pos ->
             working.style = Glyphs.styles[pos].first; editor.invalidate()
         } }
-        btn("Cancel") { removeAll(); onCancel() }
+        btn("Discard") { removeAll(); onCancel() }
         btn("Save") {
             if (PresetStore.isBuiltin(active)) {
                 askName(PresetStore.nextName(app)) { name ->
@@ -406,7 +413,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * The preset chooser: one card per preset with a miniature, name and description. Use
      * switches the editor to it; the user's own presets can also be deleted. The active one is marked.
      */
-    private fun showPresets(active: String, onUse: (Preset) -> Unit, onDeletedActive: () -> Unit) {
+    private fun showPresets(active: String, onUse: (Preset) -> Unit, onDeletedActive: () -> Unit, onNew: ((String) -> Unit)? = null) {
         val root = FrameLayout(themed)
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
@@ -419,9 +426,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             isClickable = true
         }
         val header = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL; setPadding(24, 8, 8, 8) }
-        header.addView(TextView(themed).apply { text = "Presets"; setTextColor(Color.WHITE); textSize = 18f },
+        header.addView(TextView(themed).apply { text = "Profiles"; setTextColor(Color.WHITE); textSize = 18f },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
-        header.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } })
+        if (onNew != null) header.addView(Button(themed).apply { text = "＋ New"; isAllCaps = false; setOnClickListener { dismiss(); askName(PresetStore.nextName(app)) { name -> onNew(name) } } })
+        header.addView(Button(themed).apply { text = "Close"; isAllCaps = false; setOnClickListener { dismiss() } })
         card.addView(header)
 
         val list = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 0, 16, 16) }
