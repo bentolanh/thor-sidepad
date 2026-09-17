@@ -58,7 +58,9 @@ Everything happens on the bottom screen.
   profile you are on. Exit leaves, asking first whether to save if there is unsaved work, and
   the back gesture does the same. Switching profile with unsaved work asks too, so nothing is
   lost silently.
-- **Device controls on the pad.** Add has pages for Buttons, Sticks, Screen and Sliders.
+- **Device controls on the pad.** Add has pages for Controller, Macro and System, grouped by
+  what the thing affects: Controller goes to the game, Macro changes how the pad's own buttons
+  behave, System acts on the device and its screens.
   The D-pad is one cross you press in any of eight directions.
   Sliders set brightness and volume for each screen, plus one brightness slider that moves
   both screens together; Screen holds Home and Back for either screen and the shield toggle.

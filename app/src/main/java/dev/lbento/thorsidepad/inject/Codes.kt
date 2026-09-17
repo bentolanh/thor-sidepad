@@ -141,13 +141,19 @@ object Catalog {
         PadCode(Slider.VOLUME_2ND, "♪", "volume slider, this screen"),
     )
 
-    /** The Add picker's pages: one per kind of element, so the list stays short. */
+    /**
+     * The Add picker's pages, grouped by what pressing the thing affects: Controller goes to the
+     * game, Macro changes how the pad's own buttons behave, System acts on the device and its
+     * screens. The shield sits in System because it governs how this screen behaves, next to that
+     * screen's brightness and its Home and Back.
+     */
     val groups: List<Pair<String, List<PadCode>>> = listOf(
         // The four single-direction buttons stay out of the picker; the one-element D-pad replaces them.
-        "Buttons" to all.filter { (it.code > 0 && !it.isStickClick && !it.isDpad) || it.isDpadElement || it.code == Action.HOLD },
-        "Sticks" to all.filter { it.isStick } + all.filter { it.isStickClick },
-        "Screen" to all.filter { it.isAction && it.code != Action.HOLD },
-        "Sliders" to all.filter { it.isSlider },
+        "Controller" to all.filter { (it.code > 0 && !it.isStickClick && !it.isDpad) || it.isDpadElement } +
+            all.filter { it.isStick } + all.filter { it.isStickClick },
+        "Macro" to all.filter { it.code == Action.HOLD },
+        "System" to all.filter { it.isAction && it.code != Action.HOLD && it.code != Action.SHIELD } +
+            all.filter { it.isSlider } + all.filter { it.code == Action.SHIELD },
     )
 
     /** Small tag drawn under a Home/Back/slider element: which screen it acts on. */
