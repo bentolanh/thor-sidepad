@@ -53,7 +53,8 @@ Everything happens on the bottom screen.
   select it, drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to
   remove. The chip under the toolbar names the profile you are editing and opens the profile
   picker, where each profile offers Open, to edit that one, and Overwrite, to store what is on
-  screen into it; the picker also makes a new blank profile. Save writes into the
+  screen into it; the picker also makes a new blank profile. Deleting a profile lives in the
+  control panel's profile list instead, away from the editing controls. Save writes into the
   profile you are on. Exit leaves, asking first whether to save if there is unsaved work, and
   the back gesture does the same. Switching profile with unsaved work asks too, so nothing is
   lost silently.

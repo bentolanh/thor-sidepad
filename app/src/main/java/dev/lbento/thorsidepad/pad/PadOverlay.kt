@@ -476,7 +476,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * screen into it. Built-ins live in code, so they can be opened but never written to.
      */
     private fun showPresets(active: String, onOpen: (Preset) -> Unit, primaryLabel: String = "Open",
-                            onOverwrite: ((Preset) -> Unit)? = null, onNew: ((String) -> Unit)? = null) {
+                            onOverwrite: ((Preset) -> Unit)? = null, onNew: ((String) -> Unit)? = null,
+                            allowDelete: Boolean = false) {
         var onBack: () -> Unit = {}
         val root = backFrame { onBack() }
         root.setBackgroundColor(0x99000000.toInt())
@@ -522,6 +523,18 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                         showChoice("Overwrite \"${p.name}\"?", listOf("Overwrite it with what is on screen")) { onOverwrite(p) }
                     } })
                 }
+                // Deleting a profile is permanent, so it asks first. The profile in use cannot be
+                // deleted, and built-ins live in code.
+                if (allowDelete && !p.builtin) {
+                    actions.addView(Button(themed).apply {
+                        this.text = "Delete"; isAllCaps = false; isEnabled = !isActive
+                        setOnClickListener {
+                            showChoice("Delete \"${p.name}\"?", listOf("Delete it for good")) {
+                                PresetStore.delete(app, p.name); rebuild()
+                            }
+                        }
+                    })
+                }
                 row.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_VERTICAL })
                 list.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 })
             }
@@ -536,7 +549,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     }
 
     /** The panel's profile chooser: pick one and the pad switches to it. No overwriting from here. */
-    fun showProfilePicker(active: String, onOpen: (Preset) -> Unit) = showPresets(active, onOpen = onOpen, primaryLabel = "Use")
+    fun showProfilePicker(active: String, onOpen: (Preset) -> Unit) =
+        showPresets(active, onOpen = onOpen, primaryLabel = "Use", allowDelete = true)
 
     /** A small focusable window with a text field. The only place the pad takes window focus. */
     private fun askName(defaultName: String, onOk: (String) -> Unit) {
