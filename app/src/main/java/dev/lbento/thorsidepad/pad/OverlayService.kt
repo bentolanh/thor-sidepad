@@ -53,9 +53,14 @@ class OverlayService : Service() {
                 val svc = Injector.current()
                 if (svc != null) {
                     try {
-                        val out = svc.shell("dumpsys input_method 2>/dev/null | grep -m2 -o -E 'mCurTokenDisplayId=[0-9]+|mInputShown=[a-z]+'")
+                        // Step aside only when the keyboard is up AND the text field being typed into is
+                        // on the pad's own screen. The Thor pins the IME token to the second screen even
+                        // for a top-screen app (e.g. the Claude app), so the token display is not a reliable
+                        // signal; the focused input client's display is. Uncertain -> keep the pad up.
+                        val out = svc.shell("dumpsys input_method 2>/dev/null | grep -m3 -oE 'mInputShown=[a-z]+|mCurFocusedWindow=.*'")
                         val shown = out.contains("mInputShown=true")
-                        val onPadDisplay = Regex("mCurTokenDisplayId=(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull()?.let { it == (overlay?.displayId ?: -1) } ?: true
+                        val focusDisplay = Regex("mCurFocusedWindow=.*?displayId=(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull()
+                        val onPadDisplay = focusDisplay?.let { it == (overlay?.displayId ?: -1) } ?: false
                         val active = shown && onPadDisplay
                         if (active != lastShown) { lastShown = active; main.post { onImeVisible(active) } }
                     } catch (e: Exception) { Log.w(TAG, "ime poll failed", e) }
