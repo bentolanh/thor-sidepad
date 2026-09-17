@@ -313,35 +313,45 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val bar = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xCC101010.toInt())
-            setPadding(8, 8, 8, 8)
+            setPadding(6, 6, 6, 6)
         }
         fun btn(label: String, onClick: () -> Unit): Button = Button(themed).apply {
-            text = label; isAllCaps = false
+            text = label; isAllCaps = false; textSize = 13f
+            minWidth = 0; minimumWidth = 0; setPadding(6, 10, 6, 10)
             setOnClickListener { onClick() }
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        val hint = TextView(themed).apply { setTextColor(Color.WHITE); setPadding(16, 8, 16, 8) }
-        fun refreshHint() {
-            hint.text = if (PresetStore.isBuiltin(active))
-                "Editing \"$active\" (built-in). Save will ask for a name and keep your copy. Tap to select; drag to move; pinch to resize."
-            else
-                "Editing \"$active\". Save updates it or makes a new one. Tap to select; drag to move; pinch to resize."
+        // The profile chip: shows which preset is being edited and opens the switch/save chooser.
+        lateinit var refreshProfile: () -> Unit
+        val profileChip = Button(themed).apply {
+            isAllCaps = false; textSize = 14f; setPadding(20, 12, 20, 12)
+            setBackgroundColor(0xFF23324A.toInt()); setTextColor(Color.WHITE)
         }
-        refreshHint()
+        fun switchTo(name: String, layoutOf: PadLayout) {
+            active = name; working.buttons.clear(); working.buttons.addAll(layoutOf.buttons.map { it.copy() })
+            working.style = layoutOf.style; editor.selected = -1; editor.invalidate(); refreshProfile()
+        }
+        profileChip.setOnClickListener {
+            showPresets(active,
+                onUse = { p -> switchTo(p.name, p.layout) },
+                onDeletedActive = { switchTo(PresetStore.builtins[0].name, PresetStore.builtins[0].layout) })
+        }
+        refreshProfile = {
+            profileChip.text = if (PresetStore.isBuiltin(active)) "Profile:  $active  (built-in)  ▾" else "Profile:  $active  ▾"
+        }
+        refreshProfile()
+        val hint = TextView(themed).apply {
+            setTextColor(0xFFB8C0C8.toInt()); textSize = 12f; setPadding(16, 4, 16, 8)
+            text = "Tap an item to select it, drag to move it, pinch anywhere to resize the selected one. Save keeps your work; use Profile to switch or start a new one."
+        }
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
             val code = Catalog.groups[g].second[pos].code
             working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code) || isDpadCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
-        val smaller = btn("−") { sel(editor)?.let { it.size = (it.size - 0.02f).coerceAtLeast(0.06f); editor.invalidate() } }
-        val bigger = btn("+") { sel(editor)?.let { it.size = (it.size + 0.02f).coerceAtMost(0.6f); editor.invalidate() } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }
         // Sticky: a tap holds the button down, the next tap releases it. Only for real buttons.
         val sticky = btn("Sticky") { sel(editor)?.let { if (it.code > 0) { it.sticky = !it.sticky; editor.invalidate() } } }
-        btn("Presets") { showPresets(active,
-            onUse = { p -> active = p.name; working.buttons.clear(); working.buttons.addAll(p.layout.buttons.map { it.copy() }); working.style = p.layout.style; editor.selected = -1; editor.invalidate(); refreshHint() },
-            onDeletedActive = { active = PresetStore.builtins[0].name; working.buttons.clear(); working.buttons.addAll(PresetStore.builtins[0].layout.buttons.map { it.copy() }); working.style = PresetStore.builtins[0].layout.style; editor.selected = -1; editor.invalidate(); refreshHint() })
-        }
         // Per-preset button glyphs: the presses stay the same, the labels read like that console's pad.
         btn("Glyphs") { showChoice("Button glyphs for this preset", Glyphs.styles.map { (key, name) -> (if (key == working.style) "●  " else "") + name }) { pos ->
             working.style = Glyphs.styles[pos].first; editor.invalidate()
@@ -366,11 +376,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 }
             }
         }
-        editor.onSelectionChanged = { i -> val has = i >= 0; smaller.isEnabled = has; bigger.isEnabled = has; delete.isEnabled = has
+        editor.onSelectionChanged = { i -> val has = i >= 0; delete.isEnabled = has
             sticky.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
         editor.selected = -1
 
-        val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(hint) }
+        val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(profileChip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(8, 4, 8, 0) }); addView(hint) }
         root.addView(top, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
 
         // The whole pad area, scaled to fit under the toolbar, so a button placed near the top

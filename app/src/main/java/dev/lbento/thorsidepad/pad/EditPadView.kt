@@ -29,8 +29,12 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
     private val painter = ButtonPainter()
     private val grid = Paint().apply { color = 0x22FFFFFF; strokeWidth = 1f }
     private var scaling = false
+    private var downOnEmpty = false     // first finger landed on empty space
+    private var pinched = false         // a two-finger resize happened in this gesture
     private val scaler = ScaleGestureDetector(ctx, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScaleBegin(d: ScaleGestureDetector): Boolean { scaling = selected >= 0; return scaling }
+        // Resize the selected element no matter where the pinch is, so a small element does not
+        // have to be pinched exactly. onScaleBegin keeps the current selection.
+        override fun onScaleBegin(d: ScaleGestureDetector): Boolean { scaling = selected >= 0; if (scaling) pinched = true; return scaling }
         override fun onScale(d: ScaleGestureDetector): Boolean {
             val b = layout.buttons.getOrNull(selected) ?: return false
             b.size = (b.size * d.scaleFactor).coerceIn(0.06f, 0.6f)
@@ -71,12 +75,16 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         scaler.onTouchEvent(e)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                pinched = false
                 val i = hit(e.x, e.y)
-                selected = i
-                dragIndex = i
                 if (i >= 0) {
+                    selected = i; dragIndex = i; downOnEmpty = false
                     val b = layout.buttons[i]
                     dragDx = b.cx * width - e.x; dragDy = b.cy * height - e.y
+                } else {
+                    // Empty space: keep the current selection so a pinch here can resize it. A plain
+                    // tap that turns out not to be a pinch clears the selection on release.
+                    dragIndex = -1; downOnEmpty = true
                 }
             }
             MotionEvent.ACTION_POINTER_DOWN -> dragIndex = -1   // second finger: pinch, not drag
@@ -86,7 +94,10 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
                 b.cy = ((e.y + dragDy) / height).coerceIn(0.02f, 0.98f)
                 invalidate()
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> dragIndex = -1
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (downOnEmpty && !pinched) selected = -1   // a tap on empty space deselects
+                dragIndex = -1; downOnEmpty = false
+            }
         }
         return true
     }
