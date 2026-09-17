@@ -56,6 +56,18 @@ the app.
   guard, so edits are never dropped silently. Leaving always adopts the profile being edited,
   either as just saved or as stored.
 
+- **Reaching the media sessions without a notification listener.** Reading a position, seeking,
+  and an app's own custom actions all need `MediaSessionManager.getActiveSessions`, which normally
+  forces an app to run an enabled NotificationListenerService. It does not have to here. The
+  shell user already holds `MEDIA_CONTENT_CONTROL` (`dumpsys package com.android.shell`), so the
+  Shizuku-hosted process is allowed; the only obstacle is that this process never runs the media
+  framework's start-up, leaving `MediaServiceManager` null. Constructing that class reflectively
+  and passing it to `MediaFrameworkInitializer.setMediaServiceManager` and its Platform twin is
+  enough: `getSystemService(MEDIA_SESSION_SERVICE)` then works and `getActiveSessions(null)`
+  returns live controllers. Verified on the Thor: Spotify state=2 pos=234964 dur=236000, plus
+  Audible and the Apple TV session. `registerServiceWrappers` throws ("can only be called during
+  class initialization") and is not needed. So the planned video unit needs no extra permission.
+
 - **The media unit's volume.** The Thor scales the audio of apps on the second screen apart from
   the main stream, so "the volume of what is playing" depends on which screen the player sits on.
   The unit's track sends `Slider.VOLUME_MEDIA`, which the service resolves: it asks

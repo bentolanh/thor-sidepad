@@ -92,6 +92,11 @@ class InjectorService() : IInjector.Stub() {
         } catch (e: Throwable) { Log.w(TAG, "mediaKey", e) }
     }
 
+    /**
+     * TEMPORARY probe. This process is started by Shizuku and never runs the media framework's
+     * start-up, so MediaSessionManager could not be constructed. Try invoking that start-up by
+     * hand, then reach the sessions with the shell's own MEDIA_CONTENT_CONTROL.
+     */
     private fun sh(cmd: String): String =
         ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true).start()
             .inputStream.bufferedReader().readText()

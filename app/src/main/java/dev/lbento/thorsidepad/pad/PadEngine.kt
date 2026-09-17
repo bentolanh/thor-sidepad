@@ -16,8 +16,10 @@ import dev.lbento.thorsidepad.inject.isStickCode
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-/** Half a turbo cycle: the button is down for this long, then up for this long (about 12 a second). */
-private const val TURBO_HALF_MS = 40L
+/** Time from one press to the next when a button has no rate of its own: about 12 a second. */
+const val TURBO_DEFAULT_MS = 80
+const val TURBO_MIN_MS = 25
+const val TURBO_MAX_MS = 500
 
 /** What the open target can emit, parsed from IInjector.targetCaps(). */
 class Caps(val keys: Set<Int>, val abs: Map<Int, IntArray>, val virtual: Boolean) {
@@ -135,15 +137,18 @@ class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private v
     private val turbo = HashMap<Int, Runnable>()
 
     /** Starts [code] pulsing until [stopTurbo]. Calling it twice for one code does nothing. */
-    fun startTurbo(code: Int) {
+    fun startTurbo(code: Int, periodMs: Int = 0) {
         synchronized(turbo) {
             if (turbo.containsKey(code)) return
+            // The stored rate is the time from one press to the next, so each half is half of it.
+            val half = ((if (periodMs > 0) periodMs else TURBO_DEFAULT_MS)
+                .coerceIn(TURBO_MIN_MS, TURBO_MAX_MS) / 2).toLong().coerceAtLeast(10L)
             var isDown = false
             val pulse = object : Runnable {
                 override fun run() {
                     isDown = !isDown
                     if (isDown) press(code) else release(code)
-                    handler.postDelayed(this, TURBO_HALF_MS)
+                    handler.postDelayed(this, half)
                 }
             }
             turbo[code] = pulse

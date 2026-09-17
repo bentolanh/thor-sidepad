@@ -210,7 +210,7 @@ class ShieldPadView(
      * button or any button tapped while HOLD is armed latches down.
      */
     /** A turbo button pulses instead of simply going down, but is started and stopped the same way. */
-    private fun fire(b: PadButton) { if (b.turbo) engine.startTurbo(b.code) else engine.press(b.code) }
+    private fun fire(b: PadButton) { if (b.turbo) engine.startTurbo(b.code, b.turboMs) else engine.press(b.code) }
     private fun unfire(b: PadButton) { if (b.turbo) engine.stopTurbo(b.code) else engine.release(b.code) }
 
     private fun press(i: Int, pid: Int, initial: Boolean = false) {
@@ -235,7 +235,7 @@ class ShieldPadView(
             val asTurbo = b.turbo || turboArmed
             holdArmed = false; turboArmed = false
             latched.add(i); if (asTurbo) turboLatched.add(i); latchTouch.add(pid)
-            if (asTurbo) engine.startTurbo(code) else engine.press(code)
+            if (asTurbo) engine.startTurbo(code, b.turboMs) else engine.press(code)
             return
         }
         fire(b)

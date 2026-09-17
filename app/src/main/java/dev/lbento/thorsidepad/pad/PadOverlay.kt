@@ -19,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.EditText
 import android.widget.ListView
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.Catalog
@@ -318,7 +319,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                     { code -> onAction(code) }, onSlider)
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session,
-                    b.turbo, engine::startTurbo, engine::stopTurbo)
+                    b.turbo, { c -> engine.startTurbo(c, b.turboMs) }, engine::stopTurbo)
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
@@ -482,6 +483,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 b.sticky = pick == 1 || pick == 3
                 b.turbo = pick == 2 || pick == 3
                 editor.invalidate()
+                if (b.turbo) askTurboRate(b) { editor.invalidate() }
             }
         }
         // Per-preset button glyphs: the presses stay the same, the labels read like that console's pad.
@@ -602,6 +604,59 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     /** The panel's profile chooser: pick one and the pad switches to it. No overwriting from here. */
     fun showProfilePicker(active: String, onOpen: (Preset) -> Unit) =
         showPresets(active, onOpen = onOpen, primaryLabel = "Use", allowDelete = true)
+
+    private fun rateText(ms: Int) = "$ms ms · about ${(1000f / ms).roundToInt()} a second"
+
+    /** How fast a turbo button presses: three named rates, or a slider for anything in between. */
+    private fun askTurboRate(b: PadButton, onChanged: () -> Unit) {
+        val presets = listOf(200 to "Slow", TURBO_DEFAULT_MS to "Medium", 40 to "Fast")
+        val cur = if (b.turboMs > 0) b.turboMs else TURBO_DEFAULT_MS
+        val labels = presets.map { (ms, name) -> (if (ms == cur) "●  " else "") + "$name · ${rateText(ms)}" } +
+            ((if (presets.none { it.first == cur }) "●  " else "") + "Custom…")
+        showChoice("How fast it repeats", labels) { pick ->
+            if (pick < presets.size) { b.turboMs = presets[pick].first; onChanged() }
+            else askRate(cur) { ms -> b.turboMs = ms; onChanged() }
+        }
+    }
+
+    /** The custom rate: a slider in milliseconds from one press to the next. */
+    private fun askRate(current: Int, onOk: (Int) -> Unit) {
+        var onBack: () -> Unit = {}
+        val root = backFrame { onBack() }
+        root.setBackgroundColor(0x99000000.toInt())
+        var window: View? = null
+        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        onBack = { dismiss() }
+        val card = LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(0xF0181818.toInt()); setPadding(28, 20, 28, 20); isClickable = true
+        }
+        card.addView(TextView(themed).apply { text = "Time per press"; setTextColor(Color.WHITE); textSize = 18f })
+        var ms = current.coerceIn(TURBO_MIN_MS, TURBO_MAX_MS)
+        val read = TextView(themed).apply { setTextColor(0xFFB8C0C8.toInt()); textSize = 14f; text = rateText(ms) }
+        card.addView(read)
+        card.addView(SeekBar(themed).apply {
+            max = TURBO_MAX_MS - TURBO_MIN_MS
+            progress = ms - TURBO_MIN_MS
+            setPadding(24, 24, 24, 24)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) { ms = p + TURBO_MIN_MS; read.text = rateText(ms) }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val row = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(Button(themed).apply { text = "Save"; isAllCaps = false; setOnClickListener { dismiss(); onOk(ms) } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        card.addView(row)
+        root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
+        lp.title = "SidePad rate"
+        window = root
+        add(root, lp)
+    }
 
     /** A small focusable window with a text field. The only place the pad takes window focus. */
     private fun askName(defaultName: String, onOk: (String) -> Unit) {

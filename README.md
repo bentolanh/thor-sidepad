@@ -70,7 +70,8 @@ Everything happens on the bottom screen.
   written over, so saving while on one asks for a name and keeps your copy instead.
 - **How a button presses.** Select a button in the editor and tap Behavior: Sticky means a
   tap holds it down and the next tap lets go, Turbo means it presses itself about twelve times
-  a second for as long as you hold it, and the two together mean a tap starts it repeating
+  a second for as long as you hold it, at a rate you pick (Slow, Medium, Fast, or a slider for
+  anything between), and the two together mean a tap starts it repeating
   until you tap again. A turbo button shows two chevrons. The Macro page also has HOLD and
   TURBO elements: tap one, then tap any button, and that button holds or repeats hands-free
   until you tap it again.

@@ -11,7 +11,7 @@ import org.json.JSONObject
  * One on-screen button. Position and size are fractions of the display so a layout survives
  * rotation and other screens: cx/cy of width/height, size (diameter) of the shorter side.
  */
-data class PadButton(var code: Int, var cx: Float, var cy: Float, var size: Float, var sticky: Boolean = false, var turbo: Boolean = false)
+data class PadButton(var code: Int, var cx: Float, var cy: Float, var size: Float, var sticky: Boolean = false, var turbo: Boolean = false, var turboMs: Int = 0)
 
 class PadLayout(val buttons: MutableList<PadButton>, var style: String = Glyphs.XBOX) {
 
@@ -21,6 +21,7 @@ class PadLayout(val buttons: MutableList<PadButton>, var style: String = Glyphs.
             val o = JSONObject().put("code", b.code).put("cx", b.cx.toDouble()).put("cy", b.cy.toDouble()).put("size", b.size.toDouble())
             if (b.sticky) o.put("sticky", true)
             if (b.turbo) o.put("turbo", true)
+            if (b.turboMs > 0) o.put("turboMs", b.turboMs)
             arr.put(o)
         }
         return JSONObject().put("version", 1).put("style", style).put("buttons", arr).toString()
@@ -37,7 +38,7 @@ class PadLayout(val buttons: MutableList<PadButton>, var style: String = Glyphs.
                 val list = ArrayList<PadButton>()
                 for (i in 0 until arr.length()) {
                     val o = arr.getJSONObject(i)
-                    list.add(PadButton(o.getInt("code"), o.getDouble("cx").toFloat(), o.getDouble("cy").toFloat(), o.getDouble("size").toFloat(), o.optBoolean("sticky", false), o.optBoolean("turbo", false)))
+                    list.add(PadButton(o.getInt("code"), o.getDouble("cx").toFloat(), o.getDouble("cy").toFloat(), o.getDouble("size").toFloat(), o.optBoolean("sticky", false), o.optBoolean("turbo", false), o.optInt("turboMs", 0)))
                 }
                 PadLayout(list, root.optString("style", Glyphs.XBOX).takeIf { s -> Glyphs.styles.any { it.first == s } } ?: Glyphs.XBOX)
             } catch (e: Exception) { default() }
