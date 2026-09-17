@@ -147,11 +147,15 @@ class ButtonPainter {
         }
     }
 
-    /** PlayStation Select: the small oval the hardware carries. */
+    /**
+     * PlayStation Select and Start are drawn as the shapes of the buttons themselves on a
+     * DualShock, not as the words printed beside them: a small rounded rectangle and a
+     * right-pointing wedge.
+     */
     private fun drawSelectIcon(c: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
         ring.pathEffect = null; ring.strokeWidth = r * 0.10f; ring.color = color
-        val w = r * 0.60f; val h = r * 0.30f
-        c.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, h / 2, h / 2, ring)
+        val w = r * 0.58f; val h = r * 0.30f; val rad = r * 0.06f
+        c.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, rad, rad, ring)
     }
 
     /** PlayStation Start: a right-pointing triangle. */
