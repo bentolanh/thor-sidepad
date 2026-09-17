@@ -15,6 +15,7 @@ import dev.lbento.thorsidepad.inject.mediaCodeAt
 class MediaPadView(
     ctx: Context,
     level: Float,
+    private val now: NowPlaying,
     private val onAction: (Int) -> Unit,
     private val onSlider: (Int, Float, Boolean) -> Unit,
 ) : View(ctx) {
@@ -24,7 +25,7 @@ class MediaPadView(
     private var sliding = false
 
     override fun onDraw(c: Canvas) {
-        painter.drawMedia(c, 0f, 0f, width.toFloat(), height.toFloat(), zone, false, level)
+        painter.drawMedia(c, 0f, 0f, width.toFloat(), height.toFloat(), zone, false, level, now.playing)
     }
 
     private fun frac(x: Float) = (x / width.coerceAtLeast(1)).coerceIn(0f, 1f)

@@ -42,4 +42,8 @@ interface IInjector {
     void setBrightnessLive(int displayId, float level) = 19;
     // A media key handed to whatever is playing, whichever app that is.
     void mediaKey(String action) = 20;
+    // The playing session, as "package|state|positionMs|durationMs"; empty when nothing is playing.
+    String mediaInfo() = 21;
+    void mediaSeek(long posMs) = 22;
+    void mediaSkip(int deltaMs) = 23;
 }

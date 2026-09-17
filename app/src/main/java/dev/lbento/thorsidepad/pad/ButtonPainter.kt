@@ -129,6 +129,71 @@ class ButtonPainter {
         tri(cx + d + a * 0.6f, cy, cx + d - a * 0.6f, cy - a, cx + d - a * 0.6f, cy + a)
     }
 
+    /**
+     * The video unit: a timeline across the top that you drag to seek, and jump back, play or
+     * pause, and jump forward beneath it. [pressed] is the third under the finger, or -1.
+     */
+    fun drawVideo(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, playing: Boolean,
+                  posFrac: Float, pressed: Int = -1, elapsed: String = "", total: String = "",
+                  selected: Boolean = false) {
+        val h = bottom - top; val w = right - left; val rad = h * 0.14f
+        fill.color = 0xAA202020.toInt()
+        c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
+        ring.pathEffect = null
+        ring.strokeWidth = h * (if (selected) 0.055f else 0.030f)
+        ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
+        c.drawRoundRect(left, top, right, bottom, rad, rad, ring)
+
+        val splitY = top + h * 0.46f
+        val ty = top + h * 0.25f
+        val padX = w * 0.030f
+        small.textSize = h * 0.155f
+        small.color = 0xFFC2CAD2.toInt()
+        small.textAlign = Paint.Align.LEFT
+        c.drawText(elapsed, left + padX, ty + small.textSize * 0.36f, small)
+        small.textAlign = Paint.Align.RIGHT
+        c.drawText(total, right - padX, ty + small.textSize * 0.36f, small)
+        small.textAlign = Paint.Align.CENTER
+
+        val tl = left + padX + w * 0.115f
+        val tr = right - padX - w * 0.115f
+        val th = h * 0.065f
+        fill.color = 0x88101010.toInt()
+        c.drawRoundRect(tl, ty - th / 2, tr, ty + th / 2, th / 2, th / 2, fill)
+        val f = posFrac.coerceIn(0f, 1f)
+        fill.color = 0xDD2E7DFF.toInt()
+        c.drawRoundRect(tl, ty - th / 2, tl + (tr - tl) * f, ty + th / 2, th / 2, th / 2, fill)
+        fill.color = Color.WHITE
+        c.drawCircle(tl + (tr - tl) * f, ty, h * 0.095f, fill)
+
+        ring.strokeWidth = h * 0.018f; ring.color = 0x44FFFFFF
+        c.drawLine(left + w * 0.02f, splitY, right - w * 0.02f, splitY, ring)
+        val zw = w / 3f
+        if (pressed in 0..2) {
+            fill.color = 0x772E7DFF
+            c.drawRect(left + pressed * zw, splitY + h * 0.02f, left + (pressed + 1) * zw, bottom - h * 0.03f, fill)
+        }
+        val cy = (splitY + bottom) / 2f
+        val s = h * 0.145f
+        fill.color = Color.WHITE
+        small.textSize = h * 0.135f; small.color = Color.WHITE
+
+        var cx = left + zw * 0.5f                       // back ten
+        triL(c, cx + s * 0.35f, cy, s); triL(c, cx + s * 1.45f, cy, s)
+        c.drawText("10", cx - s * 1.15f, cy + small.textSize * 0.36f, small)
+
+        cx = left + zw * 1.5f                           // play or pause
+        if (playing) {
+            c.drawRect(cx - s * 0.75f, cy - s, cx - s * 0.25f, cy + s, fill)
+            c.drawRect(cx + s * 0.25f, cy - s, cx + s * 0.75f, cy + s, fill)
+        } else triR(c, cx - s * 0.5f, cy, s)
+
+        cx = left + zw * 2.5f                           // forward ten
+        triR(c, cx - s * 1.45f, cy, s); triR(c, cx - s * 0.35f, cy, s)
+        c.drawText("10", cx + s * 1.15f, cy + small.textSize * 0.36f, small)
+        small.color = 0xFFD0D6DC.toInt()
+    }
+
     /** The Xbox View button: two overlapping panes, drawn rather than spelled out. */
     private fun drawViewIcon(c: Canvas, cx: Float, cy: Float, r: Float, color: Int, bg: Int) {
         val w = r * 0.50f; val h = r * 0.38f; val off = r * 0.13f; val rad = r * 0.07f
@@ -186,7 +251,7 @@ class ButtonPainter {
      * third under the finger, 0..2, or -1 for none.
      */
     fun drawMedia(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, pressed: Int = -1,
-                  selected: Boolean = false, level: Float = 0.6f) {
+                  selected: Boolean = false, level: Float = 0.6f, playing: Boolean = false) {
         val h = bottom - top; val w = right - left; val rad = h * 0.30f
         val split = left + w * MEDIA_BUTTONS_FRAC
         val zw = (split - left) / 3f
@@ -211,10 +276,11 @@ class ButtonPainter {
         var cx = left + zw * 0.5f                   // previous
         c.drawRect(cx - s * 1.5f, cy - s, cx - s * 1.28f, cy + s, fill)
         triL(c, cx - s * 0.25f, cy, s); triL(c, cx + s * 0.85f, cy, s)
-        cx = left + zw * 1.5f                       // play or pause
-        triR(c, cx - s * 1.25f, cy, s)
-        c.drawRect(cx + s * 0.25f, cy - s, cx + s * 0.5f, cy + s, fill)
-        c.drawRect(cx + s * 0.75f, cy - s, cx + s * 1.0f, cy + s, fill)
+        cx = left + zw * 1.5f                       // whichever of play or pause it would do now
+        if (playing) {
+            c.drawRect(cx - s * 0.75f, cy - s, cx - s * 0.25f, cy + s, fill)
+            c.drawRect(cx + s * 0.25f, cy - s, cx + s * 0.75f, cy + s, fill)
+        } else triR(c, cx - s * 0.5f, cy, s)
         cx = left + zw * 2.5f                       // next
         triR(c, cx - s * 1.6f, cy, s); triR(c, cx - s * 0.5f, cy, s)
         c.drawRect(cx + s * 1.05f, cy - s, cx + s * 1.27f, cy + s, fill)
@@ -297,6 +363,15 @@ class ButtonPainter {
             val (t, b) = sliderTravel(cy, r)
             return ((b - y) / (b - t)).coerceIn(0f, 1f)
         }
+
+        /** The video unit's half width and half height, as multiples of the element radius. */
+        const val VIDEO_HALF_W = 2.2f
+        const val VIDEO_HALF_H = 0.75f
+        /** Where its timeline row ends and its buttons begin, as a fraction of its height. */
+        const val VIDEO_SPLIT = 0.46f
+        /** The timeline's ends, as fractions of the unit's width. */
+        const val VIDEO_TRACK_L = 0.145f
+        const val VIDEO_TRACK_R = 0.855f
 
         const val MEDIA_HALF_W = 2.3f
         /** How much of the unit's width the three transport zones take; the rest is the volume track. */

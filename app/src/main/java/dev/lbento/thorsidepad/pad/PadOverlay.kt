@@ -27,6 +27,7 @@ import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isMediaUnit
+import dev.lbento.thorsidepad.inject.isVideoUnit
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -80,6 +81,15 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         applyPanelLook(scrim, lp, shieldOn, backdrop)
         try { wm.updateViewLayout(root, lp) } catch (_: Exception) {}
     }
+    /** What the playing session is doing; the service refreshes it, the video units read it. */
+    val video = NowPlaying()
+
+    /** Called when the service has fresh session state, so any video unit redraws. */
+    fun updateVideo(playing: Boolean, position: Long, duration: Long) {
+        video.playing = playing; video.position = position; video.duration = duration
+        invalidatePad()
+    }
+
     private var shieldView: ShieldPadView? = null
     private var shieldParams: WindowManager.LayoutParams? = null
 
@@ -289,7 +299,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         if (shield) {
             val frosted = backdrop == "frosted" && blurSupported
             val color = backdropColor(backdrop)
-            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider)
+            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider, video = video)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {
@@ -315,16 +325,27 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 b.code == Action.HOLD || b.code == Action.TURBO ->
                     PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
-                isMediaUnit(b.code) -> MediaPadView(ctx, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] ?: 0.5f,
+                isMediaUnit(b.code) -> MediaPadView(ctx, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] ?: 0.5f, video,
                     { code -> onAction(code) }, onSlider)
+                isVideoUnit(b.code) -> VideoPadView(ctx, video, { code -> onAction(code) }, onSlider)
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session,
                     b.turbo, { c -> engine.startTurbo(c, b.turboMs) }, engine::stopTurbo)
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
-            val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else if (isMediaUnit(b.code)) (px * ButtonPainter.MEDIA_HALF_W).roundToInt() else px
-            val h = if (isSliderCode(b.code)) (px * 1.2f).roundToInt() else if (isMediaUnit(b.code)) (px * ButtonPainter.MEDIA_HALF_H).roundToInt() else px
+            val w = when {
+                isSliderCode(b.code) -> (px * 0.5f).roundToInt()
+                isMediaUnit(b.code) -> (px * ButtonPainter.MEDIA_HALF_W).roundToInt()
+                isVideoUnit(b.code) -> (px * ButtonPainter.VIDEO_HALF_W).roundToInt()
+                else -> px
+            }
+            val h = when {
+                isSliderCode(b.code) -> (px * 1.2f).roundToInt()
+                isMediaUnit(b.code) -> (px * ButtonPainter.MEDIA_HALF_H).roundToInt()
+                isVideoUnit(b.code) -> (px * ButtonPainter.VIDEO_HALF_H).roundToInt()
+                else -> px
+            }
             val lp = WindowManager.LayoutParams(w, h, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
             lp.x = (b.cx * width - w / 2f).roundToInt()
@@ -463,7 +484,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
             val code = Catalog.groups[g].second[pos].code
-            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code) || isDpadCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else if (isMediaUnit(code)) 0.24f else 0.15f))
+            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code) || isDpadCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else if (isMediaUnit(code)) 0.24f else if (isVideoUnit(code)) 0.30f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }

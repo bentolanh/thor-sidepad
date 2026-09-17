@@ -97,6 +97,73 @@ class InjectorService() : IInjector.Stub() {
      * start-up, so MediaSessionManager could not be constructed. Try invoking that start-up by
      * hand, then reach the sessions with the shell's own MEDIA_CONTENT_CONTROL.
      */
+    // ---- the playing session. The shell already holds MEDIA_CONTENT_CONTROL, so no notification
+    // listener is needed; this process simply never ran the media framework's start-up, which
+    // leaves MediaServiceManager null. Supplying that by hand is enough to reach the sessions.
+    private var mediaReady = false
+
+    private fun ensureMediaFramework() {
+        if (mediaReady) return
+        try {
+            val mgrCls = Class.forName("android.media.MediaServiceManager")
+            val ctor = mgrCls.getDeclaredConstructor(); ctor.isAccessible = true
+            val mgr = ctor.newInstance()
+            for (cls in listOf("android.media.MediaFrameworkPlatformInitializer", "android.media.MediaFrameworkInitializer")) {
+                try {
+                    val m = Class.forName(cls).getDeclaredMethod("setMediaServiceManager", mgrCls)
+                    m.isAccessible = true; m.invoke(null, mgr)
+                } catch (_: Throwable) {}
+            }
+            mediaReady = true
+        } catch (t: Throwable) { Log.w(TAG, "media framework init", t) }
+    }
+
+    /** The session a media key would reach: whichever is playing, else the first there is. */
+    private fun session(): android.media.session.MediaController? {
+        ensureMediaFramework()
+        val msm = context?.getSystemService(Context.MEDIA_SESSION_SERVICE)
+            as? android.media.session.MediaSessionManager ?: return null
+        return try {
+            val list = msm.getActiveSessions(null)
+            list.firstOrNull { it.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING }
+                ?: list.firstOrNull()
+        } catch (t: Throwable) { Log.w(TAG, "sessions", t); null }
+    }
+
+    /** A playing session reports where it was at a moment; carry that forward to now. */
+    private fun livePosition(st: android.media.session.PlaybackState?): Long {
+        if (st == null) return -1L
+        if (st.state != android.media.session.PlaybackState.STATE_PLAYING) return st.position
+        val dt = android.os.SystemClock.elapsedRealtime() - st.lastPositionUpdateTime
+        return st.position + (dt * st.playbackSpeed).toLong()
+    }
+
+    override fun mediaInfo(): String = try {
+        val c = session()
+        if (c == null) "" else {
+            val st = c.playbackState
+            val dur = c.metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
+            "${c.packageName}|${st?.state ?: 0}|${livePosition(st)}|$dur"
+        }
+    } catch (t: Throwable) { Log.w(TAG, "mediaInfo", t); "" }
+
+    override fun mediaSeek(posMs: Long) {
+        try { session()?.transportControls?.seekTo(posMs.coerceAtLeast(0L)) }
+        catch (t: Throwable) { Log.w(TAG, "mediaSeek", t) }
+    }
+
+    /** Jump by [deltaMs] from where the session is now, clamped to the end if a length is known. */
+    override fun mediaSkip(deltaMs: Int) {
+        try {
+            val c = session() ?: return
+            val dur = c.metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
+            var target = livePosition(c.playbackState) + deltaMs
+            if (target < 0L) target = 0L
+            if (dur > 0L && target > dur) target = dur
+            c.transportControls.seekTo(target)
+        } catch (t: Throwable) { Log.w(TAG, "mediaSkip", t) }
+    }
+
     private fun sh(cmd: String): String =
         ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true).start()
             .inputStream.bufferedReader().readText()

@@ -8,6 +8,7 @@ import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isMediaUnit
+import dev.lbento.thorsidepad.inject.isVideoUnit
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
@@ -31,7 +32,12 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
         for (b in layout.buttons) {
             val r = b.size * short / 2f
             val label = Glyphs.label(b.code, layout.style)
-            if (isMediaUnit(b.code)) {
+            if (isVideoUnit(b.code)) {
+                val vx = b.cx * width; val vy = b.cy * height
+                painter.drawVideo(c, vx - r * ButtonPainter.VIDEO_HALF_W, vy - r * ButtonPainter.VIDEO_HALF_H,
+                    vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H, false, 0.35f, -1, "0:00", "--:--")
+            }
+            else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
                     mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H)

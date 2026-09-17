@@ -191,7 +191,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         try { getSystemService(InputManager::class.java).unregisterInputDeviceListener(deviceListener) } catch (_: Exception) {}
         hide()
-        stopImeWatch()
+        stopImeWatch(); stopNowWatch()
         overlay?.tearDown()
         try { levelThread.quitSafely() } catch (_: Exception) {}
         running = false
@@ -232,7 +232,7 @@ class OverlayService : Service() {
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
-                readLevels(svc)
+                readLevels(svc); syncNowWatch()
                 ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
                     onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
@@ -248,7 +248,7 @@ class OverlayService : Service() {
     }
 
     private fun hide() {
-        stopImeWatch(); imeSuspended = false
+        stopImeWatch(); stopNowWatch(); imeSuspended = false
         overlay?.removeAll()
         engine?.shutdown(); engine = null
         try { Injector.current()?.closeTarget() } catch (_: Exception) {}
@@ -315,6 +315,8 @@ class OverlayService : Service() {
             dev.lbento.thorsidepad.inject.Action.MEDIA_PREV -> mediaKey("previous")
             dev.lbento.thorsidepad.inject.Action.MEDIA_PLAY -> mediaKey("play-pause")
             dev.lbento.thorsidepad.inject.Action.MEDIA_NEXT -> mediaKey("next")
+            dev.lbento.thorsidepad.inject.Action.VIDEO_BACK -> mediaSkipMs(-10_000)
+            dev.lbento.thorsidepad.inject.Action.VIDEO_FWD -> mediaSkipMs(10_000)
         }
     }
 
@@ -389,6 +391,50 @@ class OverlayService : Service() {
      */
     @Volatile private var mediaVolumeTarget = dev.lbento.thorsidepad.inject.Slider.VOLUME
     @Volatile private var mediaDragging = false
+    @Volatile private var nowDuration = 0L
+    @Volatile private var nowWatching = false
+    private var nowThread: Thread? = null
+
+    /**
+     * Keeps the media and video units showing what is actually playing. It runs only while such a
+     * unit is on the pad, and reads the session directly rather than through the shell.
+     */
+    private fun startNowWatch() {
+        if (nowWatching) return
+        nowWatching = true
+        val t = Thread({
+            while (nowWatching) {
+                Injector.current()?.let { svc ->
+                    try {
+                        val parts = svc.mediaInfo().split('|')
+                        val playing = parts.getOrNull(1)?.toIntOrNull() == 3
+                        val pos = parts.getOrNull(2)?.toLongOrNull() ?: -1L
+                        val dur = parts.getOrNull(3)?.toLongOrNull() ?: -1L
+                        nowDuration = dur
+                        main.post { overlay?.updateVideo(playing, pos, dur) }
+                    } catch (e: Exception) { Log.w(TAG, "now playing", e) }
+                }
+                try { Thread.sleep(700) } catch (_: InterruptedException) { break }
+            }
+        }, "sidepad-now")
+        t.isDaemon = true; nowThread = t; t.start()
+    }
+
+    private fun stopNowWatch() { nowWatching = false; nowThread?.interrupt(); nowThread = null }
+
+    /** Only worth watching the session while something on the pad shows it. */
+    private fun syncNowWatch() {
+        val wants = PadLayout.fromJson(prefs.layoutJson).buttons.any {
+            dev.lbento.thorsidepad.inject.isMediaUnit(it.code) || dev.lbento.thorsidepad.inject.isVideoUnit(it.code)
+        }
+        if (wants) startNowWatch() else stopNowWatch()
+    }
+
+    private fun mediaSkipMs(deltaMs: Int) {
+        val svc = Injector.current()
+        if (svc == null) { toast("Shizuku not ready"); return }
+        Thread { try { svc.mediaSkip(deltaMs) } catch (e: Exception) { Log.w(TAG, "skip failed", e) } }.start()
+    }
 
     /** Asks the system which app holds the media keys and which screen its window is on. */
     private fun resolveMediaTarget() {
@@ -422,6 +468,8 @@ class OverlayService : Service() {
         fun bright(display: Int) = svc.setBrightness(display, level)
         try {
             when (code) {
+                dev.lbento.thorsidepad.inject.Slider.VIDEO_SEEK ->
+                    if (nowDuration > 0L) svc.mediaSeek((level * nowDuration).toLong())
                 dev.lbento.thorsidepad.inject.Slider.VOLUME -> svc.setVolume(level)
                 dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND -> svc.setVolume2nd(level)
                 dev.lbento.thorsidepad.inject.Slider.BRIGHT_TOP -> bright(0)

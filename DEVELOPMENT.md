@@ -68,6 +68,14 @@ the app.
   Audible and the Apple TV session. `registerServiceWrappers` throws ("can only be called during
   class initialization") and is not needed. So the planned video unit needs no extra permission.
 
+- **The video unit.** It reads the playing session through the injector: `mediaInfo` returns
+  package, state, position and length, `mediaSkip` jumps by ten seconds from where the session is
+  now, and `mediaSeek` takes an absolute position. A playing session reports where it was at a
+  moment, so `livePosition` carries that forward by the elapsed time and playback speed, which is
+  why the timeline advances smoothly between polls. The service polls every 700 ms, but only while
+  a media or video unit is actually on the pad. Dragging the timeline seeks once on release rather
+  than on every move, since seeking repeatedly makes a player stutter.
+
 - **The media unit's volume.** The Thor scales the audio of apps on the second screen apart from
   the main stream, so "the volume of what is playing" depends on which screen the player sits on.
   The unit's track sends `Slider.VOLUME_MEDIA`, which the service resolves: it asks

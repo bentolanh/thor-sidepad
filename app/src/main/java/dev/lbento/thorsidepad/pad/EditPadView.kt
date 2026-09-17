@@ -10,6 +10,7 @@ import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isMediaUnit
+import dev.lbento.thorsidepad.inject.isVideoUnit
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
@@ -56,7 +57,13 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         var y = step; while (y < height) { c.drawLine(0f, y, width.toFloat(), y, grid); y += step }
         layout.buttons.forEachIndexed { i, b ->
             val label = Glyphs.label(b.code, layout.style)
-            if (isMediaUnit(b.code)) {
+            if (isVideoUnit(b.code)) {
+                val r = b.size * short() / 2f; val vx = b.cx * width; val vy = b.cy * height
+                painter.drawVideo(c, vx - r * ButtonPainter.VIDEO_HALF_W, vy - r * ButtonPainter.VIDEO_HALF_H,
+                    vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H,
+                    false, 0.35f, -1, "0:00", "--:--", i == selected)
+            }
+            else if (isMediaUnit(b.code)) {
                 val r = b.size * short() / 2f; val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
                     mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, -1, i == selected)
@@ -75,7 +82,9 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         for (i in layout.buttons.indices.reversed()) {
             val b = layout.buttons[i]
             val r = b.size * short() / 2f
-            if (isMediaUnit(b.code)) {
+            if (isVideoUnit(b.code)) {
+                if (abs(x - b.cx * width) <= r * ButtonPainter.VIDEO_HALF_W && abs(y - b.cy * height) <= r * ButtonPainter.VIDEO_HALF_H) return i
+            } else if (isMediaUnit(b.code)) {
                 if (abs(x - b.cx * width) <= r * ButtonPainter.MEDIA_HALF_W && abs(y - b.cy * height) <= r * ButtonPainter.MEDIA_HALF_H) return i
             } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
