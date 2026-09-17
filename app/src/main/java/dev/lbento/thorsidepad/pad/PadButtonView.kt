@@ -40,6 +40,7 @@ class PadButtonView(
         when {
             code == Action.SHIELD -> painter.drawShieldToggle(c, r, r, r, false)
             code == Action.HOLD -> painter.drawSysButton(c, r, r, r, label, null, down || session?.holdArmed == true)
+            code == Action.TURBO -> painter.drawSysButton(c, r, r, r, label, null, down || session?.turboArmed == true)
             isActionCode(code) -> painter.drawSysButton(c, r, r, r, label, Catalog.screenTag(code), down)
             else -> painter.draw(c, r, r, r, label, enabled, down || latched, labelColor = labelColor, mark = if (latched) 2 else if (sticky) 1 else 0, icon = icon, turbo = turbo)
         }
@@ -53,9 +54,20 @@ class PadButtonView(
                 val s = session
                 when {
                     code == Action.HOLD -> { s?.arm(!s.holdArmed); toggled = true }
+                    code == Action.TURBO -> { s?.armTurbo(!s.turboArmed); toggled = true }
                     isActionCode(code) -> {}
-                    s != null && code in s.latched -> { s.latched.remove(code); toggled = true; unfire() }
-                    s != null && (sticky || s.holdArmed) -> { s.arm(false); s.latched.add(code); toggled = true; fire() }
+                    s != null && code in s.latched -> {
+                        val wasTurbo = s.turboLatched.remove(code)
+                        s.latched.remove(code); toggled = true
+                        if (wasTurbo) onTurboStop(code) else unfire()
+                    }
+                    s != null && (sticky || s.holdArmed || s.turboArmed) -> {
+                        // TURBO makes the latch pulse; so does the button's own turbo setting.
+                        val asTurbo = turbo || s.turboArmed
+                        s.disarm(); s.latched.add(code); if (asTurbo) s.turboLatched.add(code)
+                        toggled = true
+                        if (asTurbo) onTurboStart(code) else onPress(code)
+                    }
                     else -> fire()
                 }
             }
@@ -69,7 +81,13 @@ class PadButtonView(
 
     override fun onDetachedFromWindow() {
         // A held button must not stay down once its window is gone.
-        session?.let { if (code in it.latched) { it.latched.remove(code); unfire() } }
+        session?.let {
+            if (code in it.latched) {
+                val wasTurbo = it.turboLatched.remove(code)
+                it.latched.remove(code)
+                if (wasTurbo) onTurboStop(code) else unfire()
+            }
+        }
         super.onDetachedFromWindow()
     }
 }

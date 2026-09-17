@@ -47,7 +47,14 @@ object Action {
     const val BACK_TOP = -15    // Back on the main screen
     const val BACK_2ND = -16    // Back on the pad's screen
     const val HOLD = -20        // arms a latch: the next button tapped stays down until tapped again
+    const val TURBO = -21       // arms a repeat: the next button tapped pulses until tapped again
+    const val MEDIA_PREV = -22  // whatever is playing: previous track
+    const val MEDIA_PLAY = -23  // play or pause
+    const val MEDIA_NEXT = -24  // next track
 }
+
+/** The simple media controller: keys handed to whatever is playing, whichever app that is. */
+fun isMediaCode(code: Int) = code == Action.MEDIA_PREV || code == Action.MEDIA_PLAY || code == Action.MEDIA_NEXT
 
 /** Pseudo-codes for sliders that set a device level, 0..1. */
 object Slider {
@@ -59,7 +66,7 @@ object Slider {
 }
 
 fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
-fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND
+fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND || isMediaCode(code)
 fun isDpadCode(code: Int) = code == Dpad.PAD
 fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME || code == Slider.VOLUME_2ND || code == Slider.BRIGHT_BOTH
 
@@ -129,6 +136,10 @@ object Catalog {
         PadCode(Stick.LEFT, "LS", "left stick, AXIS_X / AXIS_Y"),
         PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
         PadCode(Action.HOLD, "HOLD", "the next button you tap stays down until you tap it again"),
+        PadCode(Action.TURBO, "TURBO", "the next button you tap repeats until you tap it again"),
+        PadCode(Action.MEDIA_PREV, "PREV", "previous track"),
+        PadCode(Action.MEDIA_PLAY, "PLAY", "play or pause"),
+        PadCode(Action.MEDIA_NEXT, "NEXT", "next track"),
         PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
         PadCode(Action.HOME_TOP, "HOME", "Home on the main screen"),
         PadCode(Action.HOME_2ND, "HOME", "Home on this screen"),
@@ -151,9 +162,10 @@ object Catalog {
         // The four single-direction buttons stay out of the picker; the one-element D-pad replaces them.
         "Controller" to all.filter { (it.code > 0 && !it.isStickClick && !it.isDpad) || it.isDpadElement } +
             all.filter { it.isStick } + all.filter { it.isStickClick },
-        "Macro" to all.filter { it.code == Action.HOLD },
-        "System" to all.filter { it.isAction && it.code != Action.HOLD && it.code != Action.SHIELD } +
+        "Macro" to all.filter { it.code == Action.HOLD || it.code == Action.TURBO },
+        "System" to all.filter { it.isAction && !isMediaCode(it.code) && it.code != Action.SHIELD } +
             all.filter { it.isSlider } + all.filter { it.code == Action.SHIELD },
+        "Media" to all.filter { isMediaCode(it.code) },
     )
 
     /** Small tag drawn under a Home/Back/slider element: which screen it acts on. */

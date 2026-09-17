@@ -311,7 +311,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isStickCode(b.code) -> StickView(ctx, b.code, enabled, engine)
                 isDpadCode(b.code) -> DpadView(ctx, enabled, engine)
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
-                b.code == Action.HOLD -> PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
+                b.code == Action.HOLD || b.code == Action.TURBO ->
+                    PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session,
                     b.turbo, engine::startTurbo, engine::stopTurbo)

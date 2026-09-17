@@ -40,4 +40,6 @@ interface IInjector {
     // Brightness while a slider is being dragged: applied at once, without the system's ramp
     // animation, the way Android's own quick-settings slider does. setBrightness commits it.
     void setBrightnessLive(int displayId, float level) = 19;
+    // A media key handed to whatever is playing, whichever app that is.
+    void mediaKey(String action) = 20;
 }

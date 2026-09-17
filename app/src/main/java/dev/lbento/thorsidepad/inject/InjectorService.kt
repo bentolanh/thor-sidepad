@@ -79,6 +79,19 @@ class InjectorService() : IInjector.Stub() {
         } catch (e: Throwable) { Log.w(TAG, "setVolume2nd", e) }
     }
 
+    /**
+     * Hands a media key to whatever holds the media session, so it works whatever app is playing.
+     * AudioManager.dispatchMediaKeyEvent is not usable here: this process is started by Shizuku and
+     * never runs the media framework's initialisers, so MediaSessionManager cannot be constructed.
+     * The media_session service command does the same job from the shell.
+     */
+    override fun mediaKey(action: String) {
+        try {
+            val verb = when (action) { "next", "previous", "play", "pause", "stop", "play-pause" -> action; else -> return }
+            sh("cmd media_session dispatch $verb")
+        } catch (e: Throwable) { Log.w(TAG, "mediaKey", e) }
+    }
+
     private fun sh(cmd: String): String =
         ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true).start()
             .inputStream.bufferedReader().readText()

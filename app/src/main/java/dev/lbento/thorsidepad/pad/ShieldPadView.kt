@@ -61,6 +61,8 @@ class ShieldPadView(
     private val latched = HashSet<Int>()             // button indexes held down by a latch
     private val latchTouch = HashSet<Int>()          // pointers whose touch-down toggled a latch
     private var holdArmed = false                     // HOLD tapped: the next button latches
+    private var turboArmed = false                    // TURBO tapped: the next button latches and pulses
+    private val turboLatched = HashSet<Int>()         // latched indexes that are pulsing
     private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
     private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
@@ -112,6 +114,8 @@ class ShieldPadView(
                 painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, shieldOn)
             } else if (b.code == Action.HOLD) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, null, holdArmed || (pressCount[i] ?: 0) > 0)
+            } else if (b.code == Action.TURBO) {
+                painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, null, turboArmed || (pressCount[i] ?: 0) > 0)
             } else if (isActionCode(b.code)) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
             } else if (isSliderCode(b.code)) {
@@ -188,14 +192,25 @@ class ShieldPadView(
         pressCount[i] = n
         val b = layout.buttons[i]
         val code = b.code
-        if (code == Action.HOLD) { if (initial) holdArmed = !holdArmed; return }
+        if (code == Action.HOLD) { if (initial) { holdArmed = !holdArmed; if (holdArmed) turboArmed = false }; return }
+        if (code == Action.TURBO) { if (initial) { turboArmed = !turboArmed; if (turboArmed) holdArmed = false }; return }
         if (isActionCode(code)) return
         if (n != 1) return
         if (i in latched) {
-            if (initial) { latched.remove(i); latchTouch.add(pid); unfire(b) }
+            if (initial) {
+                latched.remove(i); latchTouch.add(pid)
+                if (turboLatched.remove(i)) engine.stopTurbo(code) else unfire(b)
+            }
             return                                   // sliding over a held button leaves it held
         }
-        if (initial && (b.sticky || holdArmed)) { holdArmed = false; latched.add(i); latchTouch.add(pid); fire(b); return }
+        if (initial && (b.sticky || holdArmed || turboArmed)) {
+            // TURBO makes the latch pulse; so does the button's own turbo setting.
+            val asTurbo = b.turbo || turboArmed
+            holdArmed = false; turboArmed = false
+            latched.add(i); if (asTurbo) turboLatched.add(i); latchTouch.add(pid)
+            if (asTurbo) engine.startTurbo(code) else engine.press(code)
+            return
+        }
         fire(b)
     }
 
@@ -295,8 +310,8 @@ class ShieldPadView(
 
     override fun onDetachedFromWindow() {
         pressedBy.keys.toList().forEach { release(it) }
-        latched.toList().forEach { i -> unfire(layout.buttons[i]) }
-        latched.clear()
+        latched.toList().forEach { i -> if (i !in turboLatched) unfire(layout.buttons[i]) }
+        latched.clear(); turboLatched.clear()
         engine.stopAllTurbo()
         stickBy.keys.toList().forEach { releaseStick(it) }
         dpadBy.keys.toList().forEach { releaseDpad(it) }

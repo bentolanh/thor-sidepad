@@ -312,7 +312,16 @@ class OverlayService : Service() {
             dev.lbento.thorsidepad.inject.Action.HOME_2ND -> Injector.current()?.let { svc -> try { svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60) } catch (_: Exception) {} }
             dev.lbento.thorsidepad.inject.Action.BACK_TOP -> shellAsync("input -d 0 keyevent 4")
             dev.lbento.thorsidepad.inject.Action.BACK_2ND -> shellAsync("input -d ${ov?.displayId ?: 0} keyevent 4")
+            dev.lbento.thorsidepad.inject.Action.MEDIA_PREV -> mediaKey("previous")
+            dev.lbento.thorsidepad.inject.Action.MEDIA_PLAY -> mediaKey("play-pause")
+            dev.lbento.thorsidepad.inject.Action.MEDIA_NEXT -> mediaKey("next")
         }
+    }
+
+    private fun mediaKey(action: String) {
+        val svc = Injector.current()
+        if (svc == null) { toast("Shizuku not ready"); return }
+        Thread { try { svc.mediaKey(action) } catch (e: Exception) { Log.w(TAG, "media key failed", e) } }.start()
     }
 
     private fun shellAsync(cmd: String) {
