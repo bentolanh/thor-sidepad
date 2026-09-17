@@ -324,6 +324,7 @@ class OverlayService : Service() {
             dev.lbento.thorsidepad.inject.Action.MEDIA_NEXT -> mediaKey("next")
             dev.lbento.thorsidepad.inject.Action.VIDEO_BACK -> mediaSkipMs(-10_000)
             dev.lbento.thorsidepad.inject.Action.VIDEO_FWD -> mediaSkipMs(10_000)
+            dev.lbento.thorsidepad.inject.Action.VIDEO_APP -> openPlayingApp()
         }
     }
 
@@ -414,11 +415,13 @@ class OverlayService : Service() {
                 Injector.current()?.let { svc ->
                     try {
                         val parts = svc.mediaInfo().split('|')
+                        val pkg = parts.getOrNull(0) ?: ""
                         val playing = parts.getOrNull(1)?.toIntOrNull() == 3
                         val pos = parts.getOrNull(2)?.toLongOrNull() ?: -1L
                         val dur = parts.getOrNull(3)?.toLongOrNull() ?: -1L
+                        val label = parts.getOrNull(4) ?: pkg
                         nowDuration = dur
-                        main.post { overlay?.updateVideo(playing, pos, dur) }
+                        main.post { overlay?.updateVideo(playing, pos, dur, if (pkg.isEmpty()) "" else label, pkg) }
                     } catch (e: Exception) { Log.w(TAG, "now playing", e) }
                 }
                 try { Thread.sleep(700) } catch (_: InterruptedException) { break }
@@ -435,6 +438,21 @@ class OverlayService : Service() {
             dev.lbento.thorsidepad.inject.isMediaUnit(it.code) || dev.lbento.thorsidepad.inject.isVideoUnit(it.code)
         }
         if (wants) startNowWatch() else stopNowWatch()
+    }
+
+    /**
+     * Brings the playing app forward on the screen its window is already on, so a player on the
+     * top screen comes back there rather than being moved.
+     */
+    private fun openPlayingApp() {
+        val pkg = overlay?.video?.pkg.orEmpty()
+        if (pkg.isEmpty()) return
+        shellAsync(
+            "d=\$(dumpsys window displays 2>/dev/null | awk -v p=\"$pkg\" " +
+            "'/Display: mDisplayId=/{d=\$0; sub(/.*mDisplayId=/,\"\",d); sub(/ .*/,\"\",d)} index(\$0,p){print d; exit}' 2>/dev/null); " +
+            "c=\$(cmd package resolve-activity --brief $pkg | tail -1); " +
+            "[ -n \"\$c\" ] && am start --display \${d:-0} -n \"\$c\""
+        )
     }
 
     private fun mediaSkipMs(deltaMs: Int) {

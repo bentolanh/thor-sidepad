@@ -5,6 +5,8 @@ package dev.lbento.thorsidepad.pad
  * and every window that draws one reads it.
  */
 class NowPlaying {
+    @Volatile var app = ""
+    @Volatile var pkg = ""
     @Volatile var playing = false
     @Volatile var position = 0L
     @Volatile var duration = 0L

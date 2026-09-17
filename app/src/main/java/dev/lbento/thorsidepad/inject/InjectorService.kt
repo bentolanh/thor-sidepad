@@ -149,7 +149,11 @@ class InjectorService() : IInjector.Stub() {
         if (c == null) "" else {
             val st = c.playbackState
             val dur = c.metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
-            "${c.packageName}|${st?.state ?: 0}|${livePosition(st)}|$dur"
+            val label = try {
+                val pm = context!!.packageManager
+                pm.getApplicationLabel(pm.getApplicationInfo(c.packageName, 0)).toString()
+            } catch (_: Throwable) { c.packageName }
+            "${c.packageName}|${st?.state ?: 0}|${livePosition(st)}|$dur|$label"
         }
     } catch (t: Throwable) { Log.w(TAG, "mediaInfo", t); "" }
 

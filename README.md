@@ -79,10 +79,13 @@ Everything happens on the bottom screen.
   and next, plus a volume track. It reaches whatever is playing, whichever app that is, and the
   track moves that app's own audio: the Thor scales the second screen's sound separately, so the
   track follows the screen the player is on rather than always moving the main one.
-- **Video controller.** System also has a video unit for players like YouTube and Netflix: a
-  timeline showing how far in you are, which you drag to seek, with jump back and forward ten
-  seconds either side of play or pause. The play mark shows what it will do, since it knows
-  whether the player is running. It needs nothing beyond Shizuku. Or add a HOLD button to the pad: tap HOLD, then any
+- **Video controller.** System also has a video unit for players like YouTube and Netflix. A band
+  at the top names what is playing and brings that app forward on the screen it was already on.
+  Below it a timeline shows how far in you are and drags to seek, then the full transport with
+  jump back and forward ten seconds either side of play or pause, then a volume row marked with a
+  speaker. The play mark shows what it will do, since it knows whether the player is running. Both
+  tracks answer a drag and ignore a tap, so a stray touch cannot jump the video or the volume. It
+  needs nothing beyond Shizuku. Or add a HOLD button to the pad: tap HOLD, then any
   button, and that button stays down until you tap it again. A held button shows a yellow
   dot. Hiding or stopping the pad releases everything.
 - **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation

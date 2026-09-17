@@ -175,7 +175,7 @@ class ButtonPainter {
      */
     fun drawVideo(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, playing: Boolean,
                   posFrac: Float, volume: Float = 0.5f, pressed: Int = -1, elapsed: String = "",
-                  total: String = "", selected: Boolean = false) {
+                  total: String = "", selected: Boolean = false, app: String = "", appDown: Boolean = false) {
         val h = bottom - top; val w = right - left; val rad = h * 0.10f
         fill.color = 0xAA202020.toInt()
         c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
@@ -184,16 +184,36 @@ class ButtonPainter {
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         c.drawRoundRect(left, top, right, bottom, rad, rad, ring)
 
+        val yApp = top + h * VIDEO_ROW_APP
         val yTime = top + h * VIDEO_ROW_TIME
         val yCtrl = top + h * VIDEO_ROW_CTRL
+
+        // The band naming what is playing; tapping it brings that app forward.
+        if (appDown) {
+            fill.color = 0x772E7DFF
+            c.drawRect(left + w * 0.012f, top + h * 0.012f, right - w * 0.012f, yApp, fill)
+        }
+        small.textSize = h * 0.095f
+        small.color = if (app.isEmpty()) 0xFF8A9199.toInt() else Color.WHITE
+        small.textAlign = Paint.Align.LEFT
+        val appY = top + h * VIDEO_ROW_APP * 0.62f
+        c.drawText(if (app.isEmpty()) "Nothing playing" else app, left + w * 0.030f, appY, small)
+        if (app.isNotEmpty()) {
+            small.textAlign = Paint.Align.RIGHT
+            small.color = 0xFF8AB4F8.toInt()
+            c.drawText("open  ›", right - w * 0.030f, appY, small)
+        }
+        small.textAlign = Paint.Align.CENTER
+
         ring.strokeWidth = h * 0.012f; ring.color = 0x33FFFFFF
+        c.drawLine(left + w * 0.02f, yApp, right - w * 0.02f, yApp, ring)
         c.drawLine(left + w * 0.02f, yTime, right - w * 0.02f, yTime, ring)
         c.drawLine(left + w * 0.02f, yCtrl, right - w * 0.02f, yCtrl, ring)
 
         // timeline
-        val ty = top + h * VIDEO_ROW_TIME * 0.52f
+        val ty = (yApp + yTime) / 2f
         val padX = w * 0.028f
-        small.textSize = h * 0.105f
+        small.textSize = h * 0.085f
         small.color = 0xFFC2CAD2.toInt()
         small.textAlign = Paint.Align.LEFT
         c.drawText(elapsed, left + padX, ty + small.textSize * 0.36f, small)
@@ -201,14 +221,14 @@ class ButtonPainter {
         c.drawText(total, right - padX, ty + small.textSize * 0.36f, small)
         small.textAlign = Paint.Align.CENTER
         val tl = left + w * VIDEO_TRACK_L; val tr = left + w * VIDEO_TRACK_R
-        val th = h * 0.045f
+        val th = h * 0.036f
         fill.color = 0x88101010.toInt()
         c.drawRoundRect(tl, ty - th / 2, tr, ty + th / 2, th / 2, th / 2, fill)
         val pf = posFrac.coerceIn(0f, 1f)
         fill.color = 0xDD2E7DFF.toInt()
         c.drawRoundRect(tl, ty - th / 2, tl + (tr - tl) * pf, ty + th / 2, th / 2, th / 2, fill)
         fill.color = Color.WHITE
-        c.drawCircle(tl + (tr - tl) * pf, ty, h * 0.065f, fill)
+        c.drawCircle(tl + (tr - tl) * pf, ty, h * 0.052f, fill)
 
         // transport: previous, back ten, play or pause, forward ten, next
         val zw = w / 5f
@@ -217,7 +237,7 @@ class ButtonPainter {
             c.drawRect(left + pressed * zw, yTime + h * 0.01f, left + (pressed + 1) * zw, yCtrl - h * 0.01f, fill)
         }
         val cy = (yTime + yCtrl) / 2f
-        val s = h * 0.105f
+        val s = h * 0.088f
         fill.color = Color.WHITE
         var cx = left + zw * 0.5f                                   // previous
         c.drawRect(cx - s * 1.25f, cy - s, cx - s * 1.05f, cy + s, fill)
@@ -236,16 +256,16 @@ class ButtonPainter {
 
         // volume, marked with a speaker so it is never taken for the timeline
         val vy = (yCtrl + bottom) / 2f
-        drawSpeaker(c, left + w * 0.072f, vy, h * 0.095f)
+        drawSpeaker(c, left + w * 0.072f, vy, h * 0.078f)
         val vl = left + w * VIDEO_VOL_L; val vr = left + w * VIDEO_VOL_R
-        val vh = h * 0.045f
+        val vh = h * 0.036f
         fill.color = 0x88101010.toInt()
         c.drawRoundRect(vl, vy - vh / 2, vr, vy + vh / 2, vh / 2, vh / 2, fill)
         val vf = volume.coerceIn(0f, 1f)
         fill.color = 0xDD6A8FBF.toInt()
         c.drawRoundRect(vl, vy - vh / 2, vl + (vr - vl) * vf, vy + vh / 2, vh / 2, vh / 2, fill)
         fill.color = Color.WHITE
-        c.drawCircle(vl + (vr - vl) * vf, vy, h * 0.062f, fill)
+        c.drawCircle(vl + (vr - vl) * vf, vy, h * 0.050f, fill)
         small.color = 0xFFD0D6DC.toInt()
     }
 
@@ -421,10 +441,11 @@ class ButtonPainter {
 
         /** The video unit's half width and half height, as multiples of the element radius. */
         const val VIDEO_HALF_W = 2.2f
-        const val VIDEO_HALF_H = 1.05f
-        /** The unit's three rows, as fractions of its height: timeline, buttons, volume. */
-        const val VIDEO_ROW_TIME = 0.32f
-        const val VIDEO_ROW_CTRL = 0.71f
+        const val VIDEO_HALF_H = 1.28f
+        /** The unit's four rows, as fractions of its height: the app, timeline, buttons, volume. */
+        const val VIDEO_ROW_APP = 0.19f
+        const val VIDEO_ROW_TIME = 0.44f
+        const val VIDEO_ROW_CTRL = 0.76f
         /** The timeline's ends and the volume track's ends, as fractions of the unit's width. */
         const val VIDEO_TRACK_L = 0.145f
         const val VIDEO_TRACK_R = 0.855f

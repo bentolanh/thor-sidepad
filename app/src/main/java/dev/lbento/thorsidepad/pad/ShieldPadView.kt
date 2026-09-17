@@ -143,7 +143,8 @@ class ShieldPadView(
                 painter.drawVideo(c, vx - r * ButtonPainter.VIDEO_HALF_W, vy - r * ButtonPainter.VIDEO_HALF_H,
                     vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H,
                     video.playing, f, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] ?: 0.5f,
-                    videoZone[i] ?: -1, NowPlaying.time(shown), NowPlaying.time(video.duration))
+                    videoZone[i] ?: -1, NowPlaying.time(shown), NowPlaying.time(video.duration), false,
+                    video.app, videoZone[i] == 9)
             } else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
@@ -304,6 +305,7 @@ class ShieldPadView(
                 val fired = when {
                     isMediaUnit(code) && z != null -> mediaCodeAt((z + 0.5f) / 3f)
                     isVideoUnit(code) && vz != null -> when (vz) {
+                        9 -> Action.VIDEO_APP
                         0 -> Action.MEDIA_PREV
                         1 -> Action.VIDEO_BACK
                         2 -> Action.MEDIA_PLAY
@@ -354,6 +356,10 @@ class ShieldPadView(
                             val left = b.cx * width - r * ButtonPainter.VIDEO_HALF_W
                             val w = 2f * r * ButtonPainter.VIDEO_HALF_W
                             when {
+                                // 9 marks the app band, which is a tap rather than a transport zone.
+                                ry < ButtonPainter.VIDEO_ROW_APP -> {
+                                    videoZone[i] = 9; press(i, pid, initial = true)
+                                }
                                 ry < ButtonPainter.VIDEO_ROW_TIME -> {
                                     tracked.remove(pid); videoDrag[pid] = i; videoRow[pid] = 0; videoDownX[pid] = x
                                 }

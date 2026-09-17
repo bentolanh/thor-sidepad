@@ -55,6 +55,7 @@ object Action {
     const val VIDEO = -27       // the video unit: a timeline with jump back and forward
     const val VIDEO_BACK = -28  // jump back ten seconds
     const val VIDEO_FWD = -29   // jump forward ten seconds
+    const val VIDEO_APP = -31   // bring the playing app forward on the screen it was on
 }
 
 /** The verbs the media unit sends: keys handed to whatever is playing, whichever app that is. */
