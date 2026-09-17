@@ -161,13 +161,17 @@ class OverlayService : Service() {
         super.onCreate()
         prefs = Prefs(this)
         prefs.guideSnapshot?.let { snap ->
-            // A guide was interrupted (service killed, reboot): undo its temporary look now.
+            // A guide was interrupted (service killed, reboot): undo its temporary look now. The
+            // guide turns the shield on for its own sake, so that goes back with the rest.
             val p = snap.split("|")
-            if (p.size == 3) { prefs.backdrop = p[1]; prefs.opacity = p[2].toFloatOrNull() ?: prefs.opacity }
+            if (p.size == 3) {
+                prefs.shield = p[0].toBooleanStrictOrNull() ?: prefs.shield
+                prefs.backdrop = p[1]
+                prefs.opacity = p[2].toFloatOrNull() ?: prefs.opacity
+            }
             prefs.guideSnapshot = null
             Log.i(TAG, "guide snapshot restored after interruption: $snap")
         }
-        prefs.shield = false   // SidePad always starts with the shield off; turn it on per session
         startForeground(NOTIF_ID, buildNotification())
         running = true
         getSystemService(InputManager::class.java).registerInputDeviceListener(deviceListener, main)
