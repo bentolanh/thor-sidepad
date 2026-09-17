@@ -100,7 +100,7 @@ object ControlPanel {
         fun pickerRow(caption: String, value: String, onClick: () -> Unit) = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(20, 18, 18, 18)
+            setPadding(20, 12, 18, 12)
             setOnClickListener { onClick() }
             addView(TextView(themed).apply { text = caption; setTextColor(grey); textSize = 13f })
             addView(TextView(themed).apply {

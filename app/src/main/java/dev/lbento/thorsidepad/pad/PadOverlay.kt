@@ -345,32 +345,32 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val bar = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xCC101010.toInt())
-            setPadding(6, 6, 6, 6)
+            setPadding(6, 4, 6, 4)
         }
         fun btn(label: String, onClick: () -> Unit): Button = Button(themed).apply {
             text = label; isAllCaps = false; textSize = 13f
-            minWidth = 0; minimumWidth = 0; setPadding(6, 10, 6, 10)
+            minWidth = 0; minimumWidth = 0; setPadding(6, 6, 6, 6)
             setOnClickListener { onClick() }
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         // The profile picker: a settings row, not another button, matching the one in the panel.
         val profileValue = TextView(themed).apply {
-            setTextColor(Color.WHITE); textSize = 16f
+            setTextColor(Color.WHITE); textSize = 15f
             gravity = Gravity.END; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
         }
         val profileChip = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(0xFF2A2D31.toInt())
-            setPadding(20, 16, 18, 16)
-            addView(TextView(themed).apply { text = "Profile"; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
+            setPadding(20, 7, 18, 7)
+            addView(TextView(themed).apply { text = "Profile"; setTextColor(0xFFB0B8C0.toInt()); textSize = 12f })
             addView(profileValue, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 20 })
-            addView(TextView(themed).apply { text = "›"; setTextColor(0xFF8AB4F8.toInt()); textSize = 20f },
+            addView(TextView(themed).apply { text = "›"; setTextColor(0xFF8AB4F8.toInt()); textSize = 18f },
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = 14 })
         }
         val hintText = "Tap to select · drag to move · pinch to resize"
         val hint = TextView(themed).apply {
-            setTextColor(0xFFB8C0C8.toInt()); textSize = 12f; setPadding(16, 4, 16, 8)
+            setTextColor(0xFFB8C0C8.toInt()); textSize = 11f; setPadding(16, 2, 16, 5)
             text = hintText
         }
         fun refreshProfile() {
@@ -455,13 +455,13 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             sticky.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
         editor.selected = -1
 
-        val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(profileChip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(8, 4, 8, 0) }); addView(hint) }
+        val top = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; addView(bar); addView(profileChip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(8, 2, 8, 0) }); addView(hint) }
         root.addView(top, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
 
         // The whole pad area, scaled to fit under the toolbar, so a button placed near the top
         // of the screen is still reachable in the editor. A thin frame marks the screen edge.
         top.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED)
-        val gap = 12
+        val gap = 8
         val avail = height - top.measuredHeight - gap * 2
         val scale = min(avail.toFloat() / height, 1f)
         val frame = FrameLayout(themed).apply { setBackgroundColor(Color.WHITE); setPadding(2, 2, 2, 2) }
