@@ -630,7 +630,7 @@ class OverlayService : Service() {
                     ov.removePanel(); padDirty = false; show(); panelClosed()
                 }
             }
-            override fun editLayout() { ov.removePanel(returnFocus = false); padDirty = false; edit() }
+            override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
@@ -653,7 +653,7 @@ class OverlayService : Service() {
         withInjector {
             try {
                 val ov = overlayOrCreate()
-                ov.removePanel(returnFocus = false)   // the editor takes focus itself in a moment
+                ov.removePanel()
                 ov.showEdit(PadLayout.fromJson(prefs.layoutJson), prefs.activePreset,
                     onSaved = { l, name -> prefs.layoutJson = l.toJson(); prefs.activePreset = name; show() },
                     onCancel = { show() })

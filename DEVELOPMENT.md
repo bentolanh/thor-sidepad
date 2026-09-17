@@ -91,12 +91,27 @@ the app.
   stream. It resolves when the pad shows, when a transport key is pressed, and once per drag, so
   the lookup never runs per touch move.
 
-- **The Back key and the back gesture.** SidePad holds Back only when the user is configuring,
-  never while the buttons are driving the game, because the focused screen is where injected
-  presses land. The panel, editor and pickers take window focus (`focusableFlags`) and swallow
-  Back in a `backFrame` root, so Back closes them; a nested picker closes first and leaves the
-  editor open, and closing the editor or panel hands focus back to display 0 through
-  `FocusHandoffActivity`. The pad itself stays non-focusable, so with the shield off or the pad
+- **The Back key, the back gesture, and who takes focus.** SidePad holds Back only when the user
+  is configuring, never while the buttons are driving the game, because the focused screen is
+  where injected presses land. The editor and the pickers take window focus (`focusableFlags`)
+  and swallow Back in a `backFrame` root, so Back closes them; a nested picker closes first and
+  leaves the editor open.
+
+  The panel does not take focus, on purpose. It is the one thing meant to be reached mid-game, for
+  volume and brightness, and a visit to a focusable window on this screen costs the game up top its
+  foreground: measured on the Thor before this was changed, a single panel visit over GameNative
+  logged `wm_on_top_resumed_lost_called` for it and then started `FocusHandoffActivity` on the top
+  screen, pausing it again. Note the cost is not in the taking of focus itself. While one of our
+  focusable windows is up, `mTopFocusedDisplayId` stays 0 and the top screen keeps its foreground;
+  the churn comes when that window goes away, and the hand-off is what puts things back. Either
+  way a non-focusable panel has neither half, and it measures clean on open and on close. It costs
+  only the Back key, and tapping outside already closes it and already says so on the panel. Do not
+  make it focusable again to get Back back.
+
+  Focus is handed to display 0 through `FocusHandoffActivity`, and `dropWindow` fires that when
+  the last focusable window of ours goes. That check matters rather than hard-coding it per
+  window: a picker opened from the editor must leave focus with the editor, while the same picker
+  opened over the non-focusable panel is the last one holding it and has to give it back. The pad itself stays non-focusable, so with the shield off or the pad
   hidden the system back gesture reaches the app behind as usual. With the shield up the screen
   behind is not meant to be touched, so `ShieldPadView` claims the left and right edges from the
   system back gesture with `systemGestureExclusionRects`; a back swipe there lands on the shield

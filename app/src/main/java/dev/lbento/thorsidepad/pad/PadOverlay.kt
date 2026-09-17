@@ -114,8 +114,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     /**
      * [baseFlags] without NOT_FOCUSABLE: the window takes input focus and so receives the Back key.
-     * Only for windows shown while the user is configuring (panel, editor, pickers) and never while
-     * the buttons are driving the game, because the focused screen is where button presses land.
+     * Only for the editor and the pickers, which are lists to be navigated, and never for anything
+     * shown while a game is running: the focused screen is where button presses land, and an app on
+     * the top screen that loses window focus takes it as being sent to the background and pauses.
+     * The panel is deliberately not in this list; see [showPanel].
      */
     private fun focusableFlags() = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -131,6 +133,23 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             return super.dispatchKeyEvent(event)
         }
+    }
+
+    /** True while one of our windows still holds input focus on the pad's screen. */
+    private fun anyFocusableWindow() = views.any {
+        ((it.layoutParams as? WindowManager.LayoutParams)?.flags ?: 0) and
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE == 0
+    }
+
+    /**
+     * Takes one of our windows down. When the last focusable one goes, the top screen is handed
+     * focus back deliberately rather than left to chance, because injected presses land on
+     * whichever screen holds it.
+     */
+    private fun dropWindow(w: View) {
+        try { wm.removeViewImmediate(w) } catch (_: Exception) {}
+        views.remove(w)
+        if (!anyFocusableWindow()) onFocusReturn?.invoke()
     }
 
     private fun add(v: View, lp: WindowManager.LayoutParams) {
@@ -182,13 +201,17 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * slides in on its own.
      */
     fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false, shieldOn: Boolean = false, backdrop: String = "clear") {
-        removePanel(animated = false, returnFocus = false)
+        removePanel(animated = false)
         panelHeight = (height * 0.82f).roundToInt()
         val h = ControlPanel.build(themed, state, actions, panelHeight)
-        // The panel takes focus so Back closes it; nothing is driving the game while it is open.
-        val wrap = backFrame { actions.close() }
+        // The panel does not take focus. It is the one thing meant to be used mid-game, for volume
+        // and brightness, and a focusable window on this screen pulls focus off the top one, which
+        // an app up there reads as being sent to the background: GameNative and the like pause. It
+        // costs only the Back key as a way out, and tapping outside already closes the panel and
+        // says so on the panel itself. Nothing in here needs key input; see ControlPanel.
+        val wrap = FrameLayout(themed)
         wrap.addView(h.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        val lp = fullScreenFocusableParams("SidePad panel")
+        val lp = fullScreenParams("SidePad panel")
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
         applyPanelLook(h.scrim, lp, shieldOn, backdrop)
         panelParams = lp
@@ -219,13 +242,12 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     /** Re-renders the open panel with new state; the window stays, so nothing flashes. */
     fun updatePanel(state: PanelState) { panelUpdate?.invoke(state) }
 
-    fun removePanel(animated: Boolean = true, returnFocus: Boolean = true) {
+    fun removePanel(animated: Boolean = true) {
         val root = panel ?: return
         panel = null; panelUpdate = null; panelParams = null
         val sheet = panelSheet; val scrim = panelScrim; panelSheet = null; panelScrim = null
         fun drop() {
             try { wm.removeViewImmediate(root) } catch (_: Exception) {}
-            if (returnFocus) onFocusReturn?.invoke()      // the panel held focus; give it back to the top screen
         }
         if (animated && sheet != null) {
             sheet.animate().translationY(-panelHeight.toFloat()).setDuration(180).setInterpolator(android.view.animation.AccelerateInterpolator()).withEndAction { drop() }.start()
@@ -560,7 +582,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val root = backFrame { onBack() }
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
-        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        fun dismiss() { window?.let { w -> dropWindow(w) } }
         onBack = { dismiss() }
         root.setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) dismiss(); true }
 
@@ -650,7 +672,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val root = backFrame { onBack() }
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
-        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        fun dismiss() { window?.let { w -> dropWindow(w) } }
         onBack = { dismiss() }
         val card = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL; setBackgroundColor(0xF0181818.toInt()); setPadding(28, 20, 28, 20); isClickable = true
@@ -691,7 +713,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         var window: View? = null
         // The editor underneath is focusable too, so focus falls back to it, not to the top screen.
         fun dismiss() {
-            window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) }
+            window?.let { w -> dropWindow(w) }
         }
         onBack = { dismiss() }
         val card = LinearLayout(themed).apply {
@@ -731,7 +753,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val root = backFrame { onBack() }
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
-        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        fun dismiss() { window?.let { w -> dropWindow(w) } }
         onBack = { dismiss() }
         root.setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) dismiss(); true }
 
@@ -784,7 +806,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val root = backFrame { onBack() }
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
-        fun dismiss() { window?.let { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {}; views.remove(w) } }
+        fun dismiss() { window?.let { w -> dropWindow(w) } }
         onBack = { dismiss() }
         root.setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) dismiss(); true }
 
