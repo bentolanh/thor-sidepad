@@ -49,16 +49,21 @@ Everything happens on the bottom screen.
   makes the buttons more see-through.
 
   <img src="docs/pad-frosted.png" width="300" alt="The same pad over the frosted backdrop">
-- **Layouts.** Edit layout opens the editor on the bottom screen: tap a button to select it,
-  drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to remove.
+- **Layouts and profiles.** Edit layout opens the editor on the bottom screen: tap a button to
+  select it, drag to move, pinch to resize, Add for more buttons or a virtual stick, Delete to
+  remove. The chip under the toolbar names the profile you are editing and opens the profile
+  picker, where you switch to another profile or make a new blank one. Save writes into the
+  profile you are on. Exit leaves, asking first whether to save if there is unsaved work, and
+  the back gesture does the same. Switching profile with unsaved work asks too, so nothing is
+  lost silently.
 - **Device controls on the pad.** Add has pages for Buttons, Sticks, Screen and Sliders.
   The D-pad is one cross you press in any of eight directions.
   Sliders set brightness and volume for each screen, plus one brightness slider that moves
   both screens together; Screen holds Home and Back for either screen and the shield toggle.
   So the things you would reach for the Thor's own keys or the Control Center for are one tap
   from the game.
-  Three presets come built in: Left hand, Right hand and Face buttons. Save keeps your own
-  changes as a preset of your own.
+  Three profiles come built in: Left hand, Right hand and Face buttons. A built-in cannot be
+  written over, so saving while on one asks for a name and keeps your copy instead.
 - **Holding a button down.** Select a button in the editor and tap Sticky: from then on a
   tap holds it and the next tap lets go. Or add a HOLD button to the pad: tap HOLD, then any
   button, and that button stays down until you tap it again. A held button shows a yellow

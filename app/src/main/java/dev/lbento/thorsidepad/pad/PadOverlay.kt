@@ -342,11 +342,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val root = backFrame { backAction() }
         root.setBackgroundColor(0xE0101010.toInt())
         val editor = EditPadView(ctx, working).apply { setBackgroundColor(0xFF1A1A1A.toInt()) }
-        // Leaving the editor hands focus back to the top screen, so the buttons drive the game again.
-        fun discard() { removeAll(); onFocusReturn?.invoke(); onCancel() }
-        fun finish(name: String) { removeAll(); onFocusReturn?.invoke(); onSaved(working, name) }
-        backAction = { discard() }
-
         val bar = LinearLayout(themed).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xCC101010.toInt())
@@ -358,35 +353,75 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             setOnClickListener { onClick() }
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        // The profile chip: shows which preset is being edited and opens the switch/save chooser.
-        lateinit var refreshProfile: () -> Unit
+        // The profile chip: shows which profile is being edited and opens the profile picker.
         val profileChip = Button(themed).apply {
             isAllCaps = false; textSize = 14f; setPadding(20, 12, 20, 12)
             setBackgroundColor(0xFF23324A.toInt()); setTextColor(Color.WHITE)
         }
+        val hintText = "Tap to select · drag to move · pinch to resize"
+        val hint = TextView(themed).apply {
+            setTextColor(0xFFB8C0C8.toInt()); textSize = 12f; setPadding(16, 4, 16, 8)
+            text = hintText
+        }
+        fun refreshProfile() {
+            profileChip.text = if (PresetStore.isBuiltin(active)) "Profile:  $active  (built-in)  ▾" else "Profile:  $active  ▾"
+        }
+        refreshProfile()
+
+        // ---- saving and leaving ----
+        /** The profile as it is stored. A built-in is "stored" in code, so this is never null in practice. */
+        fun stored(): PadLayout? = PresetStore.find(app, active)?.layout
+        /** Does the pad on screen differ from the profile it came from? */
+        fun dirty(): Boolean = stored()?.toJson() != working.toJson()
+        fun flash(msg: String) { hint.text = msg; hint.postDelayed({ hint.text = hintText }, 1500) }
+        /**
+         * Save into the profile being edited. A built-in cannot be written to, so that one case asks
+         * for a name and the new copy becomes the profile you are editing.
+         */
+        fun saveCurrent(then: () -> Unit) {
+            if (PresetStore.isBuiltin(active)) askName(PresetStore.nextName(app)) { name ->
+                PresetStore.upsert(app, Preset(name, "Your preset", working.copy(), false))
+                active = name; refreshProfile(); then()
+            } else {
+                PresetStore.upsert(app, Preset(active, "Your preset", working.copy(), false))
+                then()
+            }
+        }
+        fun leave(adopt: PadLayout) { removeAll(); onFocusReturn?.invoke(); onSaved(adopt, active) }
+        /** Leaving always asks about unsaved work, from the Exit button and from the back gesture alike. */
+        fun exit() {
+            if (!dirty()) { leave(working); return }
+            showChoice("Leave the editor?", listOf("Save changes to \"$active\"", "Leave without saving")) { pick ->
+                if (pick == 0) saveCurrent { leave(working) } else leave(stored() ?: working)
+            }
+        }
+        /** Anything that replaces what is on screen asks about unsaved work first. */
+        fun guarded(what: String, action: () -> Unit) {
+            if (!dirty()) { action(); return }
+            val plain = what.replaceFirstChar { it.uppercase() }
+            showChoice("Unsaved changes to \"$active\"", listOf("Save, then $what", "$plain without saving")) { pick ->
+                if (pick == 0) saveCurrent { action() } else action()
+            }
+        }
+        backAction = { exit() }
+
         fun switchTo(name: String, layoutOf: PadLayout) {
             active = name; working.buttons.clear(); working.buttons.addAll(layoutOf.buttons.map { it.copy() })
             working.style = layoutOf.style; editor.selected = -1; editor.invalidate(); refreshProfile()
         }
         profileChip.setOnClickListener {
             showPresets(active,
-                onUse = { p -> switchTo(p.name, p.layout) },
+                onUse = { p -> guarded("switch") { switchTo(p.name, p.layout) } },
                 onDeletedActive = { switchTo(PresetStore.builtins[0].name, PresetStore.builtins[0].layout) },
                 onNew = { name ->
-                    // A brand-new, empty profile the user builds from scratch. Persist it so it is a
-                    // real profile straight away; editing and Save write into it.
-                    val blank = PadLayout(mutableListOf(), working.style)
-                    PresetStore.upsert(app, Preset(name, "Your preset", blank, false))
-                    switchTo(name, blank)
+                    // A brand-new, empty profile to build from scratch. It is stored straight away, so
+                    // it is a real profile even before the first Save.
+                    guarded("start it") {
+                        val blank = PadLayout(mutableListOf(), working.style)
+                        PresetStore.upsert(app, Preset(name, "Your preset", blank, false))
+                        switchTo(name, blank)
+                    }
                 })
-        }
-        refreshProfile = {
-            profileChip.text = if (PresetStore.isBuiltin(active)) "Profile:  $active  (built-in)  ▾" else "Profile:  $active  ▾"
-        }
-        refreshProfile()
-        val hint = TextView(themed).apply {
-            setTextColor(0xFFB8C0C8.toInt()); textSize = 12f; setPadding(16, 4, 16, 8)
-            text = "Tap to select · drag to move · pinch to resize"
         }
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
             val code = Catalog.groups[g].second[pos].code
@@ -400,26 +435,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         btn("Glyphs") { showChoice("Button glyphs for this preset", Glyphs.styles.map { (key, name) -> (if (key == working.style) "●  " else "") + name }) { pos ->
             working.style = Glyphs.styles[pos].first; editor.invalidate()
         } }
-        btn("Discard") { discard() }
-        btn("Save") {
-            if (PresetStore.isBuiltin(active)) {
-                askName(PresetStore.nextName(app)) { name ->
-                    PresetStore.upsert(app, Preset(name, "Your preset", working.copy(), false))
-                    finish(name)
-                }
-            } else {
-                // Editing one of the user's own presets: write into it, or keep it and start a new one.
-                showChoice("Save", listOf("Update \"$active\"", "Save as a new preset")) { pick ->
-                    if (pick == 0) {
-                        PresetStore.upsert(app, Preset(active, "Your preset", working.copy(), false))
-                        finish(active)
-                    } else askName(PresetStore.nextName(app)) { name ->
-                        PresetStore.upsert(app, Preset(name, "Your preset", working.copy(), false))
-                        finish(name)
-                    }
-                }
-            }
-        }
+        btn("Exit") { exit() }
+        btn("Save") { saveCurrent { flash("Saved to \"$active\"") } }
         editor.onSelectionChanged = { i -> val has = i >= 0; delete.isEnabled = has
             sticky.isEnabled = has && (working.buttons.getOrNull(i)?.code ?: 0) > 0 }
         editor.selected = -1

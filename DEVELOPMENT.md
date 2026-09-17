@@ -46,6 +46,16 @@ the app.
   the UIDs listed in `sys.audio.uids` (the apps on display 4). SidePad's second volume slider
   writes the same setting, so the AYN slider and ours stay in step.
 
+- **Editor model.** The editor edits exactly one profile, named in the chip. `Save` writes the
+  working layout into it, stays open and flashes a confirmation; a built-in cannot be written
+  over, so that one case asks for a name and the copy becomes the profile being edited. `Exit`
+  and the back gesture both run the same check: unchanged leaves at once, changed offers save,
+  leave without saving, or cancel. Dirtiness is `PresetStore.find(active).layout.toJson()`
+  against `working.toJson()`, which covers buttons, sticky flags and glyph style. Anything that
+  replaces what is on screen (switching profile, starting a new one) goes through the same
+  guard, so edits are never dropped silently. Leaving always adopts the profile being edited,
+  either as just saved or as stored.
+
 - **The Back key and the back gesture.** SidePad holds Back only when the user is configuring,
   never while the buttons are driving the game, because the focused screen is where injected
   presses land. The panel, editor and pickers take window focus (`focusableFlags`) and swallow
