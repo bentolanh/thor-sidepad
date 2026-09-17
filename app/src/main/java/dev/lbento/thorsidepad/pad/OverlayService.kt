@@ -414,14 +414,18 @@ class OverlayService : Service() {
             while (nowWatching) {
                 Injector.current()?.let { svc ->
                     try {
-                        val parts = svc.mediaInfo().split('|')
+                        val parts = svc.mediaInfo().split('\u0001')
                         val pkg = parts.getOrNull(0) ?: ""
                         val playing = parts.getOrNull(1)?.toIntOrNull() == 3
                         val pos = parts.getOrNull(2)?.toLongOrNull() ?: -1L
                         val dur = parts.getOrNull(3)?.toLongOrNull() ?: -1L
                         val label = parts.getOrNull(4) ?: pkg
+                        val title = parts.getOrNull(5).orEmpty()
+                        val sub = parts.getOrNull(6).orEmpty()
                         nowDuration = dur
-                        main.post { overlay?.updateVideo(playing, pos, dur, if (pkg.isEmpty()) "" else label, pkg) }
+                        main.post {
+                            overlay?.updateVideo(playing, pos, dur, if (pkg.isEmpty()) "" else label, pkg, title, sub)
+                        }
                     } catch (e: Exception) { Log.w(TAG, "now playing", e) }
                 }
                 try { Thread.sleep(700) } catch (_: InterruptedException) { break }

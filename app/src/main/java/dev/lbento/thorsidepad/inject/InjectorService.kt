@@ -153,7 +153,19 @@ class InjectorService() : IInjector.Stub() {
                 val pm = context!!.packageManager
                 pm.getApplicationLabel(pm.getApplicationInfo(c.packageName, 0)).toString()
             } catch (_: Throwable) { c.packageName }
-            "${c.packageName}|${st?.state ?: 0}|${livePosition(st)}|$dur|$label"
+            val md = c.metadata
+            fun meta(vararg keys: String): String {
+                for (k in keys) md?.getString(k)?.takeIf { it.isNotBlank() }?.let { return it }
+                return ""
+            }
+            val title = meta(android.media.MediaMetadata.METADATA_KEY_TITLE,
+                android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+            val sub = meta(android.media.MediaMetadata.METADATA_KEY_ARTIST,
+                android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE,
+                android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+            // A title can hold any character, so the fields are split on one that text never carries.
+            listOf(c.packageName, "${st?.state ?: 0}", "${livePosition(st)}", "$dur", label, title, sub)
+                .joinToString("\u0001")
         }
     } catch (t: Throwable) { Log.w(TAG, "mediaInfo", t); "" }
 
@@ -173,6 +185,19 @@ class InjectorService() : IInjector.Stub() {
             c.transportControls.seekTo(target)
         } catch (t: Throwable) { Log.w(TAG, "mediaSkip", t) }
     }
+
+    override fun appIcon(pkg: String): ByteArray? = try {
+        val d = context!!.packageManager.getApplicationIcon(pkg)
+        val side = 96
+        val bmp = android.graphics.Bitmap.createBitmap(side, side, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        d.setBounds(0, 0, side, side)
+        d.draw(c)
+        java.io.ByteArrayOutputStream().use { out ->
+            bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
+    } catch (t: Throwable) { Log.w(TAG, "appIcon $pkg", t); null }
 
     private fun sh(cmd: String): String =
         ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true).start()

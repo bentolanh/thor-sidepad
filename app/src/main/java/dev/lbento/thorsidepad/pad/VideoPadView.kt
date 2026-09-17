@@ -34,7 +34,8 @@ class VideoPadView(
         val f = if (scrubbing) scrubFrac else now.fraction
         val shown = if (scrubbing && now.duration > 0L) (now.duration * f).toLong() else now.position
         painter.drawVideo(c, 0f, 0f, width.toFloat(), height.toFloat(), now.playing, f, volume, zone,
-            NowPlaying.time(shown), NowPlaying.time(now.duration), false, now.app, row == 0)
+            NowPlaying.time(shown), NowPlaying.time(now.duration), false, now.app, row == 0,
+            AppIcons.of(context, now.pkg) { invalidate() }, now.title)
     }
 
     private fun frac(x: Float, l: Float, r: Float) =

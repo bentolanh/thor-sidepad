@@ -68,6 +68,13 @@ the app.
   Audible and the Apple TV session. `registerServiceWrappers` throws ("can only be called during
   class initialization") and is not needed. So the planned video unit needs no extra permission.
 
+- **The band's icon and title.** The title comes from the session's metadata, so it is the video
+  or track name rather than the app's. The icon cannot come from our own package manager: an app
+  targeting Android 11 or later sees only packages it declares, and asking for all of them needs a
+  broad visibility permission. The injector runs as the shell, which sees everything, so it draws
+  the icon into a 96px PNG and hands back the bytes; `AppIcons` caches the result and fetches off
+  the drawing thread, redrawing when it arrives.
+
 - **The video unit.** It reads the playing session through the injector: `mediaInfo` returns
   package, state, position and length, `mediaSkip` jumps by ten seconds from where the session is
   now, and `mediaSeek` takes an absolute position. A playing session reports where it was at a

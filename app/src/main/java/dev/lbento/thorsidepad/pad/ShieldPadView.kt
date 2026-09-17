@@ -144,7 +144,7 @@ class ShieldPadView(
                     vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H,
                     video.playing, f, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] ?: 0.5f,
                     videoZone[i] ?: -1, NowPlaying.time(shown), NowPlaying.time(video.duration), false,
-                    video.app, videoZone[i] == 9)
+                    video.app, videoZone[i] == 9, AppIcons.of(context, video.pkg) { invalidate() }, video.title)
             } else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,

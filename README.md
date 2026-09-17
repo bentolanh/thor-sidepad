@@ -80,7 +80,8 @@ Everything happens on the bottom screen.
   track moves that app's own audio: the Thor scales the second screen's sound separately, so the
   track follows the screen the player is on rather than always moving the main one.
 - **Video controller.** System also has a video unit for players like YouTube and Netflix. A band
-  at the top names what is playing and brings that app forward on the screen it was already on.
+  at the top carries the app's icon and what is playing, the video or track title rather than just
+  the app's name, and brings that app forward on the screen it was already on.
   Below it a timeline shows how far in you are and drags to seek, then the full transport with
   jump back and forward ten seconds either side of play or pause, then a volume row marked with a
   speaker. The play mark shows what it will do, since it knows whether the player is running. Both

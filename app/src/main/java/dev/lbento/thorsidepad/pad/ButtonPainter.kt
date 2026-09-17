@@ -133,6 +133,14 @@ class ButtonPainter {
      * The video unit: a timeline across the top that you drag to seek, and jump back, play or
      * pause, and jump forward beneath it. [pressed] is the third under the finger, or -1.
      */
+    /** Trims text with an ellipsis until it fits the room given. */
+    private fun fit(t: String, p: Paint, room: Float): String {
+        if (p.measureText(t) <= room) return t
+        var cut = t
+        while (cut.isNotEmpty() && p.measureText("$cut…") > room) cut = cut.dropLast(1)
+        return "$cut…"
+    }
+
     /** A round arrow with the seconds inside, the mark players show when you double-tap to skip. */
     private fun drawSkipIcon(c: Canvas, cx: Float, cy: Float, rad: Float, forward: Boolean, label: String) {
         ring.pathEffect = null; ring.strokeWidth = rad * 0.20f; ring.color = Color.WHITE
@@ -175,7 +183,8 @@ class ButtonPainter {
      */
     fun drawVideo(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, playing: Boolean,
                   posFrac: Float, volume: Float = 0.5f, pressed: Int = -1, elapsed: String = "",
-                  total: String = "", selected: Boolean = false, app: String = "", appDown: Boolean = false) {
+                  total: String = "", selected: Boolean = false, app: String = "", appDown: Boolean = false,
+                  icon: android.graphics.drawable.Drawable? = null, title: String = "") {
         val h = bottom - top; val w = right - left; val rad = h * 0.10f
         fill.color = 0xAA202020.toInt()
         c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
@@ -193,16 +202,32 @@ class ButtonPainter {
             fill.color = 0x772E7DFF
             c.drawRect(left + w * 0.012f, top + h * 0.012f, right - w * 0.012f, yApp, fill)
         }
-        small.textSize = h * 0.095f
-        small.color = if (app.isEmpty()) 0xFF8A9199.toInt() else Color.WHITE
-        small.textAlign = Paint.Align.LEFT
-        val appY = top + h * VIDEO_ROW_APP * 0.62f
-        c.drawText(if (app.isEmpty()) "Nothing playing" else app, left + w * 0.030f, appY, small)
-        if (app.isNotEmpty()) {
-            small.textAlign = Paint.Align.RIGHT
-            small.color = 0xFF8AB4F8.toInt()
-            c.drawText("open  ›", right - w * 0.030f, appY, small)
+        val bandCy = top + h * VIDEO_ROW_APP * 0.5f
+        var textL = left + w * 0.030f
+        if (icon != null) {
+            val side = h * VIDEO_ROW_APP * 0.66f
+            icon.setBounds((textL).toInt(), (bandCy - side / 2).toInt(), (textL + side).toInt(), (bandCy + side / 2).toInt())
+            icon.draw(c)
+            textL += side + w * 0.016f
         }
+        small.textSize = h * 0.088f
+        small.textAlign = Paint.Align.RIGHT
+        var textR = right - w * 0.030f
+        if (app.isNotEmpty()) {
+            small.color = 0xFF8AB4F8.toInt()
+            c.drawText("open  ›", textR, bandCy + small.textSize * 0.36f, small)
+            textR -= small.measureText("open  ›") + w * 0.020f
+        }
+        // What is playing, falling back to the app's own name when it publishes no title.
+        small.textAlign = Paint.Align.LEFT
+        small.color = if (app.isEmpty()) 0xFF8A9199.toInt() else Color.WHITE
+        val shown = when {
+            app.isEmpty() -> "Nothing playing"
+            title.isNotEmpty() -> title
+            else -> app
+        }
+        val room = (textR - textL).coerceAtLeast(1f)
+        c.drawText(fit(shown, small, room), textL, bandCy + small.textSize * 0.36f, small)
         small.textAlign = Paint.Align.CENTER
 
         ring.strokeWidth = h * 0.012f; ring.color = 0x33FFFFFF

@@ -6,6 +6,8 @@ package dev.lbento.thorsidepad.pad
  */
 class NowPlaying {
     @Volatile var app = ""
+    @Volatile var title = ""
+    @Volatile var subtitle = ""
     @Volatile var pkg = ""
     @Volatile var playing = false
     @Volatile var position = 0L

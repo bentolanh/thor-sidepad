@@ -85,9 +85,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     val video = NowPlaying()
 
     /** Called when the service has fresh session state, so any video unit redraws. */
-    fun updateVideo(playing: Boolean, position: Long, duration: Long, app: String, pkg: String) {
+    fun updateVideo(playing: Boolean, position: Long, duration: Long, app: String, pkg: String,
+                    title: String = "", subtitle: String = "") {
         video.playing = playing; video.position = position; video.duration = duration
-        video.app = app; video.pkg = pkg
+        video.app = app; video.pkg = pkg; video.title = title; video.subtitle = subtitle
         invalidatePad()
     }
 

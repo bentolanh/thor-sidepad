@@ -46,4 +46,7 @@ interface IInjector {
     String mediaInfo() = 21;
     void mediaSeek(long posMs) = 22;
     void mediaSkip(int deltaMs) = 23;
+    // An app's icon as a small PNG. The shell sees every package; a normal app would need a broad
+    // visibility permission to ask for this itself.
+    byte[] appIcon(String pkg) = 24;
 }
