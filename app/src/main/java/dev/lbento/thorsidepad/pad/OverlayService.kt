@@ -501,7 +501,9 @@ class OverlayService : Service() {
                     dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND else dev.lbento.thorsidepad.inject.Slider.VOLUME
                 mediaVolumeTarget = target
                 main.post {
-                    levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] = levels[target] ?: 0.5f
+                    // Never while the finger is down: resolving takes a shell round trip, so an
+                    // answer can arrive mid-drag and would snatch the thumb back.
+                    if (!mediaDragging) levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] = levels[target] ?: 0.5f
                     overlay?.invalidatePad()
                 }
             } catch (e: Exception) { Log.w(TAG, "media target", e) }
@@ -513,6 +515,10 @@ class OverlayService : Service() {
         val second = overlay?.displayId ?: 0
         // The media unit's track stands for whichever volume the playing app actually uses.
         val code = if (code == dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA) mediaVolumeTarget else code
+        // The media track stands in for one of the two real volumes, so what it just set is now
+        // that volume's level. Without this the cached one stays at whatever it was when the pad
+        // came up, and the next time the target is resolved the thumb springs back to it.
+        if (code == dev.lbento.thorsidepad.inject.Slider.VOLUME || code == dev.lbento.thorsidepad.inject.Slider.VOLUME_2ND) main.post { levels[code] = level }
         // setTemporaryBrightness exists on the Thor but never reaches its display controller and
         // stalls the real change for seconds, so every update is a plain setBrightness.
         fun bright(display: Int) = svc.setBrightness(display, level)
