@@ -184,7 +184,7 @@ class ButtonPainter {
      * third under the finger, 0..2, or -1 for none.
      */
     fun drawMedia(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, pressed: Int = -1, selected: Boolean = false) {
-        val h = bottom - top; val w = right - left; val rad = h / 2f
+        val h = bottom - top; val w = right - left; val rad = h * 0.30f
         fill.color = 0xAA202020.toInt()
         c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
         if (pressed in 0..2) {
@@ -202,7 +202,7 @@ class ButtonPainter {
 
         fill.color = Color.WHITE
         val cy = (top + bottom) / 2f
-        val s = h * 0.20f
+        val s = h * 0.30f
         var cx = left + w / 6f                      // previous
         c.drawRect(cx - s * 1.5f, cy - s, cx - s * 1.28f, cy + s, fill)
         triL(c, cx - s * 0.25f, cy, s); triL(c, cx + s * 0.85f, cy, s)
@@ -260,5 +260,11 @@ class ButtonPainter {
                 }, fill)
             }
         }
+    }
+
+    companion object {
+        /** The media unit's half width and half height, as multiples of the element radius: a slim bar. */
+        const val MEDIA_HALF_W = 1.5f
+        const val MEDIA_HALF_H = 0.36f
     }
 }

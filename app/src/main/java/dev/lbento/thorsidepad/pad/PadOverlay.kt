@@ -320,12 +320,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
-            val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else if (isMediaUnit(b.code)) (px * 1.3f).roundToInt() else px
-            val h = if (isSliderCode(b.code)) (px * 1.2f).roundToInt() else if (isMediaUnit(b.code)) (px * 0.55f).roundToInt() else px
+            val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else if (isMediaUnit(b.code)) (px * ButtonPainter.MEDIA_HALF_W).roundToInt() else px
+            val h = if (isSliderCode(b.code)) (px * 1.2f).roundToInt() else if (isMediaUnit(b.code)) (px * ButtonPainter.MEDIA_HALF_H).roundToInt() else px
             val lp = WindowManager.LayoutParams(w, h, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
             lp.x = (b.cx * width - w / 2f).roundToInt()
-            lp.y = (b.cy * height - px / 2f).roundToInt()
+            // Sliders hang from their top edge, so they keep the square offset; everything else,
+            // including the wide media bar, is centred on its own height.
+            lp.y = (b.cy * height - (if (isSliderCode(b.code)) px / 2f else h / 2f)).roundToInt()
             lp.title = "SidePad ${Catalog.byCode(b.code).label}"
             add(v, lp)
         }

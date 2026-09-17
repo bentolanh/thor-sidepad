@@ -58,7 +58,8 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
             val label = Glyphs.label(b.code, layout.style)
             if (isMediaUnit(b.code)) {
                 val r = b.size * short() / 2f; val mx = b.cx * width; val my = b.cy * height
-                painter.drawMedia(c, mx - r * 1.3f, my - r * 0.55f, mx + r * 1.3f, my + r * 0.55f, -1, i == selected)
+                painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
+                    mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, -1, i == selected)
             }
             else if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, 0, i == selected)
             else if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
@@ -75,7 +76,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
             val b = layout.buttons[i]
             val r = b.size * short() / 2f
             if (isMediaUnit(b.code)) {
-                if (abs(x - b.cx * width) <= r * 1.3f && abs(y - b.cy * height) <= r * 0.55f) return i
+                if (abs(x - b.cx * width) <= r * ButtonPainter.MEDIA_HALF_W && abs(y - b.cy * height) <= r * ButtonPainter.MEDIA_HALF_H) return i
             } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1

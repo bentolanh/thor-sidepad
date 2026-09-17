@@ -99,7 +99,7 @@ class ShieldPadView(
             } else if (isMediaUnit(b.code)) {
                 // The media unit is a wide capsule, so its hit area is that rectangle.
                 val cx = b.cx * width; val cy = b.cy * height
-                if (abs(x - cx) <= r * 1.3f && abs(y - cy) <= r * 0.55f) return i
+                if (abs(x - cx) <= r * ButtonPainter.MEDIA_HALF_W && abs(y - cy) <= r * ButtonPainter.MEDIA_HALF_H) return i
             } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1
@@ -125,7 +125,8 @@ class ShieldPadView(
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, null, turboArmed || (pressCount[i] ?: 0) > 0)
             } else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height
-                painter.drawMedia(c, mx - r * 1.3f, my - r * 0.55f, mx + r * 1.3f, my + r * 0.55f, mediaZone[i] ?: -1)
+                painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
+                    mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, mediaZone[i] ?: -1)
             } else if (isActionCode(b.code)) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
             } else if (isSliderCode(b.code)) {
@@ -272,8 +273,9 @@ class ShieldPadView(
                     if (i >= 0) {
                         val b = layout.buttons[i]
                         if (isMediaUnit(b.code)) {
-                            val left = b.cx * width - b.size * short() / 2f * 1.3f
-                            mediaZone[i] = (((x - left) / (b.size * short() * 1.3f)) * 3f).toInt().coerceIn(0, 2)
+                            val mr = b.size * short() / 2f
+                            val left = b.cx * width - mr * ButtonPainter.MEDIA_HALF_W
+                            mediaZone[i] = (((x - left) / (2f * mr * ButtonPainter.MEDIA_HALF_W)) * 3f).toInt().coerceIn(0, 2)
                         }
                         press(i, pid, initial = true)
                     }
