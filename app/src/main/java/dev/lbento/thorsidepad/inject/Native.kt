@@ -14,6 +14,7 @@ object Native {
     @JvmStatic external fun createUinput(
         name: String, vendor: Int, product: Int,
         keys: IntArray, absCodes: IntArray, absMin: IntArray, absMax: IntArray,
+        relCodes: IntArray,
     ): Int
     @JvmStatic external fun destroyUinput(fd: Int)
     @JvmStatic external fun strerror(err: Int): String

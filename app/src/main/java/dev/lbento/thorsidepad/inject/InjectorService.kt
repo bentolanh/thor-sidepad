@@ -271,7 +271,8 @@ class InjectorService() : IInjector.Stub() {
 
     override fun openVirtual(name: String, k: IntArray, absCodes: IntArray, absMin: IntArray, absMax: IntArray): String = synchronized(lock) {
         closeTargetLocked()
-        val f = Native.createUinput(name, VENDOR, PRODUCT, k, absCodes, absMin, absMax)
+        // No relative axes: a pad that declared them would be taken for a mouse.
+        val f = Native.createUinput(name, VENDOR, PRODUCT, k, absCodes, absMin, absMax, IntArray(0))
         if (f < 0) return "uinput: ${Native.strerror(f)}"
         fd = f; virtual = true
         keys = k.toSet()
@@ -334,6 +335,37 @@ class InjectorService() : IInjector.Stub() {
             } finally { Native.closeDevice(f) }
         }, "sidepad-key").start()
         return ""
+    }
+
+    override fun probePointer(holdMs: Int): String {
+        val report = StringBuilder()
+        val f = Native.createUinput(
+            "Thor SidePad Mouse", VENDOR, PRODUCT + 1,
+            intArrayOf(Mouse.LEFT, Mouse.RIGHT, Mouse.MIDDLE),
+            IntArray(0), IntArray(0), IntArray(0),
+            intArrayOf(Rel.X, Rel.Y, Rel.WHEEL),
+        )
+        if (f < 0) return "create failed: ${Native.strerror(f)}"
+        report.append("created, fd=").append(f).append('\n')
+        try {
+            Thread.sleep(800)     // let the system pick the new device up
+            report.append(shell("dumpsys input | grep -A8 'SidePad Mouse' | head -20").trim()).append('\n')
+            // A slow sweep rather than one jump, so a cursor has time to appear and settle.
+            repeat(40) {
+                Native.writeEvent(f, Ev.REL, Rel.X, 14)
+                Native.writeEvent(f, Ev.REL, Rel.Y, 7)
+                Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+                Thread.sleep(25)
+            }
+            report.append("swept\n")
+            Thread.sleep(holdMs.toLong().coerceIn(0L, 30_000L))
+        } catch (e: Exception) {
+            report.append("error: ").append(e).append('\n')
+        } finally {
+            Native.destroyUinput(f)
+            report.append("destroyed\n")
+        }
+        return report.toString()
     }
 
     override fun shell(cmd: String): String = try {

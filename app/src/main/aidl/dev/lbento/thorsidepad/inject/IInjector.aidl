@@ -49,4 +49,9 @@ interface IInjector {
     // An app's icon as a small PNG. The shell sees every package; a normal app would need a broad
     // visibility permission to ask for this itself.
     byte[] appIcon(String pkg) = 24;
+
+    // Feasibility probe for mouse support: stands up a pointer device of its own, sweeps it, holds
+    // it alive for holdMs so a screenshot can catch the cursor, then takes it down. Deliberately
+    // does not touch the open pad, so the buttons keep working while it runs.
+    String probePointer(int holdMs) = 25;
 }

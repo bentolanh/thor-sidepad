@@ -15,6 +15,27 @@ the app.
   the spot, and a failed write triggers the same.
 - **Virtual pad mode** creates a separate uinput gamepad named "Thor SidePad". The Thor
   kernel stamps every uinput pad with AYN's vendor/product ids, so AYN's key layout applies.
+- **Mouse and keyboard: what the probe found.** Not built, but the ground is checked. A uinput
+  device that declares relative axes is taken by Android as a pointer (`Classes: CURSOR | EXTERNAL`)
+  and its cursor lands on **display 0**, the top screen, which is where it is wanted. That was the
+  question that decided whether the feature is worth building, since no input device on the Thor
+  has an `AssociatedDisplayPort` and a virtual device has no port to associate one with, so the
+  cursor could not have been steered there by configuration. Verified by screenshot: the arrow
+  appeared over the video on the top screen and woke its controls. AYN ships its own uinput mouse
+  ("ODIN Station Virtual Mouse"), so the kernel and the security policy were never in doubt.
+  `IInjector.probePointer` reruns all of this; fire it with the `PROBE` action (development only).
+
+  Three things still stand between that and a feature. Motion has to travel as one call carrying
+  both axes and emitting one sync report, because `key` and `abs` each write their own and a
+  pointer moved through two calls steps instead of glides. The injector holds one target
+  descriptor and opening a second closes the first, so a pointer alongside a pad needs a real
+  multi-device model; the probe sidesteps this by holding its own descriptor and leaving the pad
+  alone. And same-controller mode can never carry a pointer or a keyboard, because it writes into
+  the physical controller's node and that node declares neither; both are virtual-only. One
+  caution for the keyboard half: declaring a full alphabetic keyboard tells Android a hardware
+  keyboard is attached, which normally suppresses the on-screen one. This device has
+  `show_ime_with_hard_keyboard` on, so it would not show here, but it would elsewhere.
+
 - **M1 / M2** are BTN_C / BTN_Z, which the Thor's controller advertises and AYN's key layouts
   map to Android `BUTTON_C` / `BUTTON_Z`; stock `BUTTON_1..` codes are unmapped on the Thor.
 - **Windows.** Shield mode is one full-screen non-focusable overlay on the second display;

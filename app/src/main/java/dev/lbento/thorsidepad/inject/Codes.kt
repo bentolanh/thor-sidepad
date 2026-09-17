@@ -5,7 +5,16 @@ object Ev {
     const val SYN = 0x00
     const val KEY = 0x01
     const val ABS = 0x03
+    const val REL = 0x02
     const val SYN_REPORT = 0
+}
+
+/** Relative axes. A device that declares these is a pointer, and Android draws a cursor for it. */
+object Rel {
+    const val X = 0x00
+    const val Y = 0x01
+    const val HWHEEL = 0x06
+    const val WHEEL = 0x08
 }
 
 object Abs {
@@ -96,6 +105,13 @@ fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
 fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND || isMediaUnit(code) || isVideoUnit(code)
 fun isDpadCode(code: Int) = code == Dpad.PAD
 fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME || code == Slider.VOLUME_2ND || code == Slider.BRIGHT_BOTH
+
+/** Mouse buttons. Alongside [Rel] these are what make a device a mouse rather than a pad. */
+object Mouse {
+    const val LEFT = 0x110       // BTN_LEFT
+    const val RIGHT = 0x111
+    const val MIDDLE = 0x112
+}
 
 object Btn {
     const val A = 0x130          // BTN_SOUTH

@@ -113,7 +113,7 @@ Java_dev_lbento_thorsidepad_inject_Native_readEvent(JNIEnv* env, jclass cls, jin
 // Creates a uinput device. Returns fd >= 0, or -errno.
 JNIEXPORT jint JNICALL
 Java_dev_lbento_thorsidepad_inject_Native_createUinput(JNIEnv* env, jclass cls, jstring jname, jint vendor, jint product,
-        jintArray jkeys, jintArray jabs, jintArray jabsMin, jintArray jabsMax) {
+        jintArray jkeys, jintArray jabs, jintArray jabsMin, jintArray jabsMax, jintArray jrel) {
     int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) return -errno;
 
@@ -125,6 +125,18 @@ Java_dev_lbento_thorsidepad_inject_Native_createUinput(JNIEnv* env, jclass cls, 
         if (ioctl(fd, UI_SET_KEYBIT, keys[i]) < 0) { LOGE("UI_SET_KEYBIT %d: %s", keys[i], strerror(errno)); }
     }
     (*env)->ReleaseIntArrayElements(env, jkeys, keys, JNI_ABORT);
+
+    // Relative axes make the device a pointer as far as Android is concerned, which is what puts
+    // a cursor on screen; a gamepad must not declare them.
+    jsize nr = jrel ? (*env)->GetArrayLength(env, jrel) : 0;
+    if (nr > 0) {
+        if (ioctl(fd, UI_SET_EVBIT, EV_REL) < 0) goto fail;
+        jint* rel = (*env)->GetIntArrayElements(env, jrel, NULL);
+        for (jsize i = 0; i < nr; i++) {
+            if (ioctl(fd, UI_SET_RELBIT, rel[i]) < 0) { LOGE("UI_SET_RELBIT %d: %s", rel[i], strerror(errno)); }
+        }
+        (*env)->ReleaseIntArrayElements(env, jrel, rel, JNI_ABORT);
+    }
 
     jsize na = jabs ? (*env)->GetArrayLength(env, jabs) : 0;
     if (na > 0) {

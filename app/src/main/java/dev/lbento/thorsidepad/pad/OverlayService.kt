@@ -203,6 +203,10 @@ class OverlayService : Service() {
             ACTION_STOP -> { hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
             ACTION_FOCUS_TOP -> returnFocusToTopScreen()
+            ACTION_PROBE -> Injector.current()?.let { svc ->
+                Thread { try { Log.i(TAG, "pointer probe:\n" + svc.probePointer(12_000)) }
+                         catch (e: Exception) { Log.w(TAG, "probe failed", e) } }.start()
+            }
             ACTION_GUIDE -> showGuide()
             else -> { ensureCatcher(); if (!prefs.guideShown) showGuide() }
         }
@@ -730,6 +734,8 @@ class OverlayService : Service() {
         const val ACTION_FOCUS_TOP = "dev.lbento.thorsidepad.FOCUS_TOP"
         const val ACTION_GUIDE = "dev.lbento.thorsidepad.GUIDE"
         const val ACTION_START = "dev.lbento.thorsidepad.START"
+        /** Development only: see IInjector.probePointer. */
+        const val ACTION_PROBE = "dev.lbento.thorsidepad.PROBE"
 
         @Volatile var running = false
         @Volatile var visible = false
