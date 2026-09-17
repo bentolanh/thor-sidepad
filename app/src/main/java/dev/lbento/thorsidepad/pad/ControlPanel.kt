@@ -92,6 +92,25 @@ object ControlPanel {
             buttons.forEach { b -> addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)) }
         }
         fun btn(t: String, enabled: Boolean = true, onClick: () -> Unit) = Button(themed).apply { text = t; isAllCaps = false; isEnabled = enabled; setOnClickListener { onClick() } }
+        /**
+         * A settings row rather than a button: the caption on the left, what it is set to on the
+         * right, and a chevron. Two of these sit together in one panel so they read as a pair of
+         * choices, not as more action buttons.
+         */
+        fun pickerRow(caption: String, value: String, onClick: () -> Unit) = LinearLayout(themed).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(20, 18, 18, 18)
+            setOnClickListener { onClick() }
+            addView(TextView(themed).apply { text = caption; setTextColor(grey); textSize = 13f })
+            addView(TextView(themed).apply {
+                text = value; setTextColor(Color.WHITE); textSize = 16f
+                gravity = Gravity.END; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 20 })
+            addView(TextView(themed).apply { text = "›"; setTextColor(0xFF8AB4F8.toInt()); textSize = 20f },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = 14 })
+        }
+        fun hairline() = View(themed).apply { setBackgroundColor(0x22FFFFFF) }
         fun sw(t: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(themed).apply {
             text = t; isChecked = checked; setTextColor(Color.WHITE); setPadding(0, 12, 0, 12)
             setOnCheckedChangeListener { v, on ->
@@ -125,9 +144,19 @@ object ControlPanel {
                 }
                 // Quick settings: everything on one page, as before.
                 val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
-                card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })
-                card.addView(btn("Profile: ${state.activeProfile}  ›") { actions.pickProfile() })
-                card.addView(btn("Edit layout") { actions.editLayout() })
+                val choicesGroup = LinearLayout(themed).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setBackgroundColor(0xFF2A2D31.toInt())
+                }
+                choicesGroup.addView(pickerRow("Controller", target) { page = Page.CONTROLLER; render() })
+                choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+                choicesGroup.addView(pickerRow("Profile", state.activeProfile) { actions.pickProfile() })
+                card.addView(choicesGroup, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                    .apply { topMargin = 14; bottomMargin = 14 })
+                // The one action on this page, so it is coloured rather than a third grey band.
+                card.addView(btn("Edit layout") { actions.editLayout() }.apply {
+                    setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
+                })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))

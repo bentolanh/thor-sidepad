@@ -353,10 +353,20 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             setOnClickListener { onClick() }
             bar.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        // The profile chip: shows which profile is being edited and opens the profile picker.
-        val profileChip = Button(themed).apply {
-            isAllCaps = false; textSize = 14f; setPadding(20, 12, 20, 12)
-            setBackgroundColor(0xFF23324A.toInt()); setTextColor(Color.WHITE)
+        // The profile picker: a settings row, not another button, matching the one in the panel.
+        val profileValue = TextView(themed).apply {
+            setTextColor(Color.WHITE); textSize = 16f
+            gravity = Gravity.END; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val profileChip = LinearLayout(themed).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(0xFF2A2D31.toInt())
+            setPadding(20, 16, 18, 16)
+            addView(TextView(themed).apply { text = "Profile"; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
+            addView(profileValue, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 20 })
+            addView(TextView(themed).apply { text = "›"; setTextColor(0xFF8AB4F8.toInt()); textSize = 20f },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = 14 })
         }
         val hintText = "Tap to select · drag to move · pinch to resize"
         val hint = TextView(themed).apply {
@@ -364,7 +374,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             text = hintText
         }
         fun refreshProfile() {
-            profileChip.text = if (PresetStore.isBuiltin(active)) "Profile:  $active  (built-in)  ▾" else "Profile:  $active  ▾"
+            profileValue.text = if (PresetStore.isBuiltin(active)) "$active  (built-in)" else active
         }
         refreshProfile()
 
