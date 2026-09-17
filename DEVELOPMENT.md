@@ -46,6 +46,19 @@ the app.
   the UIDs listed in `sys.audio.uids` (the apps on display 4). SidePad's second volume slider
   writes the same setting, so the AYN slider and ours stay in step.
 
+- **The Back key and the back gesture.** SidePad holds Back only when the user is configuring,
+  never while the buttons are driving the game, because the focused screen is where injected
+  presses land. The panel, editor and pickers take window focus (`focusableFlags`) and swallow
+  Back in a `backFrame` root, so Back closes them; a nested picker closes first and leaves the
+  editor open, and closing the editor or panel hands focus back to display 0 through
+  `FocusHandoffActivity`. The pad itself stays non-focusable, so with the shield off or the pad
+  hidden the system back gesture reaches the app behind as usual. With the shield up the screen
+  behind is not meant to be touched, so `ShieldPadView` claims the left and right edges from the
+  system back gesture with `systemGestureExclusionRects`; a back swipe there lands on the shield
+  and does nothing. That needs no focus, so injection is unaffected. Android caps edge exclusion
+  (`system_gesture_exclusion_limit_dp=200` on the Thor), but the full height of both side edges
+  was accepted on the device: `SkRegion((0,0,73,1080)(1167,0,1240,1080))`.
+
 ## Layout
 
 | Path | What |

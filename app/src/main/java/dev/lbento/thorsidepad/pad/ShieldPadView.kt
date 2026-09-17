@@ -3,6 +3,8 @@ package dev.lbento.thorsidepad.pad
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
+import android.os.Build
 import android.view.MotionEvent
 import android.view.View
 import dev.lbento.thorsidepad.inject.Catalog
@@ -66,6 +68,20 @@ class ShieldPadView(
     private val swipes = HashMap<Int, Swipe>()
 
     private fun short() = min(width, height).toFloat()
+
+    /**
+     * With the shield up the screen behind is not meant to be touched, so claim the left and right
+     * edges from the system's back gesture. A back swipe there then lands on the shield and does
+     * nothing, instead of reaching the app behind or falling through to the top screen. Android
+     * caps how much of an edge an app may claim, so this covers the strip, not the whole side.
+     */
+    override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+        super.onSizeChanged(w, h, ow, oh)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val strip = (BACK_EDGE_DP * resources.displayMetrics.density).toInt()
+            systemGestureExclusionRects = listOf(Rect(0, 0, strip, h), Rect(w - strip, 0, w, h))
+        }
+    }
 
     private fun hit(x: Float, y: Float): Int {
         for (i in layout.buttons.indices.reversed()) {
@@ -286,5 +302,6 @@ class ShieldPadView(
         const val EDGE_ZONE = 0.07f     // fraction of the short side that counts as an edge
         const val SWIPE_LEN = 0.15f     // minimum travel, fraction of the short side
         const val SWIPE_MAX_MS = 700L
+        const val BACK_EDGE_DP = 32     // side strip taken from the system back gesture while the shield is up
     }
 }
