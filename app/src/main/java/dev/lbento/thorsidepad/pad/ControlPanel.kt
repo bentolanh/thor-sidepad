@@ -35,11 +35,12 @@ data class PanelState(
     val backdrop: String, val blurSupported: Boolean,
     val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean,
     val shizukuReady: Boolean = true,
+    val activeProfile: String = "",
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
 interface PanelActions {
-    fun togglePad()
+    fun pickProfile()
     fun editLayout()
     fun setShield(on: Boolean)
     fun setOpacity(value: Float)
@@ -125,10 +126,8 @@ object ControlPanel {
                 // Quick settings: everything on one page, as before.
                 val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
                 card.addView(btn("Controller: $target  ›") { page = Page.CONTROLLER; render() })
-                card.addView(row(
-                    btn(if (state.padVisible) "Hide pad" else "Show pad") { actions.togglePad() },
-                    btn("Edit layout") { actions.editLayout() },
-                ))
+                card.addView(btn("Profile: ${state.activeProfile}  ›") { actions.pickProfile() })
+                card.addView(btn("Edit layout") { actions.editLayout() })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))

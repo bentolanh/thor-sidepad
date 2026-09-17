@@ -122,7 +122,7 @@ class OverlayService : Service() {
 
     private fun panelState(ov: PadOverlay) = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
         targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL,
-        shizukuReady = Injector.state() == Injector.ShizukuState.READY)
+        shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {
@@ -476,7 +476,13 @@ class OverlayService : Service() {
                 if (visible) reopenTarget("target chosen")   // reopens the injector; the windows stay
                 ov.updatePanel(panelState(ov))
             }
-            override fun togglePad() { ov.removePanel(); padDirty = false; toggle(); panelClosed() }
+            override fun pickProfile() {
+                ov.showProfilePicker(prefs.activePreset) { p ->
+                    prefs.activePreset = p.name
+                    prefs.layoutJson = p.layout.toJson()
+                    ov.removePanel(); padDirty = false; show(); panelClosed()
+                }
+            }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }

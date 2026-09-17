@@ -411,8 +411,12 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
         profileChip.setOnClickListener {
             showPresets(active,
-                onUse = { p -> guarded("switch") { switchTo(p.name, p.layout) } },
-                onDeletedActive = { switchTo(PresetStore.builtins[0].name, PresetStore.builtins[0].layout) },
+                onOpen = { p -> guarded("open") { switchTo(p.name, p.layout) } },
+                onOverwrite = { p ->
+                    // Store what is on screen into that profile and carry on editing it there.
+                    PresetStore.upsert(app, Preset(p.name, "Your profile", working.copy(), false))
+                    active = p.name; refreshProfile(); flash("Saved to \"$active\"")
+                },
                 onNew = { name ->
                     // A brand-new, empty profile to build from scratch. It is stored straight away, so
                     // it is a real profile even before the first Save.
@@ -467,7 +471,12 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * The preset chooser: one card per preset with a miniature, name and description. Use
      * switches the editor to it; the user's own presets can also be deleted. The active one is marked.
      */
-    private fun showPresets(active: String, onUse: (Preset) -> Unit, onDeletedActive: () -> Unit, onNew: ((String) -> Unit)? = null) {
+    /**
+     * The profile list. [onOpen] loads a profile; [onOverwrite], when given, writes what is on
+     * screen into it. Built-ins live in code, so they can be opened but never written to.
+     */
+    private fun showPresets(active: String, onOpen: (Preset) -> Unit, primaryLabel: String = "Open",
+                            onOverwrite: ((Preset) -> Unit)? = null, onNew: ((String) -> Unit)? = null) {
         var onBack: () -> Unit = {}
         val root = backFrame { onBack() }
         root.setBackgroundColor(0x99000000.toInt())
@@ -502,14 +511,15 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 row.addView(LayoutPreviewView(themed, p.layout, aspect), LinearLayout.LayoutParams(220, ViewGroup.LayoutParams.WRAP_CONTENT))
                 val text = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 0, 12, 0) }
                 text.addView(TextView(themed).apply { this.text = p.name + (if (isActive) "   • active" else ""); setTextColor(Color.WHITE); textSize = 17f; setTypeface(typeface, android.graphics.Typeface.BOLD) })
-                text.addView(TextView(themed).apply { this.text = if (p.builtin) p.description else "Your preset. Save in the editor writes into it."; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
+                text.addView(TextView(themed).apply { this.text = if (p.builtin) p.description else "Your profile."; setTextColor(0xFFB0B8C0.toInt()); textSize = 13f })
                 row.addView(text, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL })
                 val actions = LinearLayout(themed).apply { orientation = LinearLayout.VERTICAL }
-                actions.addView(Button(themed).apply { this.text = "Use"; isAllCaps = false; isEnabled = !isActive; setOnClickListener { dismiss(); onUse(p) } })
-                if (!p.builtin) {
-                    actions.addView(Button(themed).apply { this.text = "Delete"; isAllCaps = false; setOnClickListener {
-                        PresetStore.delete(app, p.name)
-                        if (isActive) { dismiss(); onDeletedActive() } else rebuild()
+                actions.addView(Button(themed).apply { this.text = primaryLabel; isAllCaps = false; isEnabled = !isActive; setOnClickListener { dismiss(); onOpen(p) } })
+                // Overwrite replaces that profile's saved layout with the one on screen, so it asks first.
+                if (onOverwrite != null && !p.builtin) {
+                    actions.addView(Button(themed).apply { this.text = "Overwrite"; isAllCaps = false; setOnClickListener {
+                        dismiss()
+                        showChoice("Overwrite \"${p.name}\"?", listOf("Overwrite it with what is on screen")) { onOverwrite(p) }
                     } })
                 }
                 row.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_VERTICAL })
@@ -524,6 +534,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         window = root
         add(root, fullScreenFocusableParams("SidePad presets"))
     }
+
+    /** The panel's profile chooser: pick one and the pad switches to it. No overwriting from here. */
+    fun showProfilePicker(active: String, onOpen: (Preset) -> Unit) = showPresets(active, onOpen = onOpen, primaryLabel = "Use")
 
     /** A small focusable window with a text field. The only place the pad takes window focus. */
     private fun askName(defaultName: String, onOk: (String) -> Unit) {
