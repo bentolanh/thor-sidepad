@@ -21,6 +21,8 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
     var selected: Int = -1
         set(v) { field = v; invalidate(); onSelectionChanged?.invoke(v) }
     var onSelectionChanged: ((Int) -> Unit)? = null
+    /** Fired on every touch in the pad area, so the helper text can step aside while editing. */
+    var onTouched: (() -> Unit)? = null
 
     private var dragIndex = -1
     private var dragDx = 0f
@@ -72,6 +74,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        onTouched?.invoke()
         scaler.onTouchEvent(e)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {

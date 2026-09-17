@@ -376,7 +376,15 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             setBackgroundColor(0xCC0E1114.toInt())
             text = hintText
         }
-        fun fadeHint(after: Long) { hint.animate().cancel(); hint.animate().alpha(0f).setStartDelay(after).setDuration(500).start() }
+        // The helper text belongs to an idle screen: it steps aside as soon as a finger works in the
+        // pad area, and comes back once the finger has been still for a moment.
+        val showHint = Runnable { hint.animate().cancel(); hint.animate().alpha(1f).setDuration(250).start() }
+        editor.onTouched = {
+            hint.removeCallbacks(showHint)
+            hint.animate().cancel()
+            if (hint.alpha > 0f) hint.animate().alpha(0f).setDuration(150).start()
+            hint.postDelayed(showHint, 2200)
+        }
         fun refreshProfile() {
             profileValue.text = if (PresetStore.isBuiltin(active)) "$active  (built-in)" else active
         }
@@ -388,8 +396,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         /** Does the pad on screen differ from the profile it came from? */
         fun dirty(): Boolean = stored()?.toJson() != working.toJson()
         fun flash(msg: String) {
-            hint.animate().cancel(); hint.alpha = 1f; hint.text = msg
-            hint.animate().alpha(0f).setStartDelay(1600).setDuration(500).withEndAction { hint.text = hintText }.start()
+            hint.removeCallbacks(showHint); hint.animate().cancel()
+            hint.alpha = 1f; hint.text = msg
+            hint.postDelayed({ hint.text = hintText }, 1600)
         }
         /**
          * Save into the profile being edited. A built-in cannot be written to, so that one case asks
@@ -477,7 +486,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             .apply { topMargin = top.measuredHeight + gap })
         root.addView(hint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 18 })
-        fadeHint(4500)
 
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
