@@ -7,6 +7,7 @@ import android.view.View
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
+import dev.lbento.thorsidepad.inject.isMediaUnit
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
@@ -30,7 +31,11 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
         for (b in layout.buttons) {
             val r = b.size * short / 2f
             val label = Glyphs.label(b.code, layout.style)
-            if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, r, true, 0)
+            if (isMediaUnit(b.code)) {
+                val mx = b.cx * width; val my = b.cy * height
+                painter.drawMedia(c, mx - r * 1.3f, my - r * 0.55f, mx + r * 1.3f, my + r * 0.55f)
+            }
+            else if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, r, true, 0)
             else if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, r, label, true, 0f, 0f)
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, r, true)
             else if (isActionCode(b.code)) painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), false)

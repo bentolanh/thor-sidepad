@@ -10,6 +10,8 @@ import android.view.View
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
+import dev.lbento.thorsidepad.inject.isMediaUnit
+import dev.lbento.thorsidepad.inject.mediaCodeAt
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
@@ -63,6 +65,7 @@ class ShieldPadView(
     private var holdArmed = false                     // HOLD tapped: the next button latches
     private var turboArmed = false                    // TURBO tapped: the next button latches and pulses
     private val turboLatched = HashSet<Int>()         // latched indexes that are pulsing
+    private val mediaZone = HashMap<Int, Int>()       // media unit index -> the third under the finger
     private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
     private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
@@ -93,6 +96,10 @@ class ShieldPadView(
                 // A slider is a narrow bar; only the bar and a little around it count.
                 val cx = b.cx * width; val cy = b.cy * height
                 if (abs(x - cx) <= r * 0.45f && y >= cy - r && y <= cy + r * 0.7f) return i
+            } else if (isMediaUnit(b.code)) {
+                // The media unit is a wide capsule, so its hit area is that rectangle.
+                val cx = b.cx * width; val cy = b.cy * height
+                if (abs(x - cx) <= r * 1.3f && abs(y - cy) <= r * 0.55f) return i
             } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1
@@ -116,6 +123,9 @@ class ShieldPadView(
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, null, holdArmed || (pressCount[i] ?: 0) > 0)
             } else if (b.code == Action.TURBO) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, null, turboArmed || (pressCount[i] ?: 0) > 0)
+            } else if (isMediaUnit(b.code)) {
+                val mx = b.cx * width; val my = b.cy * height
+                painter.drawMedia(c, mx - r * 1.3f, my - r * 0.55f, mx + r * 1.3f, my + r * 0.55f, mediaZone[i] ?: -1)
             } else if (isActionCode(b.code)) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
             } else if (isSliderCode(b.code)) {
@@ -224,7 +234,11 @@ class ShieldPadView(
         if (n <= 0) {
             pressCount.remove(i)
             if (code == Action.HOLD) return
-            if (isActionCode(code)) { if (fireAction) onAction(code) }
+            if (isActionCode(code)) {
+                // The media unit reports which third was tapped, not the element's own code.
+                val z = mediaZone.remove(i)
+                if (fireAction) onAction(if (isMediaUnit(code) && z != null) mediaCodeAt((z + 0.5f) / 3f) else code)
+            }
             else if (!toggled && i !in latched) unfire(layout.buttons[i])
         }
     }
@@ -253,7 +267,17 @@ class ShieldPadView(
                 else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
                 else if (i >= 0 && isDpadCode(layout.buttons[i].code)) { dpadBy[pid] = i; steerDpad(i, x, y) }
                 else if (i >= 0 && isSliderCode(layout.buttons[i].code)) { sliderBy[pid] = i; slide(i, y) }
-                else { tracked.add(pid); if (i >= 0) press(i, pid, initial = true) }
+                else {
+                    tracked.add(pid)
+                    if (i >= 0) {
+                        val b = layout.buttons[i]
+                        if (isMediaUnit(b.code)) {
+                            val left = b.cx * width - b.size * short() / 2f * 1.3f
+                            mediaZone[i] = (((x - left) / (b.size * short() * 1.3f)) * 3f).toInt().coerceIn(0, 2)
+                        }
+                        press(i, pid, initial = true)
+                    }
+                }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {

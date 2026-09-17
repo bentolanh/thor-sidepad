@@ -172,6 +172,49 @@ class ButtonPainter {
      * [icon]: 0 draw [label] as text, 1 the View panes, 2 the Menu bars, 3 the Select oval,
      * 4 the Start triangle.
      */
+    private fun triR(c: Canvas, x: Float, y: Float, s: Float) {
+        c.drawPath(android.graphics.Path().apply { moveTo(x, y - s); lineTo(x + s * 0.95f, y); lineTo(x, y + s); close() }, fill)
+    }
+    private fun triL(c: Canvas, x: Float, y: Float, s: Float) {
+        c.drawPath(android.graphics.Path().apply { moveTo(x, y - s); lineTo(x - s * 0.95f, y); lineTo(x, y + s); close() }, fill)
+    }
+
+    /**
+     * The media unit: one capsule split into previous, play or pause, and next. [pressed] is the
+     * third under the finger, 0..2, or -1 for none.
+     */
+    fun drawMedia(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, pressed: Int = -1, selected: Boolean = false) {
+        val h = bottom - top; val w = right - left; val rad = h / 2f
+        fill.color = 0xAA202020.toInt()
+        c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
+        if (pressed in 0..2) {
+            val zw = w / 3f
+            fill.color = 0x772E7DFF
+            c.drawRoundRect(left + pressed * zw, top, left + (pressed + 1) * zw, bottom, rad, rad, fill)
+        }
+        ring.pathEffect = null
+        ring.strokeWidth = h * (if (selected) 0.10f else 0.055f)
+        ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
+        c.drawRoundRect(left, top, right, bottom, rad, rad, ring)
+        ring.strokeWidth = h * 0.025f; ring.color = 0x55FFFFFF
+        c.drawLine(left + w / 3f, top + h * 0.22f, left + w / 3f, bottom - h * 0.22f, ring)
+        c.drawLine(left + 2 * w / 3f, top + h * 0.22f, left + 2 * w / 3f, bottom - h * 0.22f, ring)
+
+        fill.color = Color.WHITE
+        val cy = (top + bottom) / 2f
+        val s = h * 0.20f
+        var cx = left + w / 6f                      // previous
+        c.drawRect(cx - s * 1.5f, cy - s, cx - s * 1.28f, cy + s, fill)
+        triL(c, cx - s * 0.25f, cy, s); triL(c, cx + s * 0.85f, cy, s)
+        cx = left + w / 2f                          // play or pause
+        triR(c, cx - s * 1.25f, cy, s)
+        c.drawRect(cx + s * 0.25f, cy - s, cx + s * 0.5f, cy + s, fill)
+        c.drawRect(cx + s * 0.75f, cy - s, cx + s * 1.0f, cy + s, fill)
+        cx = left + 5 * w / 6f                      // next
+        triR(c, cx - s * 1.6f, cy, s); triR(c, cx - s * 0.5f, cy, s)
+        c.drawRect(cx + s * 1.05f, cy - s, cx + s * 1.27f, cy + s, fill)
+    }
+
     fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0, icon: Int = 0, turbo: Boolean = false) {
         ring.strokeWidth = r * (if (selected) 0.14f else 0.08f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE

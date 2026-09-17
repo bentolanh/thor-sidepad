@@ -9,9 +9,11 @@ import android.view.View
 import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
+import dev.lbento.thorsidepad.inject.isMediaUnit
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
+import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -54,7 +56,11 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         var y = step; while (y < height) { c.drawLine(0f, y, width.toFloat(), y, grid); y += step }
         layout.buttons.forEachIndexed { i, b ->
             val label = Glyphs.label(b.code, layout.style)
-            if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, 0, i == selected)
+            if (isMediaUnit(b.code)) {
+                val r = b.size * short() / 2f; val mx = b.cx * width; val my = b.cy * height
+                painter.drawMedia(c, mx - r * 1.3f, my - r * 0.55f, mx + r * 1.3f, my + r * 0.55f, -1, i == selected)
+            }
+            else if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, 0, i == selected)
             else if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, i == selected)
             else if (isActionCode(b.code)) painter.drawSysButton(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, Catalog.screenTag(b.code), false, i == selected)
@@ -68,7 +74,9 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
         for (i in layout.buttons.indices.reversed()) {
             val b = layout.buttons[i]
             val r = b.size * short() / 2f
-            if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
+            if (isMediaUnit(b.code)) {
+                if (abs(x - b.cx * width) <= r * 1.3f && abs(y - b.cy * height) <= r * 0.55f) return i
+            } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1
     }

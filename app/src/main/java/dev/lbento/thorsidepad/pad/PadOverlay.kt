@@ -25,6 +25,7 @@ import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
+import dev.lbento.thorsidepad.inject.isMediaUnit
 import dev.lbento.thorsidepad.inject.isStickCode
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -319,8 +320,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             v.alpha = opacity
             // Sliders are narrow and hang their symbol and screen tag below the track; everything else is square.
-            val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else px
-            val h = if (isSliderCode(b.code)) (px * 1.2f).roundToInt() else px
+            val w = if (isSliderCode(b.code)) (px * 0.5f).roundToInt() else if (isMediaUnit(b.code)) (px * 1.3f).roundToInt() else px
+            val h = if (isSliderCode(b.code)) (px * 1.2f).roundToInt() else if (isMediaUnit(b.code)) (px * 0.55f).roundToInt() else px
             val lp = WindowManager.LayoutParams(w, h, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = Gravity.TOP or Gravity.START
             lp.x = (b.cx * width - w / 2f).roundToInt()
@@ -457,7 +458,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
         btn("Add") { showGroupedChoice("Add to the pad", Catalog.groups.map { g -> g.first to g.second.map { "${it.label}   (${it.androidName})" } }) { g, pos ->
             val code = Catalog.groups[g].second[pos].code
-            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code) || isDpadCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else 0.15f))
+            working.buttons.add(PadButton(code, 0.5f, 0.5f, if (isStickCode(code) || isDpadCode(code)) 0.28f else if (isSliderCode(code)) 0.34f else if (isMediaUnit(code)) 0.24f else 0.15f))
             editor.selected = working.buttons.size - 1
         } }
         val delete = btn("Delete") { if (editor.selected >= 0) { working.buttons.removeAt(editor.selected); editor.selected = -1 } }

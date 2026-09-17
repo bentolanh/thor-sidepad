@@ -51,10 +51,21 @@ object Action {
     const val MEDIA_PREV = -22  // whatever is playing: previous track
     const val MEDIA_PLAY = -23  // play or pause
     const val MEDIA_NEXT = -24  // next track
+    const val MEDIA = -25       // the media unit itself: one element carrying the three above
 }
 
-/** The simple media controller: keys handed to whatever is playing, whichever app that is. */
+/** The verbs the media unit sends: keys handed to whatever is playing, whichever app that is. */
 fun isMediaCode(code: Int) = code == Action.MEDIA_PREV || code == Action.MEDIA_PLAY || code == Action.MEDIA_NEXT
+
+/** The media unit is one wide element, not three buttons; a tap picks a verb by where it lands. */
+fun isMediaUnit(code: Int) = code == Action.MEDIA
+
+/** Which verb a tap at [f], measured 0..1 across the unit, means. */
+fun mediaCodeAt(f: Float) = when {
+    f < 1f / 3f -> Action.MEDIA_PREV
+    f < 2f / 3f -> Action.MEDIA_PLAY
+    else -> Action.MEDIA_NEXT
+}
 
 /** Pseudo-codes for sliders that set a device level, 0..1. */
 object Slider {
@@ -66,7 +77,7 @@ object Slider {
 }
 
 fun isStickCode(code: Int) = code == Stick.LEFT || code == Stick.RIGHT
-fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND || isMediaCode(code)
+fun isActionCode(code: Int) = code == Action.SHIELD || code == Action.HOME_TOP || code == Action.HOME_2ND || code == Action.BACK_TOP || code == Action.BACK_2ND || isMediaUnit(code)
 fun isDpadCode(code: Int) = code == Dpad.PAD
 fun isSliderCode(code: Int) = code == Slider.BRIGHT_TOP || code == Slider.BRIGHT_2ND || code == Slider.VOLUME || code == Slider.VOLUME_2ND || code == Slider.BRIGHT_BOTH
 
@@ -137,9 +148,7 @@ object Catalog {
         PadCode(Stick.RIGHT, "RS", "right stick, AXIS_Z / AXIS_RZ"),
         PadCode(Action.HOLD, "HOLD", "the next button you tap stays down until you tap it again"),
         PadCode(Action.TURBO, "TURBO", "the next button you tap repeats until you tap it again"),
-        PadCode(Action.MEDIA_PREV, "PREV", "previous track"),
-        PadCode(Action.MEDIA_PLAY, "PLAY", "play or pause"),
-        PadCode(Action.MEDIA_NEXT, "NEXT", "next track"),
+        PadCode(Action.MEDIA, "MEDIA", "one unit: previous, play or pause, next"),
         PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
         PadCode(Action.HOME_TOP, "HOME", "Home on the main screen"),
         PadCode(Action.HOME_2ND, "HOME", "Home on this screen"),
@@ -163,9 +172,11 @@ object Catalog {
         "Controller" to all.filter { (it.code > 0 && !it.isStickClick && !it.isDpad) || it.isDpadElement } +
             all.filter { it.isStick } + all.filter { it.isStickClick },
         "Macro" to all.filter { it.code == Action.HOLD || it.code == Action.TURBO },
-        "System" to all.filter { it.isAction && !isMediaCode(it.code) && it.code != Action.SHIELD } +
+        // Everything the device itself answers: its screens, what is playing, its levels, and the
+        // shield. Media sits here rather than in a page of its own until there is more of it.
+        "System" to all.filter { it.isAction && !isMediaUnit(it.code) && it.code != Action.SHIELD } +
+            all.filter { isMediaUnit(it.code) } +
             all.filter { it.isSlider } + all.filter { it.code == Action.SHIELD },
-        "Media" to all.filter { isMediaCode(it.code) },
     )
 
     /** Small tag drawn under a Home/Back/slider element: which screen it acts on. */
