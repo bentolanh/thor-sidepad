@@ -35,7 +35,7 @@ class LayoutPreviewView(ctx: Context, private val layout: PadLayout, private val
             if (isVideoUnit(b.code)) {
                 val vx = b.cx * width; val vy = b.cy * height
                 painter.drawVideo(c, vx - r * ButtonPainter.VIDEO_HALF_W, vy - r * ButtonPainter.VIDEO_HALF_H,
-                    vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H, false, 0.35f, -1, "0:00", "--:--")
+                    vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H, false, 0.35f, 0.5f, -1, "0:00", "--:--")
             }
             else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height

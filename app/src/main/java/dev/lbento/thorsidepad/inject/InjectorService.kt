@@ -118,15 +118,21 @@ class InjectorService() : IInjector.Stub() {
         } catch (t: Throwable) { Log.w(TAG, "media framework init", t) }
     }
 
-    /** The session a media key would reach: whichever is playing, else the first there is. */
+    /**
+     * The session a media key would reach, so the timeline follows the same player the transport
+     * buttons do.
+     */
     private fun session(): android.media.session.MediaController? {
         ensureMediaFramework()
         val msm = context?.getSystemService(Context.MEDIA_SESSION_SERVICE)
             as? android.media.session.MediaSessionManager ?: return null
         return try {
-            val list = msm.getActiveSessions(null)
-            list.firstOrNull { it.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING }
-                ?: list.firstOrNull()
+            // The system names the session that receives media keys; priority order in
+            // getActiveSessions does not reliably match it, which put the timeline on a
+            // different player from the transport buttons.
+            val token = msm.getMediaKeyEventSession()
+            if (token != null) android.media.session.MediaController(context!!, token)
+            else msm.getActiveSessions(null).firstOrNull()
         } catch (t: Throwable) { Log.w(TAG, "sessions", t); null }
     }
 

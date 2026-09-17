@@ -133,64 +133,119 @@ class ButtonPainter {
      * The video unit: a timeline across the top that you drag to seek, and jump back, play or
      * pause, and jump forward beneath it. [pressed] is the third under the finger, or -1.
      */
+    /** A round arrow with the seconds inside, the mark players show when you double-tap to skip. */
+    private fun drawSkipIcon(c: Canvas, cx: Float, cy: Float, rad: Float, forward: Boolean, label: String) {
+        ring.pathEffect = null; ring.strokeWidth = rad * 0.20f; ring.color = Color.WHITE
+        val box = android.graphics.RectF(cx - rad, cy - rad, cx + rad, cy + rad)
+        // Most of a circle, with the gap where the arrowhead sits.
+        if (forward) c.drawArc(box, -50f, 285f, false, ring) else c.drawArc(box, -130f, -285f, false, ring)
+        fill.color = Color.WHITE
+        val dir = if (forward) 1f else -1f
+        val hx = cx + dir * rad * 0.64f
+        val hy = cy - rad * 0.76f
+        val s = rad * 0.42f
+        c.drawPath(android.graphics.Path().apply {
+            moveTo(hx + dir * s * 0.95f, hy + s * 0.15f)
+            moveTo(hx - dir * s * 0.15f, hy - s * 0.75f)
+            lineTo(hx + dir * s * 0.95f, hy + s * 0.20f)
+            lineTo(hx - dir * s * 0.85f, hy + s * 0.45f)
+            close()
+        }, fill)
+        text.textSize = rad * 0.86f
+        text.color = Color.WHITE
+        c.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text)
+    }
+
+    /** The little speaker that marks the volume row, so it is not read as another timeline. */
+    private fun drawSpeaker(c: Canvas, cx: Float, cy: Float, s: Float) {
+        fill.color = Color.WHITE
+        c.drawRect(cx - s * 0.80f, cy - s * 0.30f, cx - s * 0.30f, cy + s * 0.30f, fill)
+        c.drawPath(android.graphics.Path().apply {
+            moveTo(cx - s * 0.30f, cy - s * 0.30f); lineTo(cx + s * 0.28f, cy - s * 0.85f)
+            lineTo(cx + s * 0.28f, cy + s * 0.85f); lineTo(cx - s * 0.30f, cy + s * 0.30f); close()
+        }, fill)
+        ring.pathEffect = null; ring.strokeWidth = s * 0.17f; ring.color = Color.WHITE
+        c.drawArc(android.graphics.RectF(cx + s * 0.10f, cy - s * 0.62f, cx + s * 0.95f, cy + s * 0.62f), -55f, 110f, false, ring)
+    }
+
+    /**
+     * The video unit: a timeline across the top that you drag to seek, the full transport beneath
+     * it, and a volume row at the bottom marked with a speaker. [pressed] is the control under the
+     * finger, 0..4, or -1.
+     */
     fun drawVideo(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, playing: Boolean,
-                  posFrac: Float, pressed: Int = -1, elapsed: String = "", total: String = "",
-                  selected: Boolean = false) {
-        val h = bottom - top; val w = right - left; val rad = h * 0.14f
+                  posFrac: Float, volume: Float = 0.5f, pressed: Int = -1, elapsed: String = "",
+                  total: String = "", selected: Boolean = false) {
+        val h = bottom - top; val w = right - left; val rad = h * 0.10f
         fill.color = 0xAA202020.toInt()
         c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
         ring.pathEffect = null
-        ring.strokeWidth = h * (if (selected) 0.055f else 0.030f)
+        ring.strokeWidth = h * (if (selected) 0.040f else 0.022f)
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         c.drawRoundRect(left, top, right, bottom, rad, rad, ring)
 
-        val splitY = top + h * 0.46f
-        val ty = top + h * 0.25f
-        val padX = w * 0.030f
-        small.textSize = h * 0.155f
+        val yTime = top + h * VIDEO_ROW_TIME
+        val yCtrl = top + h * VIDEO_ROW_CTRL
+        ring.strokeWidth = h * 0.012f; ring.color = 0x33FFFFFF
+        c.drawLine(left + w * 0.02f, yTime, right - w * 0.02f, yTime, ring)
+        c.drawLine(left + w * 0.02f, yCtrl, right - w * 0.02f, yCtrl, ring)
+
+        // timeline
+        val ty = top + h * VIDEO_ROW_TIME * 0.52f
+        val padX = w * 0.028f
+        small.textSize = h * 0.105f
         small.color = 0xFFC2CAD2.toInt()
         small.textAlign = Paint.Align.LEFT
         c.drawText(elapsed, left + padX, ty + small.textSize * 0.36f, small)
         small.textAlign = Paint.Align.RIGHT
         c.drawText(total, right - padX, ty + small.textSize * 0.36f, small)
         small.textAlign = Paint.Align.CENTER
-
-        val tl = left + padX + w * 0.115f
-        val tr = right - padX - w * 0.115f
-        val th = h * 0.065f
+        val tl = left + w * VIDEO_TRACK_L; val tr = left + w * VIDEO_TRACK_R
+        val th = h * 0.045f
         fill.color = 0x88101010.toInt()
         c.drawRoundRect(tl, ty - th / 2, tr, ty + th / 2, th / 2, th / 2, fill)
-        val f = posFrac.coerceIn(0f, 1f)
+        val pf = posFrac.coerceIn(0f, 1f)
         fill.color = 0xDD2E7DFF.toInt()
-        c.drawRoundRect(tl, ty - th / 2, tl + (tr - tl) * f, ty + th / 2, th / 2, th / 2, fill)
+        c.drawRoundRect(tl, ty - th / 2, tl + (tr - tl) * pf, ty + th / 2, th / 2, th / 2, fill)
         fill.color = Color.WHITE
-        c.drawCircle(tl + (tr - tl) * f, ty, h * 0.095f, fill)
+        c.drawCircle(tl + (tr - tl) * pf, ty, h * 0.065f, fill)
 
-        ring.strokeWidth = h * 0.018f; ring.color = 0x44FFFFFF
-        c.drawLine(left + w * 0.02f, splitY, right - w * 0.02f, splitY, ring)
-        val zw = w / 3f
-        if (pressed in 0..2) {
+        // transport: previous, back ten, play or pause, forward ten, next
+        val zw = w / 5f
+        if (pressed in 0..4) {
             fill.color = 0x772E7DFF
-            c.drawRect(left + pressed * zw, splitY + h * 0.02f, left + (pressed + 1) * zw, bottom - h * 0.03f, fill)
+            c.drawRect(left + pressed * zw, yTime + h * 0.01f, left + (pressed + 1) * zw, yCtrl - h * 0.01f, fill)
         }
-        val cy = (splitY + bottom) / 2f
-        val s = h * 0.145f
+        val cy = (yTime + yCtrl) / 2f
+        val s = h * 0.105f
         fill.color = Color.WHITE
-        small.textSize = h * 0.135f; small.color = Color.WHITE
-
-        var cx = left + zw * 0.5f                       // back ten
-        triL(c, cx + s * 0.35f, cy, s); triL(c, cx + s * 1.45f, cy, s)
-        c.drawText("10", cx - s * 1.15f, cy + small.textSize * 0.36f, small)
-
-        cx = left + zw * 1.5f                           // play or pause
+        var cx = left + zw * 0.5f                                   // previous
+        c.drawRect(cx - s * 1.25f, cy - s, cx - s * 1.05f, cy + s, fill)
+        triL(c, cx - s * 0.05f, cy, s); triL(c, cx + s * 1.05f, cy, s)
+        drawSkipIcon(c, left + zw * 1.5f, cy, s * 1.30f, false, "10")
+        cx = left + zw * 2.5f                                       // play or pause
         if (playing) {
             c.drawRect(cx - s * 0.75f, cy - s, cx - s * 0.25f, cy + s, fill)
             c.drawRect(cx + s * 0.25f, cy - s, cx + s * 0.75f, cy + s, fill)
         } else triR(c, cx - s * 0.5f, cy, s)
+        drawSkipIcon(c, left + zw * 3.5f, cy, s * 1.30f, true, "10")
+        cx = left + zw * 4.5f                                       // next
+        fill.color = Color.WHITE
+        triR(c, cx - s * 1.25f, cy, s); triR(c, cx - s * 0.15f, cy, s)
+        c.drawRect(cx + s * 1.05f, cy - s, cx + s * 1.25f, cy + s, fill)
 
-        cx = left + zw * 2.5f                           // forward ten
-        triR(c, cx - s * 1.45f, cy, s); triR(c, cx - s * 0.35f, cy, s)
-        c.drawText("10", cx + s * 1.15f, cy + small.textSize * 0.36f, small)
+        // volume, marked with a speaker so it is never taken for the timeline
+        val vy = (yCtrl + bottom) / 2f
+        drawSpeaker(c, left + w * 0.072f, vy, h * 0.095f)
+        val vl = left + w * VIDEO_VOL_L; val vr = left + w * VIDEO_VOL_R
+        val vh = h * 0.045f
+        fill.color = 0x88101010.toInt()
+        c.drawRoundRect(vl, vy - vh / 2, vr, vy + vh / 2, vh / 2, vh / 2, fill)
+        val vf = volume.coerceIn(0f, 1f)
+        fill.color = 0xDD6A8FBF.toInt()
+        c.drawRoundRect(vl, vy - vh / 2, vl + (vr - vl) * vf, vy + vh / 2, vh / 2, vh / 2, fill)
+        fill.color = Color.WHITE
+        c.drawCircle(vl + (vr - vl) * vf, vy, h * 0.062f, fill)
         small.color = 0xFFD0D6DC.toInt()
     }
 
@@ -366,12 +421,15 @@ class ButtonPainter {
 
         /** The video unit's half width and half height, as multiples of the element radius. */
         const val VIDEO_HALF_W = 2.2f
-        const val VIDEO_HALF_H = 0.75f
-        /** Where its timeline row ends and its buttons begin, as a fraction of its height. */
-        const val VIDEO_SPLIT = 0.46f
-        /** The timeline's ends, as fractions of the unit's width. */
+        const val VIDEO_HALF_H = 1.05f
+        /** The unit's three rows, as fractions of its height: timeline, buttons, volume. */
+        const val VIDEO_ROW_TIME = 0.32f
+        const val VIDEO_ROW_CTRL = 0.71f
+        /** The timeline's ends and the volume track's ends, as fractions of the unit's width. */
         const val VIDEO_TRACK_L = 0.145f
         const val VIDEO_TRACK_R = 0.855f
+        const val VIDEO_VOL_L = 0.150f
+        const val VIDEO_VOL_R = 0.940f
 
         const val MEDIA_HALF_W = 2.3f
         /** How much of the unit's width the three transport zones take; the rest is the volume track. */

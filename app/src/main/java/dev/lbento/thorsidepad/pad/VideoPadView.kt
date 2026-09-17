@@ -4,55 +4,82 @@ import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.Slider
+import kotlin.math.abs
 
 /**
- * The video unit in its own overlay window (islands mode): a timeline you drag to seek, with jump
- * back, play or pause, and jump forward beneath it.
+ * The video unit in its own overlay window (islands mode): a timeline on top, the full transport
+ * beneath it, and a volume row at the bottom. The two tracks answer a drag and ignore a tap, so a
+ * stray touch never jumps the video or the volume.
  */
 class VideoPadView(
     ctx: Context,
-    private val state: NowPlaying,
+    private val now: NowPlaying,
+    private var volume: Float,
     private val onAction: (Int) -> Unit,
     private val onSlider: (Int, Float, Boolean) -> Unit,
 ) : View(ctx) {
     private val painter = ButtonPainter()
+    private val slop = ViewConfiguration.get(ctx).scaledTouchSlop
+    private var row = -1            // 0 timeline, 1 transport, 2 volume
     private var zone = -1
-    private var scrubbing = false
+    private var downX = 0f
+    private var dragging = false
     private var scrubFrac = 0f
 
     override fun onDraw(c: Canvas) {
-        val f = if (scrubbing) scrubFrac else state.fraction
-        val shown = if (scrubbing && state.duration > 0L) (state.duration * f).toLong() else state.position
-        painter.drawVideo(c, 0f, 0f, width.toFloat(), height.toFloat(), state.playing, f, zone,
-            NowPlaying.time(shown), NowPlaying.time(state.duration))
+        val scrubbing = dragging && row == 0
+        val f = if (scrubbing) scrubFrac else now.fraction
+        val shown = if (scrubbing && now.duration > 0L) (now.duration * f).toLong() else now.position
+        painter.drawVideo(c, 0f, 0f, width.toFloat(), height.toFloat(), now.playing, f, volume, zone,
+            NowPlaying.time(shown), NowPlaying.time(now.duration))
     }
 
-    private fun fracAt(x: Float): Float {
-        val l = width * ButtonPainter.VIDEO_TRACK_L
-        val r = width * ButtonPainter.VIDEO_TRACK_R
-        return ((x - l) / (r - l)).coerceIn(0f, 1f)
-    }
+    private fun frac(x: Float, l: Float, r: Float) =
+        ((x - width * l) / (width * (r - l))).coerceIn(0f, 1f)
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
-        val onTimeline = e.y < height * ButtonPainter.VIDEO_SPLIT
+        val h = height.toFloat()
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN ->
-                if (onTimeline) { scrubbing = true; scrubFrac = fracAt(e.x); invalidate() }
-                else { zone = ((e.x / width.coerceAtLeast(1)) * 3f).toInt().coerceIn(0, 2); invalidate() }
-            MotionEvent.ACTION_MOVE -> if (scrubbing) { scrubFrac = fracAt(e.x); invalidate() }
-            MotionEvent.ACTION_UP -> {
-                if (scrubbing) {
-                    // Seek once, on release: seeking on every move would stutter the player.
-                    onSlider(Slider.VIDEO_SEEK, fracAt(e.x), true)
-                    scrubbing = false
-                } else if (zone >= 0) {
-                    onAction(when (zone) { 0 -> Action.VIDEO_BACK; 1 -> Action.MEDIA_PLAY; else -> Action.VIDEO_FWD })
+            MotionEvent.ACTION_DOWN -> {
+                downX = e.x; dragging = false
+                row = when {
+                    e.y < h * ButtonPainter.VIDEO_ROW_TIME -> 0
+                    e.y < h * ButtonPainter.VIDEO_ROW_CTRL -> 1
+                    else -> 2
                 }
-                zone = -1; invalidate()
+                if (row == 1) zone = ((e.x / width.coerceAtLeast(1)) * 5f).toInt().coerceIn(0, 4)
+                invalidate()
             }
-            MotionEvent.ACTION_CANCEL -> { scrubbing = false; zone = -1; invalidate() }
+            MotionEvent.ACTION_MOVE -> if (row == 0 || row == 2) {
+                if (!dragging && abs(e.x - downX) > slop) dragging = true
+                if (dragging) {
+                    if (row == 0) scrubFrac = frac(e.x, ButtonPainter.VIDEO_TRACK_L, ButtonPainter.VIDEO_TRACK_R)
+                    else {
+                        volume = frac(e.x, ButtonPainter.VIDEO_VOL_L, ButtonPainter.VIDEO_VOL_R)
+                        onSlider(Slider.VOLUME_MEDIA, volume, false)
+                    }
+                    invalidate()
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                when {
+                    row == 1 && zone >= 0 -> onAction(when (zone) {
+                        0 -> Action.MEDIA_PREV
+                        1 -> Action.VIDEO_BACK
+                        2 -> Action.MEDIA_PLAY
+                        3 -> Action.VIDEO_FWD
+                        else -> Action.MEDIA_NEXT
+                    })
+                    // Seek once, on release: seeking on every move would stutter the player.
+                    row == 0 && dragging -> onSlider(Slider.VIDEO_SEEK, scrubFrac, true)
+                    row == 2 && dragging -> onSlider(Slider.VOLUME_MEDIA, volume, true)
+                }
+                row = -1; zone = -1; dragging = false; invalidate()
+            }
+            MotionEvent.ACTION_CANCEL -> { row = -1; zone = -1; dragging = false; invalidate() }
         }
         return true
     }

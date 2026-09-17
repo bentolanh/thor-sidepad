@@ -72,6 +72,9 @@ class ShieldPadView(
     private val videoZone = HashMap<Int, Int>()       // video unit index -> the third under the finger
     private val videoDrag = HashMap<Int, Int>()       // pointerId -> video unit whose timeline it is dragging
     private val videoScrub = HashMap<Int, Float>()    // video unit index -> the position being dragged to
+    private val videoRow = HashMap<Int, Int>()        // pointerId -> 0 timeline, 2 volume
+    private val videoDownX = HashMap<Int, Float>()    // pointerId -> where the drag began
+    private val videoMoved = HashSet<Int>()           // pointers that have moved far enough to count
     private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
     private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
@@ -139,7 +142,8 @@ class ShieldPadView(
                 val shown = if (scrub != null && video.duration > 0L) (video.duration * f).toLong() else video.position
                 painter.drawVideo(c, vx - r * ButtonPainter.VIDEO_HALF_W, vy - r * ButtonPainter.VIDEO_HALF_H,
                     vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H,
-                    video.playing, f, videoZone[i] ?: -1, NowPlaying.time(shown), NowPlaying.time(video.duration))
+                    video.playing, f, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] ?: 0.5f,
+                    videoZone[i] ?: -1, NowPlaying.time(shown), NowPlaying.time(video.duration))
             } else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
@@ -169,6 +173,21 @@ class ShieldPadView(
         if (len > 1f) { dx /= len; dy /= len }
         knob[i] = floatArrayOf(dx, dy)
         engine.stick(b.code, dx, dy)
+    }
+
+    private val touchSlop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop
+
+    /** The video unit's volume row moves the same audio the media unit's track does. */
+    private fun videoVolume(i: Int, x: Float, final: Boolean) {
+        val b = layout.buttons[i]
+        val r = b.size * short() / 2f
+        val left = b.cx * width - r * ButtonPainter.VIDEO_HALF_W
+        val w = 2f * r * ButtonPainter.VIDEO_HALF_W
+        val vl = left + w * ButtonPainter.VIDEO_VOL_L
+        val vr = left + w * ButtonPainter.VIDEO_VOL_R
+        val lv = ((x - vl) / (vr - vl)).coerceIn(0f, 1f)
+        levels[dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA] = lv
+        onSlider(dev.lbento.thorsidepad.inject.Slider.VOLUME_MEDIA, lv, final)
     }
 
     /** Where along a video unit's timeline a touch sits, 0..1. */
@@ -285,7 +304,11 @@ class ShieldPadView(
                 val fired = when {
                     isMediaUnit(code) && z != null -> mediaCodeAt((z + 0.5f) / 3f)
                     isVideoUnit(code) && vz != null -> when (vz) {
-                        0 -> Action.VIDEO_BACK; 1 -> Action.MEDIA_PLAY; else -> Action.VIDEO_FWD
+                        0 -> Action.MEDIA_PREV
+                        1 -> Action.VIDEO_BACK
+                        2 -> Action.MEDIA_PLAY
+                        3 -> Action.VIDEO_FWD
+                        else -> Action.MEDIA_NEXT
                     }
                     else -> code
                 }
@@ -327,12 +350,20 @@ class ShieldPadView(
                             val r = b.size * short() / 2f
                             val top = b.cy * height - r * ButtonPainter.VIDEO_HALF_H
                             val h = 2f * r * ButtonPainter.VIDEO_HALF_H
-                            if (y - top < h * ButtonPainter.VIDEO_SPLIT) {
-                                tracked.remove(pid); videoDrag[pid] = i; videoScrub[i] = videoFrac(i, x)
-                            } else {
-                                val left = b.cx * width - r * ButtonPainter.VIDEO_HALF_W
-                                videoZone[i] = (((x - left) / (2f * r * ButtonPainter.VIDEO_HALF_W)) * 3f).toInt().coerceIn(0, 2)
-                                press(i, pid, initial = true)
+                            val ry = (y - top) / h
+                            val left = b.cx * width - r * ButtonPainter.VIDEO_HALF_W
+                            val w = 2f * r * ButtonPainter.VIDEO_HALF_W
+                            when {
+                                ry < ButtonPainter.VIDEO_ROW_TIME -> {
+                                    tracked.remove(pid); videoDrag[pid] = i; videoRow[pid] = 0; videoDownX[pid] = x
+                                }
+                                ry < ButtonPainter.VIDEO_ROW_CTRL -> {
+                                    videoZone[i] = (((x - left) / w) * 5f).toInt().coerceIn(0, 4)
+                                    press(i, pid, initial = true)
+                                }
+                                else -> {
+                                    tracked.remove(pid); videoDrag[pid] = i; videoRow[pid] = 2; videoDownX[pid] = x
+                                }
                             }
                             invalidate()
                             return true
@@ -358,7 +389,16 @@ class ShieldPadView(
                     dpadBy[pid]?.let { di -> steerDpad(di, e.getX(idx), e.getY(idx)); invalidate() }
                     sliderBy[pid]?.let { si -> slide(si, e.getY(idx)); invalidate() }
                     mediaDrag[pid]?.let { mi -> mediaSlide(mi, e.getX(idx), false); invalidate() }
-                    videoDrag[pid]?.let { vi -> videoScrub[vi] = videoFrac(vi, e.getX(idx)); invalidate() }
+                    videoDrag[pid]?.let { vi ->
+                        // Both tracks answer a drag and ignore a tap, so a stray touch changes nothing.
+                        val x0 = videoDownX[pid] ?: e.getX(idx)
+                        if (pid !in videoMoved && abs(e.getX(idx) - x0) > touchSlop) videoMoved.add(pid)
+                        if (pid in videoMoved) {
+                            if (videoRow[pid] == 0) videoScrub[vi] = videoFrac(vi, e.getX(idx))
+                            else videoVolume(vi, e.getX(idx), false)
+                            invalidate()
+                        }
+                    }
                     swipes[pid]?.let { s -> if (s.edge == EdgeGesture.PULL_DOWN) onPullDown?.onPullMove(e.getY(idx) - s.y0) }
                 }
                 // A finger keeps being tracked while it crosses gaps, so it can slide A -> B.
@@ -378,9 +418,12 @@ class ShieldPadView(
                 releaseDpad(pid)
                 mediaDrag.remove(pid)?.let { mi -> mediaSlide(mi, e.getX(idx), true) }
                 videoDrag.remove(pid)?.let { vi ->
-                    // Seek once, on release: seeking on every move would stutter the player.
-                    onSlider(dev.lbento.thorsidepad.inject.Slider.VIDEO_SEEK, videoFrac(vi, e.getX(idx)), true)
-                    videoScrub.remove(vi)
+                    if (pid in videoMoved) {
+                        // Seek once, on release: seeking on every move would stutter the player.
+                        if (videoRow[pid] == 0) onSlider(dev.lbento.thorsidepad.inject.Slider.VIDEO_SEEK, videoFrac(vi, e.getX(idx)), true)
+                        else videoVolume(vi, e.getX(idx), true)
+                    }
+                    videoScrub.remove(vi); videoRow.remove(pid); videoDownX.remove(pid); videoMoved.remove(pid)
                 }
                 endSlide(pid)
                 tracked.remove(pid)
@@ -404,6 +447,7 @@ class ShieldPadView(
                 dpadBy.keys.toList().forEach { releaseDpad(it) }
                 sliderBy.keys.toList().forEach { endSlide(it) }
                 mediaDrag.clear(); videoDrag.clear(); videoScrub.clear()
+                videoRow.clear(); videoDownX.clear(); videoMoved.clear()
                 tracked.clear()
                 swipes.clear()
                 invalidate()

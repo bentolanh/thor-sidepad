@@ -61,7 +61,7 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
                 val r = b.size * short() / 2f; val vx = b.cx * width; val vy = b.cy * height
                 painter.drawVideo(c, vx - r * ButtonPainter.VIDEO_HALF_W, vy - r * ButtonPainter.VIDEO_HALF_H,
                     vx + r * ButtonPainter.VIDEO_HALF_W, vy + r * ButtonPainter.VIDEO_HALF_H,
-                    false, 0.35f, -1, "0:00", "--:--", i == selected)
+                    false, 0.35f, 0.5f, -1, "0:00", "--:--", i == selected)
             }
             else if (isMediaUnit(b.code)) {
                 val r = b.size * short() / 2f; val mx = b.cx * width; val my = b.cy * height

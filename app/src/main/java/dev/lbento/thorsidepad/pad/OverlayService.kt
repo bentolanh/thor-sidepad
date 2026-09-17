@@ -268,10 +268,17 @@ class OverlayService : Service() {
             ov.onFocusReturn = { returnFocusToTopScreen() }
         }
 
-    /** Starts the invisible hand-off activity on the top screen through the shell user (a plain start would be a blocked background launch). */
+    /**
+     * Starts the invisible hand-off activity on the top screen through the shell user (a plain
+     * start would be a blocked background launch). NO_USER_ACTION matters: without it a player
+     * like YouTube treats the launch as the user leaving and drops into picture-in-picture.
+     */
     private fun returnFocusToTopScreen() {
         val svc = Injector.current() ?: return
-        Thread { try { svc.shell("am start --display 0 -n $packageName/.FocusHandoffActivity") } catch (e: Exception) { Log.w(TAG, "focus handoff failed", e) } }.start()
+        Thread {
+            try { svc.shell("am start -f 0x10050000 --display 0 -n $packageName/.FocusHandoffActivity") }
+            catch (e: Exception) { Log.w(TAG, "focus handoff failed", e) }
+        }.start()
     }
 
     /** Keeps the edge strips on the pad's screen whenever the shield is not covering it. */
@@ -580,7 +587,7 @@ class OverlayService : Service() {
                     ov.removePanel(); padDirty = false; show(); panelClosed()
                 }
             }
-            override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
+            override fun editLayout() { ov.removePanel(returnFocus = false); padDirty = false; edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
@@ -603,7 +610,7 @@ class OverlayService : Service() {
         withInjector {
             try {
                 val ov = overlayOrCreate()
-                ov.removePanel()
+                ov.removePanel(returnFocus = false)   // the editor takes focus itself in a moment
                 ov.showEdit(PadLayout.fromJson(prefs.layoutJson), prefs.activePreset,
                     onSaved = { l, name -> prefs.layoutJson = l.toJson(); prefs.activePreset = name; show() },
                     onCancel = { show() })
