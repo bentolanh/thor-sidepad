@@ -19,9 +19,8 @@ class SliderView(ctx: Context, val code: Int, private var level: Float, private 
     }
 
     private fun slide(y: Float) {
-        val r = width.toFloat(); val cy = r
-        val top = cy - r * 0.9f; val bottom = cy + r * 0.55f
-        level = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
+        val r = width.toFloat()
+        level = ButtonPainter.levelAt(r, r, y)
         onSlider(code, level, false); invalidate()
     }
 

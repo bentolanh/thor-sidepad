@@ -66,6 +66,7 @@ class ShieldPadView(
     private var turboArmed = false                    // TURBO tapped: the next button latches and pulses
     private val turboLatched = HashSet<Int>()         // latched indexes that are pulsing
     private val mediaZone = HashMap<Int, Int>()       // media unit index -> the third under the finger
+    private val mediaDrag = HashMap<Int, Int>()       // pointerId -> media unit whose track it is dragging
     private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
     private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
@@ -126,7 +127,8 @@ class ShieldPadView(
             } else if (isMediaUnit(b.code)) {
                 val mx = b.cx * width; val my = b.cy * height
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
-                    mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, mediaZone[i] ?: -1)
+                    mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, mediaZone[i] ?: -1,
+                    false, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] ?: 0.5f)
             } else if (isActionCode(b.code)) {
                 painter.drawSysButton(c, b.cx * width, b.cy * height, r, label, Catalog.screenTag(b.code), (pressCount[i] ?: 0) > 0)
             } else if (isSliderCode(b.code)) {
@@ -153,11 +155,25 @@ class ShieldPadView(
         engine.stick(b.code, dx, dy)
     }
 
+    /** Where along the media unit a touch sits, 0..1 across its width. */
+    private fun mediaFrac(i: Int, x: Float): Float {
+        val b = layout.buttons[i]
+        val r = b.size * short() / 2f
+        val left = b.cx * width - r * ButtonPainter.MEDIA_HALF_W
+        return ((x - left) / (2f * r * ButtonPainter.MEDIA_HALF_W)).coerceIn(0f, 1f)
+    }
+
+    private fun mediaSlide(i: Int, x: Float, final: Boolean) {
+        val f = mediaFrac(i, x)
+        val lv = ((f - ButtonPainter.MEDIA_BUTTONS_FRAC) / (1f - ButtonPainter.MEDIA_BUTTONS_FRAC)).coerceIn(0f, 1f)
+        levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] = lv
+        onSlider(dev.lbento.thorsidepad.inject.Slider.VOLUME, lv, final)
+    }
+
     private fun slide(i: Int, y: Float) {
         val b = layout.buttons[i]
         val r = b.size * short() / 2f
-        val top = b.cy * height - r * 0.9f; val bottom = b.cy * height + r * 0.55f
-        val lv = ((bottom - y) / (bottom - top)).coerceIn(0f, 1f)
+        val lv = ButtonPainter.levelAt(b.cy * height, r, y)
         levels[b.code] = lv
         onSlider(b.code, lv, false)
     }
@@ -272,12 +288,16 @@ class ShieldPadView(
                     tracked.add(pid)
                     if (i >= 0) {
                         val b = layout.buttons[i]
-                        if (isMediaUnit(b.code)) {
-                            val mr = b.size * short() / 2f
-                            val left = b.cx * width - mr * ButtonPainter.MEDIA_HALF_W
-                            mediaZone[i] = (((x - left) / (2f * mr * ButtonPainter.MEDIA_HALF_W)) * 3f).toInt().coerceIn(0, 2)
+                        val f = if (isMediaUnit(b.code)) mediaFrac(i, x) else 0f
+                        if (isMediaUnit(b.code) && f >= ButtonPainter.MEDIA_BUTTONS_FRAC) {
+                            // The track half of the media unit drags like a slider.
+                            tracked.remove(pid); mediaDrag[pid] = i; mediaSlide(i, x, false)
+                        } else {
+                            if (isMediaUnit(b.code)) {
+                                mediaZone[i] = (f / ButtonPainter.MEDIA_BUTTONS_FRAC * 3f).toInt().coerceIn(0, 2)
+                            }
+                            press(i, pid, initial = true)
                         }
-                        press(i, pid, initial = true)
                     }
                 }
                 invalidate()
@@ -288,6 +308,7 @@ class ShieldPadView(
                     stickBy[pid]?.let { si -> steer(si, e.getX(idx), e.getY(idx)); invalidate() }
                     dpadBy[pid]?.let { di -> steerDpad(di, e.getX(idx), e.getY(idx)); invalidate() }
                     sliderBy[pid]?.let { si -> slide(si, e.getY(idx)); invalidate() }
+                    mediaDrag[pid]?.let { mi -> mediaSlide(mi, e.getX(idx), false); invalidate() }
                     swipes[pid]?.let { s -> if (s.edge == EdgeGesture.PULL_DOWN) onPullDown?.onPullMove(e.getY(idx) - s.y0) }
                 }
                 // A finger keeps being tracked while it crosses gaps, so it can slide A -> B.
@@ -305,6 +326,7 @@ class ShieldPadView(
                 release(pid, fireAction = pressedBy[pid]?.let { it == hit(e.getX(idx), e.getY(idx)) } == true)
                 releaseStick(pid)
                 releaseDpad(pid)
+                mediaDrag.remove(pid)?.let { mi -> mediaSlide(mi, e.getX(idx), true) }
                 endSlide(pid)
                 tracked.remove(pid)
                 swipes.remove(pid)?.let { s ->
@@ -326,6 +348,7 @@ class ShieldPadView(
                 stickBy.keys.toList().forEach { releaseStick(it) }
                 dpadBy.keys.toList().forEach { releaseDpad(it) }
                 sliderBy.keys.toList().forEach { endSlide(it) }
+                mediaDrag.clear()
                 tracked.clear()
                 swipes.clear()
                 invalidate()

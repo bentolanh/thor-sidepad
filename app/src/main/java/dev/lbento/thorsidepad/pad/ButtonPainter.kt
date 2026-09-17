@@ -60,18 +60,20 @@ class ButtonPainter {
      * [level] (0..1), a knob, the symbol at the bottom and the screen tag under it.
      */
     fun drawSlider(c: Canvas, cx: Float, cy: Float, r: Float, symbol: String, tag: String?, level: Float, active: Boolean, selected: Boolean = false) {
-        val top = cy - r * 0.9f; val bottom = cy + r * 0.55f
-        val w = r * 0.34f
+        val top = cy - r * SLIDER_TOP; val bottom = cy + r * SLIDER_BOTTOM
+        val w = r * SLIDER_W
         fill.color = 0xAA202020.toInt()
         c.drawRoundRect(cx - w / 2, top, cx + w / 2, bottom, w / 2, w / 2, fill)
         val lv = level.coerceIn(0f, 1f)
-        val ky = bottom - (bottom - top) * lv
+        // The knob travels between insets so it never hangs off either end of the track.
+        val (kTop, kBottom) = sliderTravel(cy, r)
+        val ky = kBottom - (kBottom - kTop) * lv
         fill.color = if (active) 0xDD2E7DFF.toInt() else 0xAA6A8FBF.toInt()
         c.drawRoundRect(cx - w / 2, ky, cx + w / 2, bottom, w / 2, w / 2, fill)
         ring.pathEffect = null; ring.strokeWidth = r * (if (selected) 0.1f else 0.06f); ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         c.drawRoundRect(cx - w / 2, top, cx + w / 2, bottom, w / 2, w / 2, ring)
         fill.color = Color.WHITE
-        c.drawCircle(cx, ky, w * 0.62f, fill)
+        c.drawCircle(cx, ky, w * SLIDER_KNOB, fill)
         text.textSize = r * 0.42f
         c.drawText(symbol, cx, bottom + r * 0.42f, text)
         if (tag != null) { small.textSize = r * 0.26f; c.drawText(tag, cx, bottom + r * 0.7f, small) }
@@ -183,12 +185,14 @@ class ButtonPainter {
      * The media unit: one capsule split into previous, play or pause, and next. [pressed] is the
      * third under the finger, 0..2, or -1 for none.
      */
-    fun drawMedia(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, pressed: Int = -1, selected: Boolean = false) {
+    fun drawMedia(c: Canvas, left: Float, top: Float, right: Float, bottom: Float, pressed: Int = -1,
+                  selected: Boolean = false, level: Float = 0.6f) {
         val h = bottom - top; val w = right - left; val rad = h * 0.30f
+        val split = left + w * MEDIA_BUTTONS_FRAC
+        val zw = (split - left) / 3f
         fill.color = 0xAA202020.toInt()
         c.drawRoundRect(left, top, right, bottom, rad, rad, fill)
         if (pressed in 0..2) {
-            val zw = w / 3f
             fill.color = 0x772E7DFF
             c.drawRoundRect(left + pressed * zw, top, left + (pressed + 1) * zw, bottom, rad, rad, fill)
         }
@@ -197,22 +201,34 @@ class ButtonPainter {
         ring.color = if (selected) 0xFFFFC107.toInt() else Color.WHITE
         c.drawRoundRect(left, top, right, bottom, rad, rad, ring)
         ring.strokeWidth = h * 0.025f; ring.color = 0x55FFFFFF
-        c.drawLine(left + w / 3f, top + h * 0.22f, left + w / 3f, bottom - h * 0.22f, ring)
-        c.drawLine(left + 2 * w / 3f, top + h * 0.22f, left + 2 * w / 3f, bottom - h * 0.22f, ring)
+        c.drawLine(left + zw, top + h * 0.22f, left + zw, bottom - h * 0.22f, ring)
+        c.drawLine(left + 2 * zw, top + h * 0.22f, left + 2 * zw, bottom - h * 0.22f, ring)
+        c.drawLine(split, top + h * 0.16f, split, bottom - h * 0.16f, ring)
 
         fill.color = Color.WHITE
         val cy = (top + bottom) / 2f
         val s = h * 0.30f
-        var cx = left + w / 6f                      // previous
+        var cx = left + zw * 0.5f                   // previous
         c.drawRect(cx - s * 1.5f, cy - s, cx - s * 1.28f, cy + s, fill)
         triL(c, cx - s * 0.25f, cy, s); triL(c, cx + s * 0.85f, cy, s)
-        cx = left + w / 2f                          // play or pause
+        cx = left + zw * 1.5f                       // play or pause
         triR(c, cx - s * 1.25f, cy, s)
         c.drawRect(cx + s * 0.25f, cy - s, cx + s * 0.5f, cy + s, fill)
         c.drawRect(cx + s * 0.75f, cy - s, cx + s * 1.0f, cy + s, fill)
-        cx = left + 5 * w / 6f                      // next
+        cx = left + zw * 2.5f                       // next
         triR(c, cx - s * 1.6f, cy, s); triR(c, cx - s * 0.5f, cy, s)
         c.drawRect(cx + s * 1.05f, cy - s, cx + s * 1.27f, cy + s, fill)
+
+        // The volume track: the media stream, which is the volume of whatever is playing.
+        val tl = split + w * 0.035f; val tr = right - w * 0.030f
+        val th = h * 0.20f
+        fill.color = 0x88101010.toInt()
+        c.drawRoundRect(tl, cy - th / 2, tr, cy + th / 2, th / 2, th / 2, fill)
+        val lv = level.coerceIn(0f, 1f)
+        fill.color = 0xDD2E7DFF.toInt()
+        c.drawRoundRect(tl, cy - th / 2, tl + (tr - tl) * lv, cy + th / 2, th / 2, th / 2, fill)
+        fill.color = Color.WHITE
+        c.drawCircle(tl + (tr - tl) * lv, cy, h * 0.21f, fill)
     }
 
     fun draw(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, down: Boolean, selected: Boolean = false, labelColor: Int = Color.WHITE, mark: Int = 0, icon: Int = 0, turbo: Boolean = false) {
@@ -264,7 +280,27 @@ class ButtonPainter {
 
     companion object {
         /** The media unit's half width and half height, as multiples of the element radius: a slim bar. */
-        const val MEDIA_HALF_W = 1.5f
+        /** A slider's track, as multiples of the element radius, and its knob within that track. */
+        const val SLIDER_TOP = 0.9f
+        const val SLIDER_BOTTOM = 0.55f
+        const val SLIDER_W = 0.34f
+        const val SLIDER_KNOB = 0.62f
+
+        /** Where the knob's centre may sit: the track inset by the knob's own radius. */
+        fun sliderTravel(cy: Float, r: Float): Pair<Float, Float> {
+            val kr = r * SLIDER_W * SLIDER_KNOB
+            return Pair(cy - r * SLIDER_TOP + kr, cy + r * SLIDER_BOTTOM - kr)
+        }
+
+        /** The level a touch at [y] means, matching where the knob is drawn. */
+        fun levelAt(cy: Float, r: Float, y: Float): Float {
+            val (t, b) = sliderTravel(cy, r)
+            return ((b - y) / (b - t)).coerceIn(0f, 1f)
+        }
+
+        const val MEDIA_HALF_W = 2.3f
+        /** How much of the unit's width the three transport zones take; the rest is the volume track. */
+        const val MEDIA_BUTTONS_FRAC = 0.58f
         const val MEDIA_HALF_H = 0.36f
     }
 }

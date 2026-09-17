@@ -75,7 +75,8 @@ Everything happens on the bottom screen.
   TURBO elements: tap one, then tap any button, and that button holds or repeats hands-free
   until you tap it again.
 - **Simple media controller.** System holds a media unit: one bar with previous, play or pause,
-  and next, whichever third you tap. It reaches whatever is playing, whichever app that is. Or add a HOLD button to the pad: tap HOLD, then any
+  and next, plus a volume track. It reaches whatever is playing, whichever app that is, and the
+  track moves that same audio. Or add a HOLD button to the pad: tap HOLD, then any
   button, and that button stays down until you tap it again. A held button shows a yellow
   dot. Hiding or stopping the pad releases everything.
 - **Glyphs per preset.** The editor's Glyphs button labels the buttons the Xbox, PlayStation

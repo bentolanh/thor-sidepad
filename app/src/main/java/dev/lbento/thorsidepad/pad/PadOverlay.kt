@@ -314,6 +314,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 b.code == Action.HOLD || b.code == Action.TURBO ->
                     PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
+                isMediaUnit(b.code) -> MediaPadView(ctx, levels[dev.lbento.thorsidepad.inject.Slider.VOLUME] ?: 0.5f,
+                    { code -> onAction(code) }, onSlider)
                 isActionCode(b.code) -> PadButtonView(ctx, b.code, true, {}, { code -> onAction(code) })
                 else -> PadButtonView(ctx, b.code, enabled, engine::press, engine::release, layout.style, b.sticky, session,
                     b.turbo, engine::startTurbo, engine::stopTurbo)
