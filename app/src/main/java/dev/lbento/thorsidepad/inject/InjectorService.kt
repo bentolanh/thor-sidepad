@@ -48,6 +48,7 @@ class InjectorService() : IInjector.Stub() {
             val m = setTempBrightnessM ?: dm.javaClass.getMethod("setTemporaryBrightness", Int::class.javaPrimitiveType, Float::class.javaPrimitiveType).also { setTempBrightnessM = it }
             m.invoke(dm, displayId, level.coerceIn(0f, 1f))
         } catch (e: NoSuchMethodException) {
+            Log.w(TAG, "setTemporaryBrightness missing on this firmware; using setBrightness")
             tempMissing = true; setBrightness(displayId, level)
         } catch (e: Throwable) { Log.w(TAG, "setBrightnessLive", e) }
     }

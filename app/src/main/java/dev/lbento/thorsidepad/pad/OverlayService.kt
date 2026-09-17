@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 import dev.lbento.thorsidepad.MainActivity
@@ -338,23 +339,33 @@ class OverlayService : Service() {
     private val levelThread by lazy { HandlerThread("sidepad-levels").apply { start() } }
     private val levelHandler by lazy { Handler(levelThread.looper) }
     private val pendingLevel = HashMap<Int, Pair<Float, Boolean>>()   // code -> (level, final)
+    private val levelJobQueued = HashSet<Int>()
+    private val lastApplied = HashMap<Int, Long>()
 
     private fun onSlider(code: Int, level: Float, final: Boolean) {
+        val delay: Long
         synchronized(pendingLevel) {
             val had = pendingLevel[code]
             pendingLevel[code] = level to (final || had?.second == true)
-            if (had != null) return      // a job is already queued; it will pick up this newer value
+            if (code in levelJobQueued) return      // a job is queued; it will send this newer value
+            levelJobQueued.add(code)
+            // The display service takes a while per change; feeding it faster than this only builds a backlog.
+            val since = SystemClock.uptimeMillis() - (lastApplied[code] ?: 0L)
+            delay = if (final) 0L else (LEVEL_INTERVAL_MS - since).coerceIn(0L, LEVEL_INTERVAL_MS)
         }
-        levelHandler.post {
-            val (lv, fin) = synchronized(pendingLevel) { pendingLevel.remove(code) } ?: return@post
-            applyLevel(code, lv, fin)
-        }
+        levelHandler.postDelayed({
+            val job = synchronized(pendingLevel) { levelJobQueued.remove(code); pendingLevel.remove(code) } ?: return@postDelayed
+            synchronized(pendingLevel) { lastApplied[code] = SystemClock.uptimeMillis() }
+            applyLevel(code, job.first, job.second)
+        }, delay)
     }
 
     private fun applyLevel(code: Int, level: Float, final: Boolean) {
         val svc = Injector.current() ?: return
         val second = overlay?.displayId ?: 0
-        fun bright(display: Int) = if (final) svc.setBrightness(display, level) else svc.setBrightnessLive(display, level)
+        // setTemporaryBrightness exists on the Thor but never reaches its display controller and
+        // stalls the real change for seconds, so every update is a plain setBrightness.
+        fun bright(display: Int) = svc.setBrightness(display, level)
         try {
             when (code) {
                 dev.lbento.thorsidepad.inject.Slider.VOLUME -> svc.setVolume(level)
@@ -542,6 +553,7 @@ class OverlayService : Service() {
 
     companion object {
         private const val TAG = "SidePadService"
+        private const val LEVEL_INTERVAL_MS = 60L
         private const val CHANNEL = "sidepad"
         private const val NOTIF_ID = 1
 
