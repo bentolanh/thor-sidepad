@@ -138,9 +138,19 @@ class OverlayService : Service() {
         } catch (e: Exception) { Log.w(TAG, "reopen failed", e) }
     }
 
+    /** Machines the Thor is paired with, computers first since those are what this is for. */
+    private fun pairedHosts(): List<HostChoice> = try {
+        val a = getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
+        (a?.bondedDevices ?: emptySet())
+            .filter { it.bluetoothClass?.majorDeviceClass == android.bluetooth.BluetoothClass.Device.Major.COMPUTER }
+            .map { HostChoice(it.address, it.name ?: it.address) }
+    } catch (e: Exception) { emptyList() }
+
     private fun panelState(ov: PadOverlay) = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
         targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL,
-        shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset)
+        shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset,
+        remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
+        hostAddress = prefs.btHost, hostConnected = btSink?.connected == true)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {
@@ -204,12 +214,6 @@ class OverlayService : Service() {
             ACTION_STOP -> { userStopped = true; disarmKeepAlive(); hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
             ACTION_FOCUS_TOP -> returnFocusToTopScreen()
-            // Development only, until the panel carries a Send-to row: flip the destination.
-            ACTION_DEST -> {
-                prefs.targetMode = if (prefs.targetMode == Prefs.MODE_BT) Prefs.MODE_PHYSICAL else Prefs.MODE_BT
-                Log.i(TAG, "destination is now ${prefs.targetMode}")
-                if (visible) { hide(); show() }
-            }
             ACTION_PROBE_BT -> dev.lbento.thorsidepad.inject.BtHidProbe.start(this)
             ACTION_PROBE_BT_SEND -> dev.lbento.thorsidepad.inject.BtHidProbe.press()
             ACTION_PROBE -> Injector.current()?.let { svc ->
@@ -714,6 +718,20 @@ class OverlayService : Service() {
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
+            override fun setDestination(address: String) {
+                prefs.targetMode = if (address.isEmpty()) Prefs.MODE_PHYSICAL else Prefs.MODE_BT
+                prefs.btHost = address
+                ControlPanel.page = ControlPanel.Page.MAIN
+                if (visible) { hide(); show() }
+                ov.updatePanel(panelState(ov))
+            }
+
+            /** Pairing is Android's own dialog; there is no way to do it from inside an overlay. */
+            override fun pairMachine() {
+                ov.removePanel()
+                shellAsync("am start --display ${ov.displayId} -a android.settings.BLUETOOTH_SETTINGS")
+            }
+
             override fun stopService() {
                 ov.removePanel(); padDirty = false
                 userStopped = true; disarmKeepAlive(); hide(); stopSelf()
@@ -817,7 +835,6 @@ class OverlayService : Service() {
         /** Development only: see IInjector.probePointer. */
         const val ACTION_PROBE = "dev.lbento.thorsidepad.PROBE"
         /** Development only: see BtHidProbe. */
-        const val ACTION_DEST = "dev.lbento.thorsidepad.DEST"
         const val ACTION_PROBE_BT = "dev.lbento.thorsidepad.PROBE_BT"
         const val ACTION_PROBE_BT_SEND = "dev.lbento.thorsidepad.PROBE_BT_SEND"
 

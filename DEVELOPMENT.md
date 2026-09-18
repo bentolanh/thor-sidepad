@@ -263,7 +263,11 @@ the app.
   entirely for a Bluetooth destination since there is nothing there to reopen.
 
   Verified against a Mac: tapping A, Y and B on the pad arrived as buttons 1, 5 and 2, down and up.
-  `DEST` flips the destination until the panel carries a row for it. Development only.
+  The panel asks the two questions separately, because adding a machine split them. **Send to** is
+  where presses go, this device or a paired machine; **Appears as** is what the receiver thinks they
+  come from, which locally means the Thor's own controller or a separate virtual pad and remotely
+  has one answer for now. That row stays visible when remote rather than being hidden, because the
+  next answer in it is an Xbox-shaped identity chosen so that Mac games accept it.
 
 ## Layout
 

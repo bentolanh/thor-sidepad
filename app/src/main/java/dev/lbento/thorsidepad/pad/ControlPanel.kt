@@ -19,6 +19,9 @@ data class TargetChoice(val name: String, val path: String) {
     val label: String get() = thorLabel(name) ?: name
 }
 
+/** A machine the Thor is paired with, that presses can be sent to instead of into this device. */
+data class HostChoice(val address: String, val label: String)
+
 /**
  * The Thor's built-in controller reports one of two names depending on the Control Center's
  * "Handle Style". Both mean the same physical pad, so both are shown as "Thor controller".
@@ -36,6 +39,11 @@ data class PanelState(
     val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean,
     val shizukuReady: Boolean = true,
     val activeProfile: String = "",
+    /** Where presses go: this device, or one of [hosts]. */
+    val remote: Boolean = false,
+    val hosts: List<HostChoice> = emptyList(),
+    val hostAddress: String = "",
+    val hostConnected: Boolean = false,
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -46,6 +54,9 @@ interface PanelActions {
     fun setOpacity(value: Float)
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
+    /** Empty address = this device; otherwise the paired machine to send to. */
+    fun setDestination(address: String)
+    fun pairMachine()
     fun stopService()
     fun openApp()
     fun startShizuku()
@@ -58,7 +69,7 @@ interface PanelActions {
  * display and tapping it closes the panel. Everything here works without window focus.
  */
 object ControlPanel {
-    enum class Page { MAIN, CONTROLLER }
+    enum class Page { MAIN, CONTROLLER, DESTINATION }
 
     /** Remembered so a re-render after a setting change stays on the same page. */
     var page: Page = Page.MAIN
@@ -124,7 +135,11 @@ object ControlPanel {
             card.removeAllViews()
             val bar = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
             if (page == Page.CONTROLLER) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
-            bar.addView(label(if (page == Page.MAIN) "Thor SidePad" else "Controller", 20f),
+            bar.addView(label(when (page) {
+                Page.MAIN -> "Thor SidePad"
+                Page.DESTINATION -> "Send to"
+                else -> "Appears as"
+            }, 20f),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page == Page.CONTROLLER) 16 else 0 })
             if (page == Page.MAIN) {
                 bar.addView(btn("Open app") { actions.openApp() })
@@ -148,7 +163,17 @@ object ControlPanel {
                     orientation = LinearLayout.VERTICAL
                     setBackgroundColor(0xFF2A2D31.toInt())
                 }
-                choicesGroup.addView(pickerRow("Controller", target) { page = Page.CONTROLLER; render() })
+                // Two questions, not one: where the presses go, and what the receiver thinks they
+                // come from. They were the same thing only while there was one possible destination.
+                val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
+                val whereTo = if (!state.remote) "This device"
+                              else hostLabel + (if (state.hostConnected) "" else " — not connected")
+                choicesGroup.addView(pickerRow("Send to", whereTo) { page = Page.DESTINATION; render() })
+                choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+                choicesGroup.addView(pickerRow("Appears as", if (state.remote) "A gamepad" else target) {
+                    // Remote has only one answer for now; the row stays so the question is visible.
+                    if (!state.remote) { page = Page.CONTROLLER; render() }
+                })
                 choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
                 choicesGroup.addView(pickerRow("Profile", state.activeProfile) { actions.pickProfile() })
                 card.addView(choicesGroup, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -176,6 +201,19 @@ object ControlPanel {
                     marginStart = 140; marginEnd = 140
                 })
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
+            } else if (page == Page.DESTINATION) {
+                card.addView(label("Send presses to", 14f, grey))
+                card.addView(btn((if (!state.remote) "\u25CF  " else "") + "This device", state.remote) { actions.setDestination("") })
+                for (h in state.hosts) {
+                    val active = state.remote && h.address == state.hostAddress
+                    card.addView(btn((if (active) "\u25CF  " else "") + h.label, !active) { actions.setDestination(h.address) })
+                }
+                card.addView(btn("Pair a new machine\u2026") { actions.pairMachine() })
+                card.addView(label(
+                    if (state.hosts.isEmpty())
+                        "Nothing paired yet. Pair a computer and the Thor becomes a controller for it, over Bluetooth."
+                    else "Sending to a machine needs no Shizuku: the Thor presents itself as an ordinary Bluetooth gamepad.",
+                    12f, grey).apply { setPadding(0, 14, 0, 0) })
             } else {
                 card.addView(label("Presses go to", 14f, grey))
                 for (t in state.targets) {
