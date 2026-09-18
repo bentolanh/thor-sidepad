@@ -131,7 +131,7 @@ class OverlayService : Service() {
             val caps = Caps.fromJson(svc.targetCaps())
             val eng = engine
             if (eng == null) { show(); return }
-            eng.rebind(svc, caps)
+            eng.rebind(LocalSink(svc), caps)
             overlay?.invalidatePad()
             Log.i(TAG, "reopened target ($why): ${thorLabel(prefs.physicalName) ?: prefs.physicalName}")
         } catch (e: Exception) { Log.w(TAG, "reopen failed", e) }
@@ -295,7 +295,7 @@ class OverlayService : Service() {
                 val err = openTarget(svc)
                 if (err.isNotEmpty()) { toast(err); return@withInjector }
                 engine?.shutdown()
-                val eng = PadEngine(svc, Caps.fromJson(svc.targetCaps())) { main.post { scheduleReopen("write failed") } }
+                val eng = PadEngine(LocalSink(svc), Caps.fromJson(svc.targetCaps())) { main.post { scheduleReopen("write failed") } }
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()

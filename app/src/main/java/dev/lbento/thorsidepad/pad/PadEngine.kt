@@ -82,8 +82,8 @@ fun stickPlanFor(code: Int, caps: Caps): StickPlan? {
     return StickPlan(ax, ay, caps.abs.getValue(ax), caps.abs.getValue(ay))
 }
 
-/** Sends press/release plans to the injector off the UI thread, in order. */
-class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private val onTargetLost: () -> Unit = {}) {
+/** Sends press/release plans to the destination off the UI thread, in order. */
+class PadEngine(@Volatile private var sink: PadSink, caps: Caps, private val onTargetLost: () -> Unit = {}) {
     private val thread = HandlerThread("sidepad-engine").apply { start() }
     private val handler = Handler(thread.looper)
     private val plans = HashMap<Int, List<Emit>>()
@@ -92,8 +92,8 @@ class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private v
         private set
 
     /** Points the engine at a (re)opened target without touching the views that hold it. */
-    fun rebind(newInjector: IInjector, newCaps: Caps) {
-        injector = newInjector; caps = newCaps
+    fun rebind(newSink: PadSink, newCaps: Caps) {
+        sink = newSink; caps = newCaps
         synchronized(plans) { plans.clear() }
         synchronized(sticks) { sticks.clear() }
         lost = false
@@ -126,7 +126,7 @@ class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private v
         }
         val x = map(nx, sp.xr); val y = map(ny, sp.yr)
         handler.post {
-            try { check(injector.abs(sp.ax, x)); check(injector.abs(sp.ay, y)) } catch (ex: Exception) { Log.w("SidePadEngine", "stick failed", ex) }
+            try { check(sink.abs(sp.ax, x)); check(sink.abs(sp.ay, y)) } catch (ex: Exception) { Log.w("SidePadEngine", "stick failed", ex) }
         }
     }
 
@@ -170,7 +170,7 @@ class PadEngine(@Volatile private var injector: IInjector, caps: Caps, private v
             try {
                 for (e in plan) {
                     val v = if (down) e.down else e.up
-                    check(if (e.type == Ev.KEY) injector.key(e.code, v != 0) else injector.abs(e.code, v))
+                    check(if (e.type == Ev.KEY) sink.key(e.code, v != 0) else sink.abs(e.code, v))
                 }
             } catch (ex: Exception) { Log.w("SidePadEngine", "inject failed", ex) }
         }
