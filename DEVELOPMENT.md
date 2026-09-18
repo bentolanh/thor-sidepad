@@ -231,6 +231,20 @@ the app.
   some native Mac games may not. Whether the advertised device class can be changed from an app was
   not established.
 
+- **The whole pad can vanish, and it is not our bug.** An app may set
+  `HIDE_NON_SYSTEM_OVERLAY_WINDOWS` on its window, which asks the system to hide every
+  non-system overlay while it is showing. Android's own Settings does this on its home screen, as
+  anti-tapjacking. It applies across the whole device, not per display: Settings open on the top
+  screen hides the pad on the second one. The windows still exist and the permission is still
+  granted; `dumpsys window windows` shows them with `mHasSurface=true` and
+  `isReadyForDisplay()=false`, and the culprit is whichever window's `pfl=` line carries the flag.
+  Move that app off the top and the pad returns at once.
+
+  Worth knowing before chasing it as a rendering fault, which cost an evening on 2026-09-18. Banking
+  apps and other security-minded ones use the same flag, so a user will meet this. Nothing can be
+  done about the hiding itself; what the app could do is notice and say so, since a pad that
+  disappears without explanation mid-game is alarming.
+
 ## Layout
 
 | Path | What |
