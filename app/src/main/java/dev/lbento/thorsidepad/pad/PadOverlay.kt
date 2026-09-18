@@ -18,7 +18,6 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.EditText
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -708,44 +707,84 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     }
 
     /** A small focusable window with a text field. The only place the pad takes window focus. */
+    /**
+     * Asks for a preset name with a keypad of our own rather than the system keyboard.
+     *
+     * The system keyboard cannot be had here. A floating window like ours never reports itself to
+     * the input-method service the way an app's own window does: the service ends up pointing at a
+     * different window, our side never asks for a keyboard at all, and asking by hand is refused
+     * because the field was never adopted. An app sitting on this screen has no such trouble, which
+     * is the difference between a window that belongs to a screen and one that merely floats over
+     * it. Rather than fight that, the letters are drawn here and typing is ours to handle.
+     *
+     * It also means this window takes no focus, so naming a preset now disturbs the top screen no
+     * more than anything else on the pad does.
+     */
     private fun askName(defaultName: String, onOk: (String) -> Unit) {
-        var onBack: () -> Unit = {}
-        val root = backFrame { onBack() }
+        val root = FrameLayout(themed)
         root.setBackgroundColor(0x99000000.toInt())
         var window: View? = null
-        // The editor underneath is focusable too, so focus falls back to it, not to the top screen.
-        fun dismiss() {
-            window?.let { w -> dropWindow(w) }
-        }
-        onBack = { dismiss() }
+        fun dismiss() { window?.let { w -> dropWindow(w) } }
+
+        val typed = StringBuilder(defaultName)
+        var caps = false
+
         val card = LinearLayout(themed).apply {
-            orientation = LinearLayout.VERTICAL; setBackgroundColor(0xF0181818.toInt()); setPadding(28, 20, 28, 20); isClickable = true
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xF0181818.toInt()); setPadding(22, 16, 22, 16); isClickable = true
         }
-        card.addView(TextView(themed).apply { text = "Preset name"; setTextColor(Color.WHITE); textSize = 18f })
-        val field = EditText(themed).apply {
-            setText(defaultName); setSelectAllOnFocus(true); isSingleLine = true
-            // Keep the dialog visible instead of the keyboard's full-screen text box, and let Done save.
-            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
+        card.addView(TextView(themed).apply { text = "Preset name"; setTextColor(0xFF9AA0A6.toInt()); textSize = 14f })
+        val shown = TextView(themed).apply {
+            setTextColor(Color.WHITE); textSize = 20f; setPadding(14, 10, 14, 10)
+            setBackgroundColor(0xFF2A2D31.toInt()); isSingleLine = true
         }
-        card.addView(field, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        fun render() { shown.text = if (typed.isEmpty()) " " else typed.toString() }
+        render()
+        card.addView(shown, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = 8; bottomMargin = 12 })
+
+        fun key(label: String, onTap: () -> Unit) = Button(themed).apply {
+            text = label; isAllCaps = false; textSize = 15f
+            minWidth = 0; minimumWidth = 0; setPadding(0, 0, 0, 0)
+            setOnClickListener { onTap() }
+        }
+        fun keyRow(chars: String): LinearLayout {
+            val r = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
+            for (c in chars) r.addView(
+                key(c.toString()) {
+                    // 26 letters would otherwise need a key each for both cases; Caps picks the case.
+                    typed.append(if (caps || !c.isLetter()) c else c.lowercaseChar()); render()
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            return r
+        }
+        for (rowChars in listOf("1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM")) {
+            card.addView(keyRow(rowChars), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        val tools = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
+        lateinit var capsKey: Button
+        capsKey = key("Caps: off") { caps = !caps; capsKey.text = if (caps) "Caps: on" else "Caps: off" }
+        tools.addView(capsKey, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
+        tools.addView(key("space") { typed.append(' '); render() },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 3f))
+        tools.addView(key("\u232B") { if (typed.isNotEmpty()) { typed.deleteCharAt(typed.length - 1); render() } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
+        card.addView(tools, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
         val row = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
-        row.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        fun save() { val name = field.text.toString().trim().ifEmpty { defaultName }; dismiss(); onOk(name) }
-        field.setOnEditorActionListener { _, _, _ -> save(); true }
-        row.addView(Button(themed).apply { text = "Save"; isAllCaps = false; setOnClickListener { save() } },
+        row.addView(Button(themed).apply { text = "Cancel"; isAllCaps = false; setOnClickListener { dismiss() } },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        card.addView(row)
-        root.addView(card, FrameLayout.LayoutParams((width * 0.6f).roundToInt(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-        val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT)
-        lp.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-        lp.title = "SidePad name"
-        lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
+        row.addView(Button(themed).apply {
+            text = "Save"; isAllCaps = false
+            setOnClickListener { val name = typed.toString().trim().ifEmpty { defaultName }; dismiss(); onOk(name) }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        card.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = 10 })
+
+        root.addView(card, FrameLayout.LayoutParams((width * 0.82f).roundToInt(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        val lp = fullScreenParams("SidePad name")
         window = root
         add(root, lp)
-        field.requestFocus()
     }
 
     /** A list chooser: a card over a scrim. Pick an entry, or Cancel / tap outside to back out. */

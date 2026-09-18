@@ -162,15 +162,20 @@ the app.
   costs 401 ms against 35 ms. Its `mInputShown` is not trustworthy either: it was seen true with
   no keyboard window in existence, and false while a keyboard was up and drawn.
 
-- **Known bug: the preset name box gets no keyboard.** Naming a profile opens a focusable overlay
-  with a text field. It takes focus and the input method targets it, but no keyboard appears: the
-  system is never asked (`mShowRequested` stays false). The window's `softInputMode` carries
-  `SOFT_INPUT_STATE_VISIBLE` and it is ignored for an overlay. Calling `showSoftInput` directly is
-  refused too, with `Ignoring showSoftInput() as view ... is not served`, both straight after
-  `requestFocus` and again when the window gains focus, so the field never becomes the served view.
-  Predates the focus work of 2026-09-18 and was reproduced on the build before it. Not yet fixed;
-  two attempts along the obvious line failed, so the next one should start from why the field is
-  never served rather than from when the request is made.
+- **Naming a preset uses a keypad of our own.** The system keyboard cannot be had in a floating
+  window. Ours takes focus and the window manager even names it the IME target, yet the
+  input-method service is pointing at a different window, our side never asks for a keyboard at
+  all (`mShowRequested` stays false, and no input traffic leaves the process), and asking by hand
+  is refused with `Ignoring showSoftInput() as view ... is not served`, both straight after
+  `requestFocus` and again when the window gains focus. An app that lives on this screen has none
+  of this trouble: Settings' search field on display 4 raises the keyboard normally. The
+  difference is between a window that belongs to a screen and one that only floats over it.
+
+  So `askName` draws its own letters and handles typing itself. That is not a workaround so much
+  as the better fit: the window needs no focus, which means naming a preset costs the top screen
+  nothing, and it does not depend on where this device decides to put the keyboard. It also
+  leaves SidePad with no focusable window at all; the hand-off machinery stays for safety but
+  nothing currently triggers it.
 
 ## Layout
 
