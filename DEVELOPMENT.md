@@ -262,6 +262,12 @@ the app.
   asynchronous, so the pad appears before the host answers; the local reopen path is skipped
   entirely for a Bluetooth destination since there is nothing there to reopen.
 
+  Shizuku is not required for this. `show()` waits for the injector only when the destination is
+  this device; a machine destination opens straight away and the device sliders and media units
+  simply have nothing to show without it. The setup screen says so and no longer gates the later
+  steps or the Start button on Shizuku, since someone who only wants a Bluetooth gamepad never
+  needs it.
+
   Verified against a Mac: tapping A, Y and B on the pad arrived as buttons 1, 5 and 2, down and up.
   The panel asks the two questions separately, because adding a machine split them. **Send to** is
   where presses go, this device or a paired machine; **Appears as** is what the receiver thinks they

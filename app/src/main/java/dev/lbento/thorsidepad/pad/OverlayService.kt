@@ -301,7 +301,14 @@ class OverlayService : Service() {
     }
 
     private fun show() {
-        withInjector { svc ->
+        // Sending to a machine asks nothing of Shizuku, so the pad opens without waiting for it. The
+        // device sliders and the media units still need it and simply have nothing to show without.
+        if (prefs.targetMode == Prefs.MODE_BT) showWith(Injector.current())
+        else withInjector { svc -> showWith(svc) }
+    }
+
+    private fun showWith(svc: IInjector?) {
+        run {
             try {
                 val sink: PadSink
                 val caps: Caps
@@ -314,8 +321,9 @@ class OverlayService : Service() {
                     bt.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
                     sink = bt; caps = BluetoothSink.CAPS
                 } else {
+                    if (svc == null) { toast("Shizuku is not ready"); return@run }
                     val err = openTarget(svc)
-                    if (err.isNotEmpty()) { toast(err); return@withInjector }
+                    if (err.isNotEmpty()) { toast(err); return@run }
                     sink = LocalSink(svc); caps = Caps.fromJson(svc.targetCaps())
                 }
                 engine?.shutdown()
@@ -326,7 +334,7 @@ class OverlayService : Service() {
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
-                readLevels(svc); syncNowWatch()
+                if (svc != null) { readLevels(svc); syncNowWatch() }
                 ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
                     onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.

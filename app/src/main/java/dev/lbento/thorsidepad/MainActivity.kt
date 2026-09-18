@@ -139,11 +139,12 @@ class MainActivity : AppCompatActivity() {
         val s1help = findViewById<TextView>(R.id.step1Help)
         val s1btn = findViewById<Button>(R.id.step1Button)
         val shizukuReady: Boolean
-        val why = "Android does not let one app press buttons for another. Shizuku lends SidePad the same access a computer has over USB debugging, which is what lets it write presses into the controller. No root needed.\n\n"
+        val why = "Shizuku is needed to press buttons on this device: Android does not let one app do that for another, and Shizuku lends SidePad the same access a computer has over USB debugging. No root needed.\n\n" +
+            "It is not needed to use the Thor as a controller for another machine. That goes out over Bluetooth, which any app may do, so you can skip this step if that is all you want. The brightness and volume sliders and the media controls need it either way.\n\n"
         when {
             !shizukuInstalled() -> {
                 shizukuReady = false
-                s1status.text = "Not installed."
+                s1status.text = "Not installed. Only needed to press buttons on this device."
                 s1help.text = why + "Shizuku is a small free app. Install it, then come back here."
                 s1btn.text = "Install Shizuku"
             }
@@ -171,18 +172,22 @@ class MainActivity : AppCompatActivity() {
         // Step 2: overlay.
         findViewById<TextView>(R.id.step2Status).text = if (overlayOk()) "Allowed." else "Not allowed yet."
         findViewById<Button>(R.id.step2Button).visibility = if (overlayOk()) View.GONE else View.VISIBLE
-        setDone(R.id.step2, R.id.step2Title, R.id.step2Status, overlayOk(), locked = !shizukuReady)
+        setDone(R.id.step2, R.id.step2Title, R.id.step2Status, overlayOk(), locked = false)
 
         // Step 3: notifications, optional; never locks anything.
         findViewById<TextView>(R.id.step3Status).text = if (notifOk()) "Allowed." else "Not allowed yet. You can skip this."
         findViewById<Button>(R.id.step3Button).visibility = if (notifOk()) View.GONE else View.VISIBLE
-        setDone(R.id.step3, R.id.step3Title, R.id.step3Status, notifOk(), locked = !(shizukuReady && overlayOk()))
+        setDone(R.id.step3, R.id.step3Title, R.id.step3Status, notifOk(), locked = !overlayOk())
 
-        // Step 4: start, needs 1 and 2.
-        val canRun = shizukuReady && overlayOk()
+        // Step 4: start. Only the overlay permission is required; Shizuku decides what the pad can
+        // drive, not whether it can run, because sending to another machine does not use it.
+        val canRun = overlayOk()
         findViewById<TextView>(R.id.serviceStatus).text = when {
-            !canRun -> "Finish steps 1 and 2 first."
+            !canRun -> "Finish step 2 first."
+            OverlayService.running && !shizukuReady ->
+                "SidePad is running. Without Shizuku it can only send to another machine."
             OverlayService.running -> "SidePad is running in the background."
+            !shizukuReady -> "SidePad is not running. Without Shizuku it will only send to another machine."
             else -> "SidePad is not running."
         }
         findViewById<Button>(R.id.btnStart).isEnabled = canRun && !OverlayService.running
