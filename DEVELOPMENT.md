@@ -199,6 +199,38 @@ the app.
   Note for development: because the user service is now a daemon, it keeps running old code across
   reinstalls unless `versionCode` changes. Shizuku keys it on `.version(BuildConfig.VERSION_CODE)`.
 
+- **The handheld as a controller for another machine: what the probe found.** Not built, but proven
+  end to end against a Mac. The Thor's Bluetooth stack carries `HidDeviceService`, so it can take
+  the HID *device* role, and `BluetoothHidDevice.registerApp` with a plain gamepad descriptor,
+  sixteen buttons and four axes, reports `registered=true`. `registerApp` itself returns false even
+  on success; the callback is the signal to trust.
+
+  Connecting works from either end, but never by itself. With the gamepad registered and idle the
+  Mac did not reconnect on its own inside 45 s; calling `connect()` from this side brought the link
+  up in under 3 s, and clicking the device in the Mac's own Bluetooth list also worked, with input
+  flowing normally afterwards either way. The prerequisite is the same for both: the app has to be
+  running and registered, because the gamepad exists only while it is. So the app wants its own
+  Connect control rather than relying on the host.
+
+  What the Mac made of it. Bluetooth lists the Thor with `Services: < HID GATT ACL >` but
+  `Minor Type: Mobile Phone`, since the advertised device class still says phone. That does not
+  matter: macOS's own input stack lists it on usage page 1, usage 5, which is Game Pad, bound to
+  `AppleUserHIDEventDriver`. Buttons one to six each arrived as usage page 9 with the right usage
+  and value, and the stick arrived on page 1 as usages 0x30 and 0x31 carrying 100 and -100. So the
+  descriptor survives intact.
+
+  Why this is the interesting direction: none of it is privileged. One ordinary `BLUETOOTH_CONNECT`
+  permission, no Shizuku, no developer mode, no root, no accessibility. The pad, the editor,
+  profiles and glyphs would all be reused; only the last step changes, from writing evdev events
+  into a local uinput device to assembling HID reports. It also needs no second screen, since the
+  handheld is not the machine running the game. `BtHidProbe` reruns all of this: `PROBE_BT` to
+  register, `PROBE_BT_SEND` to press. Development only.
+
+  The open question is host compatibility rather than plumbing. Apple's controller framework
+  favours known controller families, so Steam and emulators are likely to take a generic pad while
+  some native Mac games may not. Whether the advertised device class can be changed from an app was
+  not established.
+
 ## Layout
 
 | Path | What |

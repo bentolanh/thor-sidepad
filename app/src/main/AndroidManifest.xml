@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Probe only for now: presenting as a Bluetooth gamepad to another machine. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <queries>
         <package android:name="moe.shizuku.privileged.api" />

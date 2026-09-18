@@ -203,6 +203,8 @@ class OverlayService : Service() {
             ACTION_STOP -> { userStopped = true; disarmKeepAlive(); hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
             ACTION_FOCUS_TOP -> returnFocusToTopScreen()
+            ACTION_PROBE_BT -> dev.lbento.thorsidepad.inject.BtHidProbe.start(this)
+            ACTION_PROBE_BT_SEND -> dev.lbento.thorsidepad.inject.BtHidProbe.press()
             ACTION_PROBE -> Injector.current()?.let { svc ->
                 Thread { try { Log.i(TAG, "pointer probe:\n" + svc.probePointer(12_000)) }
                          catch (e: Exception) { Log.w(TAG, "probe failed", e) } }.start()
@@ -788,6 +790,9 @@ class OverlayService : Service() {
         private const val GRACE_MS = 20_000
         /** Development only: see IInjector.probePointer. */
         const val ACTION_PROBE = "dev.lbento.thorsidepad.PROBE"
+        /** Development only: see BtHidProbe. */
+        const val ACTION_PROBE_BT = "dev.lbento.thorsidepad.PROBE_BT"
+        const val ACTION_PROBE_BT_SEND = "dev.lbento.thorsidepad.PROBE_BT_SEND"
 
         @Volatile var running = false
         @Volatile var visible = false
