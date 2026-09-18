@@ -49,6 +49,11 @@ class Prefs(ctx: Context) {
         get() = sp.getString("guideSnapshot", null)
         set(v) = sp.edit().putString("guideSnapshot", v).apply()
 
+    /** Whether the pad was on screen, so a service revived by the watchdog comes back as it was. */
+    var padShown: Boolean
+        get() = sp.getBoolean("padShown", false)
+        set(v) = sp.edit().putBoolean("padShown", v).apply()
+
     var guideShown: Boolean
         get() = sp.getBoolean("guideShown", false)
         set(v) = sp.edit().putBoolean("guideShown", v).apply()

@@ -2,6 +2,7 @@ package dev.lbento.thorsidepad.inject
 
 import android.content.Context
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
@@ -336,6 +337,38 @@ class InjectorService() : IInjector.Stub() {
         }, "sidepad-key").start()
         return ""
     }
+
+    // ---- watchdog: put the pad back when the app is taken from under it -------------------------
+    @Volatile private var alivePkg: String? = null
+    @Volatile private var graceMs = 0
+    @Volatile private var lastBeat = 0L
+    @Volatile private var lastRevive = 0L
+    private var watchdog: Thread? = null
+
+    override fun keepAlive(pkg: String?, grace: Int) {
+        if (pkg.isNullOrEmpty() || grace <= 0) { alivePkg = null; Log.i(TAG, "watchdog off"); return }
+        alivePkg = pkg; graceMs = grace; lastBeat = SystemClock.elapsedRealtime()
+        if (watchdog?.isAlive == true) return
+        val t = Thread({
+            while (true) {
+                try { Thread.sleep(5_000) } catch (_: InterruptedException) { break }
+                val p = alivePkg ?: continue
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastBeat < graceMs) continue
+                // Never faster than the grace period, so a app that cannot stay up is not hammered.
+                if (now - lastRevive < graceMs) continue
+                lastRevive = now
+                Log.w(TAG, "no heartbeat for ${now - lastBeat}ms, reviving $p")
+                // INCLUDE_STOPPED_PACKAGES: the killers that matter force-stop the app, and a plain
+                // broadcast would not reach it afterwards.
+                shell("am broadcast -f 0x00000020 -a $p.START -n $p/.TriggerReceiver")
+            }
+        }, "sidepad-watchdog")
+        t.isDaemon = true; watchdog = t; t.start()
+        Log.i(TAG, "watchdog on for $pkg, grace ${grace}ms")
+    }
+
+    override fun heartbeat() { lastBeat = SystemClock.elapsedRealtime() }
 
     override fun probePointer(holdMs: Int): String {
         val report = StringBuilder()

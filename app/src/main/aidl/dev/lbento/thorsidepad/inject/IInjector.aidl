@@ -54,4 +54,11 @@ interface IInjector {
     // it alive for holdMs so a screenshot can catch the cursor, then takes it down. Deliberately
     // does not touch the open pad, so the buttons keep working while it runs.
     String probePointer(int holdMs) = 25;
+
+    // Watchdog. The pad is meant to stay up until the user says otherwise, but the app's own process
+    // can be taken by the memory manager while this one cannot. Armed with the app's package and a
+    // grace period, it brings the pad back when the heartbeats stop. A grace of 0 disarms it, which
+    // is what the Stop button does, so quitting stays quitting.
+    void keepAlive(String pkg, int graceMs) = 26;
+    void heartbeat() = 27;
 }

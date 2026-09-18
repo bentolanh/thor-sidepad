@@ -182,6 +182,23 @@ the app.
   leaves SidePad with no focusable window at all; the hand-off machinery stays for safety but
   nothing currently triggers it.
 
+- **Staying up.** The pad is meant to be there until the user says otherwise, so it is not left to
+  the memory manager's judgement. The app's own process can be taken; the Shizuku user service
+  cannot, since it runs as shell at oom adj -1000. So it is bound with `.daemon(true)` and outlives
+  the app deliberately, and it holds a watchdog: the service beats every 5 s, and after 20 s of
+  silence the shell side revives the pad with `am broadcast ... START`, carrying
+  `FLAG_INCLUDE_STOPPED_PACKAGES` because the killers that matter force-stop the app and a plain
+  broadcast would not reach it. `prefs.padShown` remembers whether the pad was on screen, so a
+  revived service comes back as it was rather than as bare edge strips.
+
+  Only the Stop button disarms it, and only a deliberate stop releases the shell process; dying any
+  other way must leave it running, because it is the thing that puts the pad back. Measured on the
+  Thor: after `am force-stop`, the pad was back 21 s later. After Stop, nothing came back and both
+  processes were gone.
+
+  Note for development: because the user service is now a daemon, it keeps running old code across
+  reinstalls unless `versionCode` changes. Shizuku keys it on `.version(BuildConfig.VERSION_CODE)`.
+
 ## Layout
 
 | Path | What |

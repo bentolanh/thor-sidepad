@@ -37,7 +37,9 @@ object Injector {
 
     private fun args(ctx: Context) = Shizuku.UserServiceArgs(
         ComponentName(ctx.packageName, InjectorService::class.java.name))
-        .daemon(false)
+        // Outlives the app on purpose. This process runs as shell at a priority the memory manager
+        // never touches, which is what lets it put the pad back when the app itself is taken.
+        .daemon(true)
         .processNameSuffix("injector")
         .debuggable(BuildConfig.DEBUG)
         .version(BuildConfig.VERSION_CODE)

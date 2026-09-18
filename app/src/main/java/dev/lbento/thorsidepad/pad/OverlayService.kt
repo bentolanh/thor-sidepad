@@ -200,7 +200,7 @@ class OverlayService : Service() {
             ACTION_HIDE -> hide()
             ACTION_TOGGLE -> toggle()
             ACTION_EDIT -> edit()
-            ACTION_STOP -> { hide(); stopSelf() }
+            ACTION_STOP -> { userStopped = true; disarmKeepAlive(); hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
             ACTION_FOCUS_TOP -> returnFocusToTopScreen()
             ACTION_PROBE -> Injector.current()?.let { svc ->
@@ -208,9 +208,46 @@ class OverlayService : Service() {
                          catch (e: Exception) { Log.w(TAG, "probe failed", e) } }.start()
             }
             ACTION_GUIDE -> showGuide()
-            else -> { ensureCatcher(); if (!prefs.guideShown) showGuide() }
+            // START and anything unrecognised: come back as the pad was left. The watchdog uses
+            // START, so a pad that was on screen when the app was taken is on screen again.
+            else -> {
+                if (prefs.padShown) show() else ensureCatcher()
+                if (!prefs.guideShown) showGuide()
+            }
         }
+        // Every way in arms the watchdog: however the service came up, it is meant to stay up.
+        armKeepAlive()
         return START_STICKY
+    }
+
+    // ---- staying up -----------------------------------------------------------------------------
+    // The pad is a convenience that is meant to be there, so it is not left to the memory manager's
+    // judgement. The shell process cannot be killed; it watches for our heartbeat and puts us back.
+    // Only the Stop button disarms it, so quitting still means quitting.
+    @Volatile private var armed = false
+    /** Set only by the Stop button, so an unexpected death leaves the shell side alive to revive us. */
+    @Volatile private var userStopped = false
+
+    // Arming happens here rather than at start-up because the shell side is bound asynchronously and
+    // is usually not there yet when the service starts. The beat arms it the moment it appears, and
+    // re-arms if the connection is ever replaced.
+    private val beat = object : Runnable {
+        override fun run() {
+            try {
+                Injector.current()?.let { svc ->
+                    if (!armed) { svc.keepAlive(packageName, GRACE_MS); armed = true }
+                    svc.heartbeat()
+                }
+            } catch (e: Exception) { armed = false; Log.w(TAG, "keep-alive beat failed", e) }
+            main.postDelayed(this, BEAT_MS)
+        }
+    }
+
+    private fun armKeepAlive() { main.removeCallbacks(beat); main.post(beat) }
+
+    private fun disarmKeepAlive() {
+        main.removeCallbacks(beat); armed = false
+        try { Injector.current()?.keepAlive(packageName, 0) } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
@@ -221,6 +258,9 @@ class OverlayService : Service() {
         try { levelThread.quitSafely() } catch (_: Exception) {}
         running = false
         visible = false
+        // Only a deliberate Stop lets the shell process go. Dying any other way has to leave it
+        // running, because it is the thing that puts the pad back.
+        if (userStopped) try { Injector.disconnect(this) } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -263,6 +303,7 @@ class OverlayService : Service() {
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
+                prefs.padShown = true
                 updateNotification()
                 startImeWatch()
             } catch (e: Exception) {
@@ -273,6 +314,7 @@ class OverlayService : Service() {
     }
 
     private fun hide() {
+        prefs.padShown = false
         stopImeWatch(); stopNowWatch(); imeSuspended = false
         overlay?.removeAll()
         engine?.shutdown(); engine = null
@@ -644,7 +686,10 @@ class OverlayService : Service() {
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
-            override fun stopService() { ov.removePanel(); padDirty = false; hide(); stopSelf() }
+            override fun stopService() {
+                ov.removePanel(); padDirty = false
+                userStopped = true; disarmKeepAlive(); hide(); stopSelf()
+            }
             override fun openApp() { ov.removePanel(); applyDirty(); openApp(ov.displayId) }
             override fun startShizuku() {
                 ov.removePanel(); applyDirty()
@@ -734,6 +779,13 @@ class OverlayService : Service() {
         const val ACTION_FOCUS_TOP = "dev.lbento.thorsidepad.FOCUS_TOP"
         const val ACTION_GUIDE = "dev.lbento.thorsidepad.GUIDE"
         const val ACTION_START = "dev.lbento.thorsidepad.START"
+        /**
+         * How often the service says it is still there, and how long silence is allowed. A beat is a
+         * single cheap call into a process that is already running, so it can be frequent; the grace
+         * is four missed beats, which puts the pad back within about half a minute of losing it.
+         */
+        private const val BEAT_MS = 5_000L
+        private const val GRACE_MS = 20_000
         /** Development only: see IInjector.probePointer. */
         const val ACTION_PROBE = "dev.lbento.thorsidepad.PROBE"
 
