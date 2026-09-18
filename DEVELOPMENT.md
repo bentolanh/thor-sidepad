@@ -112,11 +112,13 @@ the app.
   stream. It resolves when the pad shows, when a transport key is pressed, and once per drag, so
   the lookup never runs per touch move.
 
-- **The Back key, the back gesture, and who takes focus.** SidePad holds Back only when the user
-  is configuring, never while the buttons are driving the game, because the focused screen is
-  where injected presses land. The editor and the pickers take window focus (`focusableFlags`)
-  and swallow Back in a `backFrame` root, so Back closes them; a nested picker closes first and
-  leaves the editor open.
+- **The Back key, the back gesture, and who takes focus.** Exactly one window of SidePad's takes
+  window focus: the preset name box, because it is a text field. Everything else, the pad, the
+  panel, the editor, the profile list, the rate dialog and the choosers, is non-focusable and
+  closes by its own Exit, Close or Cancel, or by a tap outside. Back therefore reaches only the
+  name box. The editor claims the side edges from the system back gesture the way the shield does,
+  so a back swipe inside it does nothing rather than navigating the app behind it, which the user
+  cannot see; verified on the device as `SkRegion((0,0,73,1080)(1167,0,1240,1080))`.
 
   The panel does not take focus, on purpose. It is the one thing meant to be reached mid-game, for
   volume and brightness, and a visit to a focusable window on this screen costs the game up top its
@@ -129,10 +131,11 @@ the app.
   only the Back key, and tapping outside already closes it and already says so on the panel. Do not
   make it focusable again to get Back back.
 
-  Focus is handed to display 0 through `FocusHandoffActivity`, and `dropWindow` fires that when
-  the last focusable window of ours goes. That check matters rather than hard-coding it per
-  window: a picker opened from the editor must leave focus with the editor, while the same picker
-  opened over the non-focusable panel is the last one holding it and has to give it back. The pad itself stays non-focusable, so with the shield off or the pad
+  Focus is handed to display 0 through `FocusHandoffActivity`, and `dropWindow` fires that only
+  when the window being closed was itself holding focus and nothing else of ours still is. Both
+  halves of that test matter. Handing focus back costs an activity launch on the top screen, so
+  doing it after a window that never took focus disturbs the game for nothing, which is what made
+  leaving the editor jolt the top screen until the editor stopped taking focus. The pad itself stays non-focusable, so with the shield off or the pad
   hidden the system back gesture reaches the app behind as usual. With the shield up the screen
   behind is not meant to be touched, so `ShieldPadView` claims the left and right edges from the
   system back gesture with `systemGestureExclusionRects`; a back swipe there lands on the shield
@@ -158,6 +161,16 @@ the app.
   processor time per 20 seconds, about half a core, against 0 for the window query, and a call
   costs 401 ms against 35 ms. Its `mInputShown` is not trustworthy either: it was seen true with
   no keyboard window in existence, and false while a keyboard was up and drawn.
+
+- **Known bug: the preset name box gets no keyboard.** Naming a profile opens a focusable overlay
+  with a text field. It takes focus and the input method targets it, but no keyboard appears: the
+  system is never asked (`mShowRequested` stays false). The window's `softInputMode` carries
+  `SOFT_INPUT_STATE_VISIBLE` and it is ignored for an overlay. Calling `showSoftInput` directly is
+  refused too, with `Ignoring showSoftInput() as view ... is not served`, both straight after
+  `requestFocus` and again when the window gains focus, so the field never becomes the served view.
+  Predates the focus work of 2026-09-18 and was reproduced on the build before it. Not yet fixed;
+  two attempts along the obvious line failed, so the next one should start from why the field is
+  never served rather than from when the request is made.
 
 ## Layout
 

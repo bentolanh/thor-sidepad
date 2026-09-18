@@ -3,6 +3,8 @@ package dev.lbento.thorsidepad.pad
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.os.Build
 import android.hardware.display.DisplayManager
 import android.util.Log
 import android.view.ContextThemeWrapper
@@ -112,17 +114,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 
-    /**
-     * [baseFlags] without NOT_FOCUSABLE: the window takes input focus and so receives the Back key.
-     * Only for the editor and the pickers, which are lists to be navigated, and never for anything
-     * shown while a game is running: the focused screen is where button presses land, and an app on
-     * the top screen that loses window focus takes it as being sent to the background and pauses.
-     * The panel is deliberately not in this list; see [showPanel].
-     */
-    private fun focusableFlags() = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-
     /** A root that swallows Back and runs [onBack] instead, so Back closes our window. */
     private fun backFrame(onBack: () -> Unit): FrameLayout = object : FrameLayout(themed) {
         init { isFocusable = true; isFocusableInTouchMode = true }
@@ -135,21 +126,23 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
     }
 
-    /** True while one of our windows still holds input focus on the pad's screen. */
-    private fun anyFocusableWindow() = views.any {
-        ((it.layoutParams as? WindowManager.LayoutParams)?.flags ?: 0) and
+    private fun isFocusableWindow(v: View) =
+        ((v.layoutParams as? WindowManager.LayoutParams)?.flags ?: 0) and
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE == 0
-    }
+
+    /** True while one of our windows still holds input focus on the pad's screen. */
+    private fun anyFocusableWindow() = views.any { isFocusableWindow(it) }
 
     /**
-     * Takes one of our windows down. When the last focusable one goes, the top screen is handed
-     * focus back deliberately rather than left to chance, because injected presses land on
-     * whichever screen holds it.
+     * Takes one of our windows down. Focus goes back to the top screen only when we were holding
+     * it and are now letting go: handing it back costs an activity launch up there, so doing it
+     * after a window that never took focus would disturb the game for nothing.
      */
     private fun dropWindow(w: View) {
+        val held = isFocusableWindow(w)
         try { wm.removeViewImmediate(w) } catch (_: Exception) {}
         views.remove(w)
-        if (!anyFocusableWindow()) onFocusReturn?.invoke()
+        if (held && !anyFocusableWindow()) onFocusReturn?.invoke()
     }
 
     private fun add(v: View, lp: WindowManager.LayoutParams) {
@@ -164,9 +157,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     }
 
     fun removeAll() {
+        val held = anyFocusableWindow()
         views.forEach { v -> try { wm.removeViewImmediate(v) } catch (_: Exception) {} }
         views.clear()
         shieldView = null; shieldParams = null
+        if (held) onFocusReturn?.invoke()
     }
 
     val isShowing get() = views.isNotEmpty()
@@ -174,10 +169,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private fun fullScreenParams(title: String) = WindowManager.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT).also { it.title = title }
-
-    private fun fullScreenFocusableParams(title: String) = WindowManager.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT).also { it.title = title }
 
     /** Thin strips on the top (pull down = panel) and bottom (pull up = show pad) edges. Idempotent. */
     fun showCatchers(onPullDown: () -> Unit, onPullUp: () -> Unit, tracker: PullListener? = null) {
@@ -468,7 +459,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 then()
             }
         }
-        fun leave(adopt: PadLayout) { removeAll(); onFocusReturn?.invoke(); onSaved(adopt, active) }
+        // removeAll hands focus back if anything was holding it; the editor itself never is.
+        fun leave(adopt: PadLayout) { removeAll(); onSaved(adopt, active) }
         /** Leaving always asks about unsaved work, from the Exit button and from the back gesture alike. */
         fun exit() {
             if (!dirty()) { leave(working); return }
@@ -560,8 +552,18 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 18 })
 
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad editor"
+        // The editor does not take focus, so a back swipe would otherwise reach the app behind it,
+        // which the user cannot see. Claim the side edges the way the shield does: the swipe lands
+        // on the editor and does nothing, and Exit is the way out.
+        root.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val strip = (ShieldPadView.BACK_EDGE_DP * v.resources.displayMetrics.density).toInt()
+                v.systemGestureExclusionRects =
+                    listOf(Rect(0, 0, strip, v.height), Rect(v.width - strip, 0, v.width, v.height))
+            }
+        }
         add(root, lp)
     }
 
@@ -645,7 +647,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
         root.addView(card, FrameLayout.LayoutParams((width * 0.86f).roundToInt(), (height * 0.9f).roundToInt(), Gravity.CENTER))
         window = root
-        add(root, fullScreenFocusableParams("SidePad presets"))
+        add(root, fullScreenParams("SidePad presets"))
     }
 
     /** The panel's profile chooser: pick one and the pad switches to it. No overwriting from here. */
@@ -699,7 +701,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         card.addView(row)
         root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad rate"
         window = root
         add(root, lp)
@@ -795,7 +797,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
         root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), (height * 0.85f).roundToInt(), Gravity.CENTER))
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad picker"
         window = root
         add(root, lp)
@@ -828,7 +830,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
         root.addView(card, FrameLayout.LayoutParams((width * 0.7f).roundToInt(), (height * 0.85f).roundToInt(), Gravity.CENTER))
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, focusableFlags(), PixelFormat.TRANSLUCENT)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad picker"
         window = root
         add(root, lp)
