@@ -125,6 +125,7 @@ class OverlayService : Service() {
     private fun reopenTarget(why: String) {
         if (!visible) return
         val svc = Injector.current() ?: return
+        if (prefs.targetMode == Prefs.MODE_BT) return   // nothing here to reopen
         try {
             val err = openTarget(svc)
             if (err.isNotEmpty()) { Log.w(TAG, "reopen ($why): $err"); toast(err); return }
@@ -203,6 +204,12 @@ class OverlayService : Service() {
             ACTION_STOP -> { userStopped = true; disarmKeepAlive(); hide(); stopSelf() }
             ACTION_PANEL -> showPanel(keepPage = false)
             ACTION_FOCUS_TOP -> returnFocusToTopScreen()
+            // Development only, until the panel carries a Send-to row: flip the destination.
+            ACTION_DEST -> {
+                prefs.targetMode = if (prefs.targetMode == Prefs.MODE_BT) Prefs.MODE_PHYSICAL else Prefs.MODE_BT
+                Log.i(TAG, "destination is now ${prefs.targetMode}")
+                if (visible) { hide(); show() }
+            }
             ACTION_PROBE_BT -> dev.lbento.thorsidepad.inject.BtHidProbe.start(this)
             ACTION_PROBE_BT_SEND -> dev.lbento.thorsidepad.inject.BtHidProbe.press()
             ACTION_PROBE -> Injector.current()?.let { svc ->
@@ -292,10 +299,26 @@ class OverlayService : Service() {
     private fun show() {
         withInjector { svc ->
             try {
-                val err = openTarget(svc)
-                if (err.isNotEmpty()) { toast(err); return@withInjector }
+                val sink: PadSink
+                val caps: Caps
+                if (prefs.targetMode == Prefs.MODE_BT) {
+                    // Another machine. Opening is asynchronous, so the pad goes up now and the first
+                    // presses simply do not land until the host answers; the state callback says so.
+                    val bt = btSink ?: BluetoothSink(this) { msg ->
+                        if (msg.isNotEmpty()) main.post { toast(msg) }
+                    }.also { btSink = it }
+                    bt.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+                    sink = bt; caps = BluetoothSink.CAPS
+                } else {
+                    val err = openTarget(svc)
+                    if (err.isNotEmpty()) { toast(err); return@withInjector }
+                    sink = LocalSink(svc); caps = Caps.fromJson(svc.targetCaps())
+                }
                 engine?.shutdown()
-                val eng = PadEngine(LocalSink(svc), Caps.fromJson(svc.targetCaps())) { main.post { scheduleReopen("write failed") } }
+                // Only the local destination can be reopened; a Bluetooth one reconnects on its own terms.
+                val eng = PadEngine(sink, caps) {
+                    if (prefs.targetMode != Prefs.MODE_BT) main.post { scheduleReopen("write failed") }
+                }
                 engine = eng
                 val ov = overlayOrCreate()
                 ov.removePanel()
@@ -315,8 +338,11 @@ class OverlayService : Service() {
         }
     }
 
+    private var btSink: BluetoothSink? = null
+
     private fun hide() {
         prefs.padShown = false
+        btSink?.close(); btSink = null
         stopImeWatch(); stopNowWatch(); imeSuspended = false
         overlay?.removeAll()
         engine?.shutdown(); engine = null
@@ -791,6 +817,7 @@ class OverlayService : Service() {
         /** Development only: see IInjector.probePointer. */
         const val ACTION_PROBE = "dev.lbento.thorsidepad.PROBE"
         /** Development only: see BtHidProbe. */
+        const val ACTION_DEST = "dev.lbento.thorsidepad.DEST"
         const val ACTION_PROBE_BT = "dev.lbento.thorsidepad.PROBE_BT"
         const val ACTION_PROBE_BT_SEND = "dev.lbento.thorsidepad.PROBE_BT_SEND"
 

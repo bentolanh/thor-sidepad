@@ -11,6 +11,11 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putString("targetMode", v).apply()
 
     /** Last resolved node of the chosen controller; re-resolved from [physicalName] whenever the pad shows. */
+    /** The paired machine presses are sent to, when the destination is another machine. */
+    var btHost: String
+        get() = sp.getString("btHost", "") ?: ""
+        set(v) = sp.edit().putString("btHost", v).apply()
+
     var physicalPath: String
         get() = sp.getString("physicalPath", "") ?: ""
         set(v) = sp.edit().putString("physicalPath", v).apply()
@@ -73,5 +78,7 @@ class Prefs(ctx: Context) {
         const val BACKDROP_FROSTED = "frosted"
         const val MODE_PHYSICAL = "physical"
         const val MODE_VIRTUAL = "virtual"
+        /** Presses go to another machine over Bluetooth rather than into this device. */
+        const val MODE_BT = "bt"
     }
 }

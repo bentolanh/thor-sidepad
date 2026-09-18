@@ -245,6 +245,26 @@ the app.
   done about the hiding itself; what the app could do is notice and say so, since a pad that
   disappears without explanation mid-game is alarming.
 
+- **Sending presses to another machine.** `PadSink` is where a press leaves the pad. `LocalSink`
+  wraps the injector as always; `BluetoothSink` presents a Bluetooth gamepad and assembles HID
+  reports instead. Everything above that seam, layouts, profiles, glyphs, turbo, hold, sticks, is
+  the same either way, because the sink also declares its `Caps` in the engine's own terms and the
+  existing planning does the rest.
+
+  The shape advertised is sixteen buttons, two sticks, two triggers and a hat, in a nine-byte
+  report. `CAPS` deliberately mirrors the local virtual pad: the D-pad is left out of the buttons so
+  it plans onto the hat, and the triggers get `BRAKE` and `GAS` so they do not fight the right
+  stick, which lives on `Z`/`RZ`.
+
+  Two things that cost time. Without a chosen host, picking the first paired device is wrong on a
+  handheld: this one's list begins with headphones and holds six controllers, so the fallback takes
+  a paired *computer* by device class. And the destination is chosen in `show()`, where opening is
+  asynchronous, so the pad appears before the host answers; the local reopen path is skipped
+  entirely for a Bluetooth destination since there is nothing there to reopen.
+
+  Verified against a Mac: tapping A, Y and B on the pad arrived as buttons 1, 5 and 2, down and up.
+  `DEST` flips the destination until the panel carries a row for it. Development only.
+
 ## Layout
 
 | Path | What |
