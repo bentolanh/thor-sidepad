@@ -171,7 +171,12 @@ the app.
   of this trouble: Settings' search field on display 4 raises the keyboard normally. The
   difference is between a window that belongs to a screen and one that only floats over it.
 
-  So `askName` draws its own letters and handles typing itself. That is not a workaround so much
+  So `askName` draws its own letters and handles typing itself, and `NameField` draws the caret,
+  blinks it and moves it, because Android stops a real field's cursor blinking the moment its window
+  loses focus and this window never has any. The caret is held lit for a moment after every key, a
+  long name scrolls by the caret rather than running off the end, and names are capped at
+  `NameField.MAX`; the header says so on the key that first hits it, since a key that quietly does
+  nothing reads as a missed press. That is not a workaround so much
   as the better fit: the window needs no focus, which means naming a preset costs the top screen
   nothing, and it does not depend on where this device decides to put the keyboard. It also
   leaves SidePad with no focusable window at all; the hand-off machinery stays for safety but

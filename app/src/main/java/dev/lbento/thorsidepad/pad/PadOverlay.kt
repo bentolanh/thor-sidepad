@@ -726,21 +726,24 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         var window: View? = null
         fun dismiss() { window?.let { w -> dropWindow(w) } }
 
-        val typed = StringBuilder(defaultName)
         var caps = false
 
         val card = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xF0181818.toInt()); setPadding(22, 16, 22, 16); isClickable = true
         }
-        card.addView(TextView(themed).apply { text = "Preset name"; setTextColor(0xFF9AA0A6.toInt()); textSize = 14f })
-        val shown = TextView(themed).apply {
-            setTextColor(Color.WHITE); textSize = 20f; setPadding(14, 10, 14, 10)
-            setBackgroundColor(0xFF2A2D31.toInt()); isSingleLine = true
+        val header = TextView(themed).apply { text = "Preset name"; setTextColor(0xFF9AA0A6.toInt()); textSize = 14f }
+        card.addView(header)
+        val field = NameField(themed, defaultName).apply {
+            setPadding(14, 8, 14, 8); setBackgroundColor(0xFF2A2D31.toInt())
         }
-        fun render() { shown.text = if (typed.isEmpty()) " " else typed.toString() }
-        render()
-        card.addView(shown, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        // Say so when the cap is reached, or a key that does nothing looks like a missed press.
+        fun afterKey() {
+            header.text = if (field.atLimit) "Preset name — ${NameField.MAX} characters is the most it takes"
+                          else "Preset name"
+        }
+        afterKey()
+        card.addView(field, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             .apply { topMargin = 8; bottomMargin = 12 })
 
         fun key(label: String, onTap: () -> Unit) = Button(themed).apply {
@@ -753,7 +756,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             for (c in chars) r.addView(
                 key(c.toString()) {
                     // 26 letters would otherwise need a key each for both cases; Caps picks the case.
-                    typed.append(if (caps || !c.isLetter()) c else c.lowercaseChar()); render()
+                    field.insert((if (caps || !c.isLetter()) c else c.lowercaseChar()).toString()); afterKey()
                 },
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             return r
@@ -764,11 +767,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val tools = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
         lateinit var capsKey: Button
         capsKey = key("Caps: off") { caps = !caps; capsKey.text = if (caps) "Caps: on" else "Caps: off" }
-        tools.addView(capsKey, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
-        tools.addView(key("space") { typed.append(' '); render() },
+        tools.addView(capsKey, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 3f))
+        // The caret moves, so a mistake in the middle of a name is a fix rather than a retype.
+        tools.addView(key("\u25C0") { field.left() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
+        tools.addView(key("\u25B6") { field.right() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
+        tools.addView(key("space") { field.insert(" "); afterKey() },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 4f))
+        tools.addView(key("\u232B") { field.backspace(); afterKey() },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 3f))
-        tools.addView(key("\u232B") { if (typed.isNotEmpty()) { typed.deleteCharAt(typed.length - 1); render() } },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
         card.addView(tools, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         val row = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
@@ -776,7 +782,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(Button(themed).apply {
             text = "Save"; isAllCaps = false
-            setOnClickListener { val name = typed.toString().trim().ifEmpty { defaultName }; dismiss(); onOk(name) }
+            setOnClickListener { val name = field.value.trim().ifEmpty { defaultName }; dismiss(); onOk(name) }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         card.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             .apply { topMargin = 10 })
