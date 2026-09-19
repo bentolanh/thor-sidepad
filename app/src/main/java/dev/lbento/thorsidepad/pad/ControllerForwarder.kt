@@ -46,7 +46,15 @@ class ControllerForwarder(private val sink: BluetoothSink) : IPadEvents.Stub() {
     override fun onEvent(type: Int, code: Int, value: Int) {
         when (type) {
             Ev.KEY -> sink.setKey(code, value != 0)
-            Ev.ABS -> sink.setAbs(code, scalers[code]?.invoke(value) ?: value)
+            Ev.ABS -> {
+                val v = scalers[code]?.invoke(value) ?: value
+                // The Thor reports its sticks with up as positive, while every host reads up as
+                // negative. Android corrects this for its own apps through the device's axis
+                // configuration; reading the kernel directly, as this does, gets the raw sense and
+                // has to turn it the right way up. Measured on the device: pushing up arrived as
+                // +127 at the far end, which a game showed as down.
+                sink.setAbs(code, if (code == Abs.Y || code == Abs.RZ) -v else v)
+            }
             // A controller ends every batch with a sync, which is the moment to send one report
             // rather than one per axis: a stick moving would otherwise be two reports per frame.
             Ev.SYN -> sink.sync()

@@ -296,6 +296,11 @@ the app.
   asynchronous, so the pad appears before the host answers; the local reopen path is skipped
   entirely for a Bluetooth destination since there is nothing there to reopen.
 
+  **The Thor reports its sticks upside down.** Up is positive on the kernel side, while every host
+  reads up as negative. Android corrects it for its own apps through the device's axis
+  configuration, but reading the kernel directly gets the raw sense, so the forwarder turns Y and
+  RZ over. Measured: pushing up arrived at the far end as +127, which a game showed as down.
+
   Shizuku is not required for this. `show()` waits for the injector only when the destination is
   this device; a machine destination opens straight away and the device sliders and media units
   simply have nothing to show without it. The setup screen says so and no longer gates the later
