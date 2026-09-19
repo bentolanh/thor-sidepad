@@ -138,7 +138,75 @@ class OverlayService : Service() {
         } catch (e: Exception) { Log.w(TAG, "reopen failed", e) }
     }
 
+    // ---- pairing: the Thor's own "hold the button until it blinks" -------------------------------
+    @Volatile private var visibleUntil = 0L
+    private val visibleTick = object : Runnable {
+        override fun run() {
+            val ov = overlay ?: return
+            ov.updatePanel(panelState(ov))
+            if (secondsVisible() > 0) main.postDelayed(this, 1000)
+        }
+    }
+
+    /**
+     * After handing the user Android's dialog, watch for the answer rather than guessing at it: when
+     * the device actually goes visible, the panel comes back on the pairing page with the countdown
+     * running, so the moment of "it is listening now" is not missed.
+     */
+    private fun waitForVisible(ov: PadOverlay, secs: Int) {
+        val deadline = SystemClock.elapsedRealtime() + 30_000
+        val check = object : Runnable {
+            override fun run() {
+                // Reading the scan mode needs the scan permission, which this app has no business
+                // asking for: it is the one tied to finding nearby devices. When we may not look,
+                // take the user at their word and start counting; the worst case is a countdown
+                // shown after they pressed Deny, which the next screen corrects anyway.
+                val mode = try {
+                    getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.scanMode
+                } catch (e: SecurityException) { android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE }
+                catch (e: Exception) { null }
+                if (mode == android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+                    visibleUntil = SystemClock.elapsedRealtime() + secs * 1000L
+                    ControlPanel.page = ControlPanel.Page.PAIRING
+                    showPanel(keepPage = true)
+                    main.removeCallbacks(visibleTick); main.post(visibleTick)
+                } else if (SystemClock.elapsedRealtime() < deadline) main.postDelayed(this, 500)
+            }
+        }
+        main.postDelayed(check, 500)
+    }
+
+    private fun secondsVisible(): Int {
+        val left = visibleUntil - SystemClock.elapsedRealtime()
+        return if (left <= 0) 0 else ((left + 999) / 1000).toInt()
+    }
+
+    /**
+     * Turns discoverability on and counts it down on the panel. The shell can do it outright, which
+     * keeps the whole thing on the pad; if it cannot, Android's own dialog is the fallback and the
+     * panel steps aside for it, since a dialog is an activity and would otherwise sit underneath.
+     */
+    private fun makeThorVisible(ov: PadOverlay) {
+        val secs = 120
+        // Android's own dialog is the moment of consent, and it doubles as the "pairing mode" ritual
+        // a person expects: something asks, they agree, and then it is listening. Asked by us rather
+        // than through the shell, so it names SidePad and not "Shell".
+        ov.removePanel()
+        try {
+            val i = Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                .putExtra(android.bluetooth.BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, secs)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val o = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(ov.displayId)
+            startActivity(i, o.toBundle())
+        } catch (e: Exception) { Log.w(TAG, "discoverable dialog failed", e) }
+        waitForVisible(ov, secs)
+    }
+
     /** Machines the Thor is paired with, computers first since those are what this is for. */
+    private fun bluetoothName(): String = try {
+        getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.name ?: "this device"
+    } catch (e: Exception) { "this device" }
+
     private fun pairedHosts(): List<HostChoice> = try {
         val a = getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
         (a?.bondedDevices ?: emptySet())
@@ -150,7 +218,8 @@ class OverlayService : Service() {
         targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL,
         shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset,
         remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
-        hostAddress = prefs.btHost, hostConnected = btSink?.connected == true)
+        hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
+        padName = bluetoothName(), visibleFor = secondsVisible())
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {
@@ -780,11 +849,10 @@ class OverlayService : Service() {
                 ov.updatePanel(panelState(ov))
             }
 
-            /** Pairing is Android's own dialog; there is no way to do it from inside an overlay. */
-            override fun pairMachine() {
-                ov.removePanel()
-                shellAsync("am start --display ${ov.displayId} -a android.settings.BLUETOOTH_SETTINGS")
-            }
+            /** The page itself is the pairing screen now; nothing to do but show it. */
+            override fun pairMachine() {}
+
+            override fun makeVisible() = makeThorVisible(ov)
 
             override fun stopService() {
                 ov.removePanel(); padDirty = false

@@ -300,6 +300,19 @@ the app.
   cached descriptor above and not the report code.
 
   Verified against a Mac: tapping A, Y and B on the pad arrived as buttons 1, 5 and 2, down and up.
+  **Pairing lives in the panel.** A controller normally makes you hold a button until a light
+  blinks, which tells you it is listening, that it will stop, and that now is the moment to look on
+  the other machine. The Thor said none of that, and handing the user off to Android's Bluetooth
+  settings was worse, because Settings is the screen that hides every overlay and the pad vanishes
+  with it. So the Pair page asks Android for discoverability itself and then shows the name to look
+  for with a live countdown. The consent dialog is left in place deliberately: making a device
+  visible without asking is not ours to do, and the dialog doubles as the ritual people expect. It
+  is raised by the app rather than through the shell so it names SidePad instead of "Shell".
+
+  Reading the scan mode back needs `BLUETOOTH_SCAN`, the permission tied to finding nearby devices,
+  which this app has no business holding. When the read is refused the countdown starts anyway on
+  the user's word.
+
   The panel asks the two questions separately, because adding a machine split them. **Send to** is
   where presses go, this device or a paired machine; **Appears as** is what the receiver thinks they
   come from, which locally means the Thor's own controller or a separate virtual pad and remotely

@@ -44,6 +44,9 @@ data class PanelState(
     val hosts: List<HostChoice> = emptyList(),
     val hostAddress: String = "",
     val hostConnected: Boolean = false,
+    /** Pairing: the name a computer will see, and how long the Thor is still visible for. */
+    val padName: String = "",
+    val visibleFor: Int = 0,
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -57,6 +60,7 @@ interface PanelActions {
     /** Empty address = this device; otherwise the paired machine to send to. */
     fun setDestination(address: String)
     fun pairMachine()
+    fun makeVisible()
     fun stopService()
     fun openApp()
     fun startShizuku()
@@ -69,7 +73,7 @@ interface PanelActions {
  * display and tapping it closes the panel. Everything here works without window focus.
  */
 object ControlPanel {
-    enum class Page { MAIN, CONTROLLER, DESTINATION }
+    enum class Page { MAIN, CONTROLLER, DESTINATION, PAIRING }
 
     /** Remembered so a re-render after a setting change stays on the same page. */
     var page: Page = Page.MAIN
@@ -139,6 +143,7 @@ object ControlPanel {
             bar.addView(label(when (page) {
                 Page.MAIN -> "Thor SidePad"
                 Page.DESTINATION -> "Send to"
+                Page.PAIRING -> "Pair a new machine"
                 else -> "Appears as"
             }, 20f),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page != Page.MAIN) 16 else 0 })
@@ -202,6 +207,26 @@ object ControlPanel {
                     marginStart = 140; marginEnd = 140
                 })
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
+            } else if (page == Page.PAIRING) {
+                // A controller normally has a button you hold until a light blinks. This is that
+                // light: it says the Thor is listening, what to look for, and how long is left.
+                if (state.visibleFor > 0) {
+                    card.addView(label("Visible now as \u201C${state.padName}\u201D", 22f))
+                    card.addView(label("${state.visibleFor} seconds left", 16f, grey))
+                    card.addView(label(
+                        "On the computer, open Bluetooth and choose \u201C${state.padName}\u201D. " +
+                        "Once it has paired it stays paired; you only do this once per machine.",
+                        13f, grey).apply { setPadding(0, 14, 0, 0) })
+                } else {
+                    card.addView(label("The Thor is not visible to other machines", 18f))
+                    card.addView(label(
+                        "Making it visible is the same as holding the pairing button on an ordinary " +
+                        "controller. It lasts two minutes, then stops on its own.",
+                        13f, grey).apply { setPadding(0, 6, 0, 12) })
+                    card.addView(btn("Make the Thor visible") { actions.makeVisible() }.apply {
+                        setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
+                    })
+                }
             } else if (page == Page.DESTINATION) {
                 card.addView(label("Send presses to", 14f, grey))
                 card.addView(btn((if (!state.remote) "\u25CF  " else "") + "This device", state.remote) { actions.setDestination("") })
@@ -209,7 +234,7 @@ object ControlPanel {
                     val active = state.remote && h.address == state.hostAddress
                     card.addView(btn((if (active) "\u25CF  " else "") + h.label, !active) { actions.setDestination(h.address) })
                 }
-                card.addView(btn("Pair a new machine\u2026") { actions.pairMachine() })
+                card.addView(btn("Pair a new machine\u2026") { page = Page.PAIRING; render() })
                 card.addView(label(
                     if (state.hosts.isEmpty())
                         "Nothing paired yet. Pair a computer and the Thor becomes a controller for it, over Bluetooth."
