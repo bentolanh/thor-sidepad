@@ -729,6 +729,29 @@ the app.
   macOS will quietly stop running, so it needs `NSAppSleepDisabled` and a heartbeat line, without
   which an empty capture cannot be told from a sleeping one.
 
+  **The Xbox shape works, measured 2026-09-19 after it was fitted.** RPCS3 and RetroArch both
+  pick the pad up with no configuration at all — worth noting because the mapping files written
+  for them earlier are keyed to the old identity and cannot be what is matching. Apple's framework
+  reports the pad with an `extendedGamepad` profile, which is the thing native games require, and
+  input reaches it: a press arrives as `button value=1.0` and a stick sweep as `x=-1.0`. So the
+  whole chain up to and including the framework is sound.
+
+  Native games still not responding is therefore most likely about which controller a game takes
+  rather than about this one. Three were attached at once during the test — the pad, an 8BitDo,
+  and something calling itself GamePad-1 — and a game usually binds player one to the first it
+  finds. Untested; disconnect the others and try again before looking anywhere else.
+
+  ### Two rough edges, found 2026-09-19, not yet fixed
+
+  A device unpaired from Android's own settings still shows as paired in the panel. Nothing tells
+  the app the bond has gone, so the list it keeps goes stale. It wants a `BOND_STATE_CHANGED`
+  receiver that drops the address from `pairedHostList`, the way pairing adds it.
+
+  The countdown on the pairing page sticks at 119 seconds. The panel is only asked to redraw twice
+  after the button is pressed, so it shows a number from a second ago and then never again; the
+  Classic path had the same shape but its dialog redrew for other reasons. It wants a repeating
+  tick while that page is open, stopping when the count reaches zero.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
