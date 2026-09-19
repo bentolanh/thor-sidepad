@@ -617,6 +617,25 @@ the app.
   no reason to repeat. Storing that per bonded client is the peripheral's responsibility in the
   specification, and skipping it looks exactly like a dead link.
 
+  **The bond was the wrong kind, and that explains all of it.** `createBond()` does not let the
+  caller say which radio, and for a machine Android already knows over Classic it picks Classic.
+  Checked on 2026-09-19, the bond with the Mac read `[BR/EDR]` every time while the pad was
+  talking Low Energy. A Classic bond carries no Low Energy identity key, and without that key a
+  Low Energy address is disposable — the host has no way to know the same pad is back. Hence five
+  entries called Thor in the Mac's list, none of which it offered to forget, and no re-attaching
+  after anything at all. The one session that did work was living off keys derived from the
+  Classic bond, which is the same confound that produced the withdrawn Xbox finding above.
+
+  The method that names the radio is not in the public API, so it is asked for by name with the
+  plain one as fallback. Whether Android 13 allows the call is unconfirmed; the log says which
+  path it took.
+
+  **Both sides must forget, or nothing changes.** Forgetting the pad on the host removes only the
+  host's copy. The handheld keeps its own bond with stale keys, and a fresh pairing attempt then
+  never reaches the server at all — seen on 2026-09-19 as pairing attempts that produced no
+  connection whatsoever on this side while the Thor still listed the Mac as bonded. There is no
+  adb command for it; it is done from the handheld's own Bluetooth settings.
+
   **Still broken: a host will not re-attach after the server is torn down and rebuilt.** Within one
   session everything holds. Once the app restarts, the Mac reconnects, bonds, negotiates a packet
   size — and never creates a HID device again, until it is made to forget the pad and pair afresh.

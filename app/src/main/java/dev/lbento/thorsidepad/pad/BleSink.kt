@@ -245,8 +245,24 @@ class BleSink(
      */
     private fun createBondWith(device: BluetoothDevice) {
         try {
-            Log.i(TAG, "asking ${device.address} to pair")
-            if (!device.createBond()) Log.w(TAG, "the pairing request was refused outright")
+            Log.i(TAG, "asking ${device.address} to pair over Low Energy")
+            // Which radio the bond is made over is not a detail. Asked without saying, Android
+            // picks for itself, and for a machine it already knows over Classic it picks Classic
+            // — measured on 2026-09-19, the bond came out BR/EDR every time while the pad was
+            // talking Low Energy. A Classic bond carries no Low Energy identity key, so the
+            // machine cannot tell it is the same pad next time: a Low Energy address is a
+            // disposable one, and recognising it across sessions is exactly what that key is for.
+            // Hence five entries called Thor in the machine's list, none of which it could keep.
+            // The method that says which radio is not in the public API, so it is asked for by
+            // name and the plain one is the fallback.
+            val asked = try {
+                val m = BluetoothDevice::class.java.getMethod("createBond", Int::class.javaPrimitiveType)
+                m.invoke(device, BluetoothDevice.TRANSPORT_LE) as? Boolean ?: false
+            } catch (e: Exception) {
+                Log.i(TAG, "could not name the radio to pair over (${e.javaClass.simpleName}); asking plainly")
+                device.createBond()
+            }
+            if (!asked) Log.w(TAG, "the pairing request was refused outright")
         } catch (e: SecurityException) { Log.w(TAG, "no permission to pair", e) }
     }
 
@@ -293,8 +309,10 @@ class BleSink(
                 // otherwise was tried and was worse than useless — the pad reported itself
                 // connected and sent presses to a host that had not asked for any, so a link that
                 // was plainly broken looked like a working one.
-                if (isBonded(device)) Log.i(TAG, "${device.address} has bonded before")
-                else createBondWith(device)
+                // Asked even when a bond already exists, because the one that matters here is a
+                // Low Energy bond and a machine may well hold only a Classic one with this same
+                // pad. A request for a bond that is genuinely already there is refused harmlessly.
+                createBondWith(device)
                 startHeartbeat()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "${device.address} went away")
