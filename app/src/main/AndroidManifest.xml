@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Probe only for now: presenting as a Bluetooth gamepad to another machine. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Being a Low Energy gamepad means advertising one. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
     <queries>
         <package android:name="moe.shizuku.privileged.api" />

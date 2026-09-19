@@ -17,7 +17,7 @@ import org.json.JSONObject
  * tens of thousands wide, while the gamepad we advertise is a single signed byte. The ranges are
  * read from the device itself rather than assumed.
  */
-class ControllerForwarder(private val sink: BluetoothSink) : IPadEvents.Stub() {
+class ControllerForwarder(private val sink: PadTransport) : IPadEvents.Stub() {
 
     private var scalers: Map<Int, (Int) -> Int> = emptyMap()
 

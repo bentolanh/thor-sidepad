@@ -19,6 +19,27 @@ interface PadSink {
     fun abs(code: Int, value: Int): Int
 }
 
+/**
+ * A destination that is another machine, whichever radio it is reached over.
+ *
+ * Two of these exist and both will stay: Classic is what Windows and Android want, Low Energy is
+ * the only one where the identity a host reads is ours to choose. They differ in nothing the pad
+ * cares about, which is what this is for — the forwarder and the engine talk to this and never
+ * learn which is underneath.
+ */
+interface PadTransport : PadSink {
+    /** Whether a machine is on the other end right now. */
+    val connected: Boolean
+    /** Changes the state without sending. Used when a burst of events ends in a sync. */
+    fun setKey(code: Int, down: Boolean)
+    fun setAbs(code: Int, value: Int)
+    /** Sends whatever the state currently says. */
+    fun sync(): Int
+    /** Tries the link again after it has dropped. What that means differs per radio. */
+    fun reconnect()
+    fun close()
+}
+
 /** The original destination: this device, through Shizuku and the kernel. */
 class LocalSink(private val svc: IInjector) : PadSink {
     override fun key(code: Int, down: Boolean): Int = svc.key(code, down)

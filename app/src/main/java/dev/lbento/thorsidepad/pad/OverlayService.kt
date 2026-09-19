@@ -435,11 +435,23 @@ class OverlayService : Service() {
                 if (prefs.targetMode == Prefs.MODE_BT) {
                     // Another machine. Opening is asynchronous, so the pad goes up now and the first
                     // presses simply do not land until the host answers; the state callback says so.
-                    val bt = btSink ?: BluetoothSink(this) { msg ->
+                    val note: (String) -> Unit = { msg ->
                         main.post { refreshLinkBadge() }
                         if (msg.isNotEmpty()) Log.i(TAG, "link: $msg")
-                    }.also { btSink = it }
-                    bt.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+                    }
+                    val bt = btSink ?: if (prefs.btTransport == Prefs.TRANSPORT_LE) {
+                        // A Low Energy pad does not dial a host; it makes itself findable and the
+                        // host comes to it. So there is no address to open with.
+                        BleSink(this, bleIdentity(), note).also { s ->
+                            btSink = s
+                            s.open { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+                        }
+                    } else {
+                        BluetoothSink(this, note).also { s ->
+                            btSink = s
+                            s.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+                        }
+                    }
                     sink = bt; caps = BluetoothSink.CAPS
                     // The pad does not wait for Shizuku here, but forwarding the real controller
                     // does need it, so ask for it in the background and start when it arrives.
@@ -476,8 +488,11 @@ class OverlayService : Service() {
         }
     }
 
-    private var btSink: BluetoothSink? = null
+    private var btSink: PadTransport? = null
     private var forwarder: ControllerForwarder? = null
+
+    private fun bleIdentity(): BleSink.Identity =
+        try { BleSink.Identity.valueOf(prefs.btIdentity) } catch (_: Exception) { BleSink.Identity.OWN }
 
     /**
      * Shows a badge on the pad only while the link to the machine is down. A connected pad says
@@ -506,7 +521,7 @@ class OverlayService : Service() {
      */
     @Volatile private var forwardingWanted = false
 
-    private fun startForwarding(bt: BluetoothSink, svc: IInjector?) {
+    private fun startForwarding(bt: PadTransport, svc: IInjector?) {
         if (svc == null) { Log.i(TAG, "no Shizuku: only the on-screen pad will reach the machine"); return }
         // Both the direct path and the late connection can arrive; only one may hold the controller.
         synchronized(this) { if (forwardingWanted) return; forwardingWanted = true }

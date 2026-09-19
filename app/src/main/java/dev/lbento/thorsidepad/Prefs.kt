@@ -25,6 +25,27 @@ class Prefs(ctx: Context) {
         if (all.add(address)) pairedHostList = all.joinToString(",")
     }
 
+    /**
+     * Which radio carries presses to a machine, when the destination is one.
+     *
+     * Classic is the default and stays that way: it is what Windows and Android expect, and it is
+     * what every host has already paired with. Low Energy exists because over Classic the vendor
+     * and product numbers a host reads belong to the handheld's Bluetooth chip and cannot be
+     * changed, while over Low Energy they are ours, which is what lets one mapping serve every
+     * handheld this runs on instead of one per radio.
+     *
+     * A host that has paired one of them may refuse to see the other, so switching is a re-pair
+     * rather than a toggle, and only one is ever open at a time.
+     */
+    var btTransport: String
+        get() = sp.getString("btTransport", TRANSPORT_CLASSIC) ?: TRANSPORT_CLASSIC
+        set(v) = sp.edit().putString("btTransport", v).apply()
+
+    /** What a host is told the pad is, when it is carried over Low Energy. See BleSink.Identity. */
+    var btIdentity: String
+        get() = sp.getString("btIdentity", "OWN") ?: "OWN"
+        set(v) = sp.edit().putString("btIdentity", v).apply()
+
     /** The paired machine presses are sent to, when the destination is another machine. */
     var btHost: String
         get() = sp.getString("btHost", "") ?: ""
@@ -94,5 +115,7 @@ class Prefs(ctx: Context) {
         const val MODE_VIRTUAL = "virtual"
         /** Presses go to another machine over Bluetooth rather than into this device. */
         const val MODE_BT = "bt"
+        const val TRANSPORT_CLASSIC = "classic"
+        const val TRANSPORT_LE = "le"
     }
 }

@@ -24,12 +24,12 @@ import java.util.concurrent.TimeUnit
  * [CAPS] describes the same shape in the terms the engine already speaks, so layouts, profiles and
  * everything else carry over untouched.
  */
-class BluetoothSink(private val ctx: Context, private val onState: (String) -> Unit = {}) : PadSink {
+class BluetoothSink(private val ctx: Context, private val onState: (String) -> Unit = {}) : PadTransport {
 
     private val pool = Executors.newSingleThreadExecutor()
     private var hid: BluetoothHidDevice? = null
     @Volatile private var host: BluetoothDevice? = null
-    @Volatile var connected = false; private set
+    @Volatile override var connected = false; private set
 
     /** The live report: buttons, four stick axes, two triggers, and the hat in the low nibble. */
     private val report = ByteArray(9)
@@ -43,6 +43,17 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
 
     private val ticker = Executors.newSingleThreadScheduledExecutor()
     private var heartbeat: ScheduledFuture<*>? = null
+
+    /**
+     * The hat's resting value is eight, not zero.
+     *
+     * Zero is north. A report that has never carried a hat event therefore says the D-pad is held
+     * up, and stays saying it until the player touches the D-pad once. Seen on 2026-09-19 in the
+     * first bytes a host received over Low Energy; the Classic sink hid the same fault because the
+     * forwarder sends the controller's resting axes the moment it attaches, and the on-screen pad
+     * alone never did.
+     */
+    init { report[8] = 8 }
 
     fun open(address: String, report: (String) -> Unit) {
         // The status callback fires again when the gamepad is taken down, saying it is no longer
@@ -100,13 +111,13 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     }
 
     /** Ask the host again, for when the link has dropped and the player wants it back. */
-    fun reconnect() {
+    override fun reconnect() {
         val h = hid ?: return
         val d = host ?: return
         try { h.connect(d) } catch (e: Exception) { Log.w(TAG, "reconnect", e) }
     }
 
-    fun close() {
+    override fun close() {
         val h = hid ?: return
         stopHeartbeat()
         try { host?.let { h.disconnect(it) }; h.unregisterApp() } catch (_: Exception) {}
@@ -116,7 +127,7 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     // ---- PadSink -----------------------------------------------------------------------------
 
     /** Updates the report without sending. Used when a burst of events ends in a sync. */
-    fun setKey(code: Int, down: Boolean) {
+    override fun setKey(code: Int, down: Boolean) {
         val bit = BUTTONS[code] ?: return            // nothing to say for this one, not a failure
         val i = bit / 8
         val mask = 1 shl (bit % 8)
@@ -126,7 +137,7 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
         }
     }
 
-    fun setAbs(code: Int, value: Int) {
+    override fun setAbs(code: Int, value: Int) {
         synchronized(lock) {
             when (code) {
                 Abs.HAT0X -> { hatX = value; writeHat() }
@@ -137,7 +148,7 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     }
 
     /** Sends whatever the report currently says. */
-    fun sync(): Int = send()
+    override fun sync(): Int = send()
 
     override fun key(code: Int, down: Boolean): Int { setKey(code, down); return send() }
 
@@ -245,6 +256,12 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     }
 
     companion object {
+        // Shared with the Low Energy sink next door. A host must be shown one gamepad, not two
+        // that disagree, so both transports read the arrangement from here.
+        fun buttonBit(code: Int): Int? = BUTTONS[code]
+        fun axisByte(code: Int): Int? = AXES[code]
+        fun reportDescriptor(): ByteArray = DESCRIPTOR
+
         private const val TAG = "SidePadBtSink"
         /** About sixteen milliseconds of trying, which outlasts any ordinary link hiccup. */
         private const val RETRIES = 8

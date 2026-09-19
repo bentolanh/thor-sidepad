@@ -597,6 +597,36 @@ the app.
   so that picking one identity tears down the other rather than leaving two links to the same host
   in two modes at once.
 
+  **The Low Energy transport works, bonding and all, measured 2026-09-19.** `BleSink` sits beside
+  the Classic sink behind `PadTransport`, and the two share one button table and one report
+  descriptor so a host can never be shown two gamepads that disagree. The chain, first attempt:
+  the Mac connected, was asked to pair, bonded, negotiated a 517-byte packet, subscribed, and took
+  presses — arriving under `1209:5350`, an identity of ours rather than the handheld's chipset.
+
+  Three things made the difference over the probe that failed all evening, in the order they
+  mattered. **It asks to pair rather than waiting to be asked**: a peripheral is supposed to let
+  the host notice an encrypted characteristic and start pairing, and across four attempts this Mac
+  never did — it connected, read what was in the clear, and hung up. **Nothing useful is readable
+  without encryption**, so a host that ignores the invitation gets a device it cannot use instead
+  of one that half works. **The profile is complete**, battery service and report-reference
+  descriptor included, both of which the probe lacked.
+
+  **A bonded host does not ask twice to be sent reports, and remembering that is our job.** After a
+  reinstall the Mac reconnected by itself, said it was bonded, and then sat in silence: the sink
+  had reset its idea of whether anyone was subscribed and was waiting for a request the host had
+  no reason to repeat. Storing that per bonded client is the peripheral's responsibility in the
+  specification, and skipping it looks exactly like a dead link.
+
+  **Still broken: a host will not re-attach after the server is torn down and rebuilt.** Within one
+  session everything holds. Once the app restarts, the Mac reconnects, bonds, negotiates a packet
+  size — and never creates a HID device again, until it is made to forget the pad and pair afresh.
+  That has the shape of a cached attribute table: a host keeps the service layout of a bonded
+  peripheral and does not look again, while this rebuilds its whole table on every show. A real
+  gamepad's table never changes, which is why real gamepads do not have this problem. The
+  direction is to stand the server up once for the life of the foreground service rather than per
+  show and hide, and that is where to start next; whether it is enough after the process itself
+  dies is not yet known.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
