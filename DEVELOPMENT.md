@@ -779,6 +779,23 @@ the app.
   So: never advertise while a host is attached, and turn away a second machine rather than serving
   it alongside the first. A pad is a thing one person holds.
 
+  **Apple's framework cannot tell this pad from a real one, and a native game still ignores it.**
+  Compared side by side on 2026-09-19 with an 8BitDo that works in the same game: controller class,
+  product category, player index, profile class, element count, current-controller flag, battery
+  and haptics are identical on both, down to `GCXboxGamepad` and thirty-four elements. Input
+  arrives correctly too — A reads as `A Button`, the left stick as −1.00. So every theory of the
+  form "a game filters on something and we fail it" is dead; there is nothing visible to fail.
+
+  Removing the `Usage(Pointer)` wrapper did what it was meant to — one device in the list instead
+  of two, usage pairs down to a lone gamepad — and changed nothing about the game, so the shadow
+  was innocent. RPCS3 and RetroArch continue to take the pad with no configuration.
+
+  The only structural difference left is that this descriptor is a subset. The pad it was copied
+  from declares four reports: the gamepad, a system-control bit, a rumble **output** report, and
+  battery. This declares the gamepad alone. A game that reaches for rumble on an Xbox controller
+  and finds no output report to write to could reasonably give up on the device, and Unity's input
+  layer does reach for it. Untested, and the next thing to try.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
