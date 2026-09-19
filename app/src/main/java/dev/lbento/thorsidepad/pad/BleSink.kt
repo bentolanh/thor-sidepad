@@ -70,6 +70,7 @@ class BleSink(
     @Volatile private var subscribed = false
     private var server: BluetoothGattServer? = null
     private var advertiser: AdvertiseCallback? = null
+    @Volatile private var wantAdvertising = false
     private var reportChar: BluetoothGattCharacteristic? = null
 
     /** Buttons, four stick axes, two triggers, the hat in the low nibble. Same shape as Classic. */
@@ -143,11 +144,12 @@ class BleSink(
      */
     override fun reconnect() {
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return
-        try { advertiser?.let { adapter.bluetoothLeAdvertiser?.stopAdvertising(it) } } catch (_: Exception) {}
+        stopAdvertising()
         startAdvertising(adapter)
     }
 
     override fun close() {
+        wantAdvertising = false
         stopHeartbeat()
         try { ctx.unregisterReceiver(bondWatcher) } catch (_: Exception) {}
         try {
@@ -241,8 +243,25 @@ class BleSink(
             override fun onStartFailure(code: Int) { Log.w(TAG, "advertising refused, code $code") }
         }
         advertiser = cb
+        wantAdvertising = true
         le.startAdvertising(settings, data, cb)
         return true
+    }
+
+    private fun stopAdvertising() {
+        val cb = advertiser ?: return
+        try {
+            val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
+            adapter?.bluetoothLeAdvertiser?.stopAdvertising(cb)
+            Log.i(TAG, "stopped calling out; a machine has us")
+        } catch (e: Exception) { Log.w(TAG, "stopAdvertising", e) }
+        advertiser = null
+    }
+
+    private fun resumeAdvertising() {
+        if (!wantAdvertising || advertiser != null) return
+        val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return
+        startAdvertising(adapter)
     }
 
     // ---- bonding -------------------------------------------------------------------------------
@@ -316,6 +335,12 @@ class BleSink(
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 host = device; connected = true
                 Log.i(TAG, "${device.address} connected")
+                // A controller stops calling out the moment a machine takes it, and so should
+                // this. Advertising while already connected is no use to anyone: the machine that
+                // has us cannot use it, every other device in the room is shown a gamepad it will
+                // never be offered, and each session leaves another entry in their lists that
+                // nobody asked for. It goes back up if the link drops.
+                stopAdvertising()
                 // A bond only means this host has been here before. Whether it is listening is a
                 // separate question and only it can answer: it says so by subscribing. Assuming
                 // otherwise was tried and was worse than useless — the pad reported itself
@@ -337,6 +362,8 @@ class BleSink(
                 if (host?.address == device.address) {
                     host = null; connected = false; subscribed = false
                     stopHeartbeat()
+                    // Findable again, now that being findable means something.
+                    resumeAdvertising()
                     onState("Not connected")
                 }
             }
