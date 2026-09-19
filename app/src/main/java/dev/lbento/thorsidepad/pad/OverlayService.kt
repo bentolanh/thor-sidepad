@@ -270,7 +270,8 @@ class OverlayService : Service() {
         shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset,
         remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
         hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
-        padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts())
+        padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts(),
+        transport = prefs.btTransport, identity = prefs.btIdentity)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {
@@ -393,6 +394,8 @@ class OverlayService : Service() {
         visible = false
         // Only a deliberate Stop lets the shell process go. Dying any other way has to leave it
         // running, because it is the thing that puts the pad back.
+        // The service is going; nothing is left to hold the gamepad up.
+        btSink?.close(); btSink = null
         if (userStopped) try { Injector.disconnect(this) } catch (_: Exception) {}
         super.onDestroy()
     }
@@ -489,6 +492,17 @@ class OverlayService : Service() {
     }
 
     private var btSink: PadTransport? = null
+
+    /**
+     * Lets a Low Energy pad go, but only when it should: the destination is no longer a machine,
+     * or the radio underneath has been changed. Hiding the pad is not a reason.
+     */
+    private fun releaseBleIfIdle() {
+        val stillWanted = prefs.targetMode == Prefs.MODE_BT &&
+            prefs.btTransport == Prefs.TRANSPORT_LE && !userStopped
+        if (stillWanted) return
+        btSink?.close(); btSink = null
+    }
     private var forwarder: ControllerForwarder? = null
 
     private fun bleIdentity(): BleSink.Identity =
@@ -555,7 +569,18 @@ class OverlayService : Service() {
         prefs.padShown = false
         overlay?.showLinkBadge(null) {}
         stopForwarding()
-        btSink?.close(); btSink = null
+        // A Low Energy gamepad is left standing. Tearing the server down and building it again
+        // is not free the way it is over Classic: a host keeps the service layout of a peripheral
+        // it has bonded with and will not look a second time, so a pad that is hidden and shown
+        // comes back bonded, connected, and invisible to the host's input stack until it is made
+        // to forget and pair afresh. Real controllers never rearrange themselves, which is why
+        // real controllers do not have this. So it lives as long as the service does, and only
+        // dropping the link or changing transport takes it down.
+        if (btSink is BleSink) {
+            releaseBleIfIdle()
+        } else {
+            btSink?.close(); btSink = null
+        }
         stopImeWatch(); stopNowWatch(); imeSuspended = false
         overlay?.removeAll()
         engine?.shutdown(); engine = null
@@ -936,6 +961,35 @@ class OverlayService : Service() {
                 ControlPanel.page = ControlPanel.Page.MAIN
                 if (visible) { hide(); show() }
                 ov.updatePanel(panelState(ov))
+            }
+
+            /**
+             * Changes the radio presses are carried over.
+             *
+             * The link has to come all the way down. To a machine these are two different devices
+             * — different address kind, different bond — so one cannot be handed over to the
+             * other, and the machine has to pair again with whichever is chosen. Saying that
+             * plainly on the page is kinder than letting someone discover it.
+             */
+            override fun setTransport(value: String) {
+                if (prefs.btTransport == value) return
+                prefs.btTransport = value
+                btSink?.close(); btSink = null
+                if (visible) { hide(); show() }
+                ov.updatePanel(panelState(ov))
+                toast(if (value == Prefs.TRANSPORT_LE)
+                          "Now a Low Energy gamepad \u2014 pair with it again from the machine"
+                      else "Back to Classic Bluetooth")
+            }
+
+            /** What a machine is told the pad is. Also a different device, so also a re-pair. */
+            override fun setIdentity(value: String) {
+                if (prefs.btIdentity == value) return
+                prefs.btIdentity = value
+                btSink?.close(); btSink = null
+                if (visible) { hide(); show() }
+                ov.updatePanel(panelState(ov))
+                toast("Pair with it again from the machine")
             }
 
             /** The page itself is the pairing screen now; nothing to do but show it. */

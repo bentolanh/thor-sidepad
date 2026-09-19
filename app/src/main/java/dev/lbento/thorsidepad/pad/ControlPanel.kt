@@ -49,6 +49,9 @@ data class PanelState(
     val visibleFor: Int = 0,
     /** Computers already paired with this Thor that SidePad does not yet know about. */
     val adoptable: List<HostChoice> = emptyList(),
+    /** Which radio carries presses to a machine, and what that machine is told the pad is. */
+    val transport: String = "classic",
+    val identity: String = "OWN",
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -61,6 +64,8 @@ interface PanelActions {
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
     /** Empty address = this device; otherwise the paired machine to send to. */
     fun setDestination(address: String)
+    fun setTransport(value: String)
+    fun setIdentity(value: String)
     fun pairMachine()
     fun makeVisible()
     fun adoptMachine(address: String)
@@ -76,7 +81,7 @@ interface PanelActions {
  * display and tapping it closes the panel. Everything here works without window focus.
  */
 object ControlPanel {
-    enum class Page { MAIN, CONTROLLER, DESTINATION, PAIRING }
+    enum class Page { MAIN, CONTROLLER, DESTINATION, PAIRING, APPEARANCE }
 
     /** Remembered so a re-render after a setting change stays on the same page. */
     var page: Page = Page.MAIN
@@ -146,6 +151,7 @@ object ControlPanel {
             bar.addView(label(when (page) {
                 Page.MAIN -> "Thor SidePad"
                 Page.DESTINATION -> "Send to"
+                Page.APPEARANCE -> "Appears as"
                 Page.PAIRING -> "Pair a new machine"
                 else -> "Appears as"
             }, 20f),
@@ -179,9 +185,10 @@ object ControlPanel {
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
                 choicesGroup.addView(pickerRow("Send to", whereTo) { page = Page.DESTINATION; render() })
                 choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-                choicesGroup.addView(pickerRow("Appears as", if (state.remote) "A gamepad" else target) {
-                    // Remote has only one answer for now; the row stays so the question is visible.
-                    if (!state.remote) { page = Page.CONTROLLER; render() }
+                val remoteAs = (if (state.transport == "le") "Low Energy" else "Classic") +
+                    (if (state.transport == "le" && state.identity == "XBOX") ", as an Xbox pad" else "")
+                choicesGroup.addView(pickerRow("Appears as", if (state.remote) remoteAs else target) {
+                    page = if (state.remote) Page.APPEARANCE else Page.CONTROLLER; render()
                 })
                 choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
                 choicesGroup.addView(pickerRow("Profile", state.activeProfile) { actions.pickProfile() })
@@ -237,6 +244,23 @@ object ControlPanel {
                     card.addView(label("Already paired with this Thor", 14f, grey)
                         .apply { setPadding(0, 18, 0, 4) })
                     for (h in state.adoptable) card.addView(btn("Use ${h.label}") { actions.adoptMachine(h.address) })
+                }
+            } else if (page == Page.APPEARANCE) {
+                card.addView(label("Carried over", 14f, grey))
+                val le = state.transport == "le"
+                card.addView(btn((if (!le) "\u25CF  " else "") + "Classic Bluetooth", le) { actions.setTransport("classic") })
+                card.addView(btn((if (le) "\u25CF  " else "") + "Bluetooth Low Energy", !le) { actions.setTransport("le") })
+                card.addView(label(
+                    "Classic is what Windows and most machines expect. Low Energy lets the pad choose what it calls itself, which is what makes one setup work on every handheld \u2014 but a machine that has paired one of these has to be paired again to use the other.",
+                    12f, grey).apply { setPadding(0, 10, 0, 0) })
+                if (le) {
+                    card.addView(label("Known to the machine as", 14f, grey).apply { setPadding(0, 18, 0, 4) })
+                    val xbox = state.identity == "XBOX"
+                    card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
+                    card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
+                    card.addView(label(
+                        "As SidePad it is honest about what it is, and a machine needs telling once which button is which. As an Xbox pad most games know the layout already, which is what nearly every third-party controller does. Either way this is a different device to the machine, so it needs pairing again after a change.",
+                        12f, grey).apply { setPadding(0, 10, 0, 0) })
                 }
             } else if (page == Page.DESTINATION) {
                 card.addView(label("Send presses to", 14f, grey))
