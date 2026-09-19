@@ -218,6 +218,30 @@ object ControlPanel {
                 })
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
             } else if (page == Page.PAIRING && state.transport == "le") {
+                if (state.visibleFor > 0) {
+                    card.addView(label("Findable now as \u201C${state.padName}\u201D", 22f))
+                    card.addView(label("${state.visibleFor} seconds left", 16f, grey))
+                    card.addView(label(
+                        "On the computer, open Bluetooth and pick \u201C${state.padName}\u201D from the " +
+                        "nearby devices \u2014 not from the already-paired list.",
+                        13f, grey).apply { setPadding(0, 14, 0, 0) })
+                } else {
+                    card.addView(label("The Thor is not announcing itself", 18f))
+                    card.addView(label(
+                        "The rest of the time it stays quiet, and only the machine it already belongs " +
+                        "to can reach it. This is the pairing button an ordinary controller has: it " +
+                        "lasts two minutes, then stops on its own.",
+                        13f, grey).apply { setPadding(0, 6, 0, 12) })
+                    card.addView(btn("Make the Thor findable") { actions.makeVisible() }.apply {
+                        setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
+                    })
+                }
+                card.addView(label(
+                    "If it has paired before and will not connect, both sides have to forget it: on " +
+                    "the computer, and on the Thor under its own Bluetooth settings. Forgetting on " +
+                    "one side alone leaves keys behind and the next attempt quietly fails.",
+                    13f, grey).apply { setPadding(0, 16, 0, 0) })
+            } else if (page == Page.PAIRING && state.transport == "le_unused") {
                 // Pairing is not one thing. Over Classic the Thor has to be made visible for a
                 // couple of minutes, the way a controller is held until its light blinks. Over
                 // Low Energy it is already calling out for as long as the pad is up, and there is
@@ -286,9 +310,7 @@ object ControlPanel {
                     val active = state.remote && h.address == state.hostAddress
                     card.addView(btn((if (active) "\u25CF  " else "") + h.label, !active) { actions.setDestination(h.address) })
                 }
-                card.addView(btn(if (state.transport == "le") "How to pair a machine\u2026" else "Pair a new machine\u2026") {
-                    page = Page.PAIRING; render()
-                })
+                card.addView(btn("Pair a new machine\u2026") { page = Page.PAIRING; render() })
                 card.addView(label(
                     if (state.hosts.isEmpty())
                         "Nothing paired yet. Pair a computer and the Thor becomes a controller for it, over Bluetooth."

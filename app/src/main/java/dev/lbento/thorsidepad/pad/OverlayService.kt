@@ -177,6 +177,9 @@ class OverlayService : Service() {
     }
 
     private fun secondsVisible(): Int {
+        // Over Low Energy findability belongs to the gamepad itself rather than to the adapter:
+        // there is no system-wide discoverable mode to ask for, only what this pad chooses to say.
+        (btSink as? BleSink)?.let { return it.secondsFindable() }
         val left = visibleUntil - SystemClock.elapsedRealtime()
         return if (left <= 0) 0 else ((left + 999) / 1000).toInt()
     }
@@ -995,7 +998,17 @@ class OverlayService : Service() {
             /** The page itself is the pairing screen now; nothing to do but show it. */
             override fun pairMachine() {}
 
-            override fun makeVisible() = makeThorVisible(ov)
+            override fun makeVisible() {
+                // Two different things wear the same name. Classic asks Android to make the whole
+                // device discoverable, with its consent dialog. Low Energy has nothing to ask:
+                // the pad simply starts saying its name for a while and then stops.
+                val ble = btSink as? BleSink
+                if (ble != null) {
+                    ble.makeFindable(120)
+                    ov.updatePanel(panelState(ov))
+                    main.postDelayed({ ov.updatePanel(panelState(ov)) }, 1000)
+                } else makeThorVisible(ov)
+            }
 
             override fun adoptMachine(address: String) {
                 prefs.rememberPairedHost(address)

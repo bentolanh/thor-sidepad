@@ -661,6 +661,19 @@ the app.
   advertiser does not obviously grant — is the open question, and it is the thing to settle before
   leaning on Low Energy as anything more than a per-session pairing.
 
+  **A pad is findable because someone asked, not because it is switched on.** The first version
+  of the Low Energy sink advertised continuously for as long as it was up, defended on the grounds
+  that this is simply what a Low Energy peripheral does. It is not. An ordinary controller is
+  discoverable because its owner held a button, and the difference matters twice over: a pad that
+  shouts its name at every device in the room is rude, and it is how a machine's list fills with
+  entries called Thor that it will not offer to forget. So there are two kinds of advertising here
+  now. Findable, with the name and the gamepad service, for two minutes after someone presses the
+  button on the pairing page. And quiet the rest of the time — still advertising, because a Low
+  Energy peripheral cannot dial its host and can only wait to be reached, but with no name and no
+  service, so a scanner sees something anonymous rather than a gamepad it will never be offered.
+  It also stops entirely once a machine connects, which is what a controller does and what the
+  first version did not.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and

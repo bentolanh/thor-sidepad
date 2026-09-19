@@ -71,6 +71,8 @@ class BleSink(
     private var server: BluetoothGattServer? = null
     private var advertiser: AdvertiseCallback? = null
     @Volatile private var wantAdvertising = false
+    /** While this is in the future the pad is findable by anyone; otherwise only by its own host. */
+    @Volatile private var findableUntil = 0L
     private var reportChar: BluetoothGattCharacteristic? = null
 
     /** Buttons, four stick axes, two triggers, the hat in the low nibble. Same shape as Classic. */
@@ -109,6 +111,44 @@ class BleSink(
      * alone never did.
      */
     init { report[8] = 8 }
+
+    /**
+     * Seconds of open findability left, for the panel to count down. Zero means the pad is not
+     * announcing itself to anything but the machine it already belongs to.
+     */
+    fun secondsFindable(): Int {
+        val left = findableUntil - android.os.SystemClock.elapsedRealtime()
+        return if (left <= 0) 0 else ((left + 999) / 1000).toInt()
+    }
+
+    /**
+     * Announces the pad to anything listening, for a while.
+     *
+     * The rest of the time it keeps quiet, which is the whole point. A controller is findable
+     * because someone held its pairing button, not because it is switched on, and a pad that
+     * shouts its name at every device in the room for as long as it is running is both rude and
+     * how a machine's list fills up with entries nobody can clear. Once bonded it still has to
+     * advertise — a Low Energy peripheral cannot dial its host, it can only be findable and wait —
+     * but it does that without giving its name, so scanners see something anonymous rather than a
+     * gamepad they will never be offered.
+     */
+    fun makeFindable(seconds: Int) {
+        findableUntil = android.os.SystemClock.elapsedRealtime() + seconds * 1000L
+        Log.i(TAG, "findable by anything for $seconds seconds")
+        restartAdvertising()
+        ticker.schedule({
+            if (secondsFindable() == 0) {
+                Log.i(TAG, "no longer findable; quiet again")
+                restartAdvertising()
+            }
+        }, seconds.toLong() + 1, TimeUnit.SECONDS)
+    }
+
+    private fun restartAdvertising() {
+        if (!wantAdvertising) return
+        stopAdvertising()
+        ctx.getSystemService(BluetoothManager::class.java)?.adapter?.let { startAdvertising(it) }
+    }
 
     /**
      * Stands the gamepad up and starts advertising. [report] is called once, with an empty string
@@ -150,6 +190,7 @@ class BleSink(
 
     override fun close() {
         wantAdvertising = false
+        findableUntil = 0L
         stopHeartbeat()
         try { ctx.unregisterReceiver(bondWatcher) } catch (_: Exception) {}
         try {
@@ -232,13 +273,17 @@ class BleSink(
             .setConnectable(true)
             .setTimeout(0)
             .build()
+        // Loud while findable, anonymous otherwise. The name and the gamepad service are what put
+        // an entry in a stranger's list; a host that already knows us finds us by address.
+        val open = secondsFindable() > 0
         val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(true)
-            .addServiceUuid(ParcelUuid(uuid(HID_SERVICE)))
+            .setIncludeDeviceName(open)
+            .also { if (open) it.addServiceUuid(ParcelUuid(uuid(HID_SERVICE))) }
             .build()
         val cb = object : AdvertiseCallback() {
             override fun onStartSuccess(s: AdvertiseSettings?) {
-                Log.i(TAG, "advertising as ${identity.label} (${hex(identity.vendor)}:${hex(identity.product)})")
+                Log.i(TAG, (if (open) "findable as " else "quietly reachable as ") +
+                    "${identity.label} (${hex(identity.vendor)}:${hex(identity.product)})")
             }
             override fun onStartFailure(code: Int) { Log.w(TAG, "advertising refused, code $code") }
         }
