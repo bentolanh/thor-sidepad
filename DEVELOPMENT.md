@@ -713,6 +713,22 @@ the app.
   and even the hat is out by one — their centre is zero where ours is eight. Claiming the identity
   means sending this, and none of it is difficult now that it has been read rather than guessed.
 
+  **Checked against the real thing, control by control.** The layout above was transcribed from a
+  working pad's descriptor; its reports were then watched while each button was pressed in turn,
+  which settled the part a descriptor does not say — which physical control is which bit. Bits
+  zero through five arrived as A, B, X, Y, L1 and R1 in that order, with Select and Start on six
+  and seven, so the conventional arrangement is the real one. A resting report reads
+  `00 80 ff ff 00 80 00 80 …`: sticks at `0x8000`, little-endian, and a hat of zero for centred.
+  That confirms two things this pad had backwards — a stick's rest is the middle of an unsigned
+  range rather than zero, and the hat's rest is zero rather than eight.
+
+  Watching a controller from the host is fiddlier than it looks and two attempts produced nothing
+  at all. `IOHIDDeviceRegisterInputReportCallback` keeps the buffer pointer it is given, so a
+  Swift array passed with `&` is a dangling pointer the moment the call returns; it wants heap
+  memory that outlives the call. And a listener launched with `open` is a background app that
+  macOS will quietly stop running, so it needs `NSAppSleepDisabled` and a heartbeat line, without
+  which an empty capture cannot be told from a sleeping one.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and

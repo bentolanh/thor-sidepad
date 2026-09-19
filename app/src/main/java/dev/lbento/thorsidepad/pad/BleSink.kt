@@ -75,10 +75,16 @@ class BleSink(
     @Volatile private var findableUntil = 0L
     private var reportChar: BluetoothGattCharacteristic? = null
 
-    /** Buttons, four stick axes, two triggers, the hat in the low nibble. Same shape as Classic. */
-    private val report = ByteArray(9)
-    private var hatX = 0
-    private var hatY = 0
+    /**
+     * What this pad tells a host it is, and therefore what it sends.
+     *
+     * A host that recognises the name holds us to the shape that name implies, not to the one we
+     * describe, so the descriptor and the bytes have to be chosen together. Claiming to be
+     * Xbox-compatible while sending our own nine-byte layout produced a pad a Mac accepted and
+     * then read as two sticks jammed into a corner.
+     */
+    private val shape: ReportShape =
+        if (identity == Identity.XBOX) XboxShape() else StandardShape()
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.
@@ -100,17 +106,6 @@ class BleSink(
     private var heartbeat: ScheduledFuture<*>? = null
 
     // ---- opening and closing -------------------------------------------------------------------
-
-    /**
-     * The hat's resting value is eight, not zero.
-     *
-     * Zero is north. A report that has never carried a hat event therefore says the D-pad is held
-     * up, and stays saying it until the player touches the D-pad once. Seen on 2026-09-19 in the
-     * first bytes a host received over Low Energy; the Classic sink hid the same fault because the
-     * forwarder sends the controller's resting axes the moment it attaches, and the on-screen pad
-     * alone never did.
-     */
-    init { report[8] = 8 }
 
     /**
      * Seconds of open findability left, for the panel to count down. Zero means the pad is not
@@ -419,8 +414,8 @@ class BleSink(
             val value = when (ch?.uuid) {
                 uuid(PNP_ID) -> pnpId()
                 uuid(HID_INFO) -> HID_INFORMATION
-                uuid(REPORT_MAP) -> DESCRIPTOR
-                uuid(REPORT) -> synchronized(lock) { report.copyOf() }
+                uuid(REPORT_MAP) -> shape.descriptor
+                uuid(REPORT) -> shape.snapshot()
                 uuid(PROTOCOL_MODE) -> byteArrayOf(REPORT_PROTOCOL)
                 uuid(BATTERY_LEVEL) -> byteArrayOf(100)
                 else -> ByteArray(0)
@@ -478,54 +473,21 @@ class BleSink(
 
     // ---- the pad's side ------------------------------------------------------------------------
 
-    override fun setKey(code: Int, down: Boolean) {
-        val bit = BluetoothSink.buttonBit(code) ?: return
-        val i = bit / 8
-        val mask = 1 shl (bit % 8)
-        synchronized(lock) {
-            report[i] = if (down) (report[i].toInt() or mask).toByte()
-                        else (report[i].toInt() and mask.inv()).toByte()
-        }
-    }
+    override fun setKey(code: Int, down: Boolean) = shape.setKey(code, down)
 
-    override fun setAbs(code: Int, value: Int) {
-        synchronized(lock) {
-            when (code) {
-                Abs.HAT0X -> { hatX = value; writeHat() }
-                Abs.HAT0Y -> { hatY = value; writeHat() }
-                else -> BluetoothSink.axisByte(code)?.let {
-                    report[it] = value.coerceIn(-127, 127).toByte()
-                }
-            }
-        }
-    }
+    override fun setAbs(code: Int, value: Int) = shape.setAbs(code, value)
 
     override fun sync(): Int = send()
 
     override fun key(code: Int, down: Boolean): Int { setKey(code, down); return send() }
     override fun abs(code: Int, value: Int): Int { setAbs(code, value); return send() }
 
-    private fun writeHat() {
-        val dir = when {
-            hatY < 0 && hatX == 0 -> 0
-            hatY < 0 && hatX > 0 -> 1
-            hatY == 0 && hatX > 0 -> 2
-            hatY > 0 && hatX > 0 -> 3
-            hatY > 0 && hatX == 0 -> 4
-            hatY > 0 && hatX < 0 -> 5
-            hatY == 0 && hatX < 0 -> 6
-            hatY < 0 && hatX < 0 -> 7
-            else -> 8
-        }
-        report[8] = ((report[8].toInt() and 0xF0) or dir).toByte()
-    }
-
     // ---- sending, which is the Classic sink's arrangement because it was learned the hard way ---
 
     private fun send(): Int {
         if (!subscribed || host == null) return -1
         synchronized(lock) {
-            queue.addLast(report.copyOf())
+            queue.addLast(shape.snapshot())
             if (!draining) { draining = true; pool.execute(::drain) }
         }
         return 1
@@ -547,7 +509,9 @@ class BleSink(
     private fun collapse() {
         while (queue.size > 1) {
             val a = queue[0]; val b = queue[1]
-            if (a[0] != b[0] || a[1] != b[1] || a[8] != b[8]) return
+            // Which bytes those are depends on the shape: the buttons and hat sit at the front of
+            // one layout and the back of the other.
+            for (i in shape.discreteBytes) if (a[i] != b[i]) return
             queue.removeFirst()
         }
     }
@@ -609,7 +573,5 @@ class BleSink(
         fun uuid(short: String): UUID = UUID.fromString("0000$short-0000-1000-8000-00805f9b34fb")
         fun hex(v: Int) = String.format("%04x", v)
 
-        /** The same gamepad the Classic sink describes; a host must see one shape, not two. */
-        val DESCRIPTOR = BluetoothSink.reportDescriptor()
     }
 }
