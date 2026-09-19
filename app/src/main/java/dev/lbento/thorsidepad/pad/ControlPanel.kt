@@ -304,6 +304,14 @@ object ControlPanel {
                     card.addView(label(
                         "As SidePad it is honest about what it is, and a machine needs telling once which button is which. As an Xbox pad most games know the layout already, which is what nearly every third-party controller does. Either way this is a different device to the machine, so it needs pairing again after a change.",
                         12f, grey).apply { setPadding(0, 10, 0, 0) })
+                    // The pad keeps quiet until asked, so having chosen what it is there is still
+                    // one step to go. Leaving that to be discovered is how someone ends up staring
+                    // at a machine that shows nothing, having done everything right.
+                    card.addView(label("The pad stays quiet until you ask it to be findable.", 13f, grey)
+                        .apply { setPadding(0, 16, 0, 6) })
+                    card.addView(btn("Make the Thor findable\u2026") { page = Page.PAIRING; render() }.apply {
+                        setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
+                    })
                 }
             } else if (page == Page.DESTINATION) {
                 card.addView(label("Send presses to", 14f, grey))
