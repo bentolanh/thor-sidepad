@@ -473,6 +473,35 @@ the app.
   Bluetooth name, matching the form of every other entry, so that renaming the handheld does not
   stop it matching.
 
+  **Over Bluetooth Low Energy the identity is ours, and this is tested.** Classic Bluetooth gives
+  us no say: the vendor and product numbers come from a root-owned file and are published by
+  Android's stack before the app exists. Low Energy carries them somewhere else entirely — a
+  characteristic called PnP ID, inside a service the app defines. Three gates, all open, probed on
+  2026-09-19 with a throwaway build:
+
+  Android accepted a GATT server holding both the HID service and the device-information service,
+  which was the gate expected to fail, since the HID service is the sort of thing a stack reserves
+  for itself. It then advertised that HID service without complaint. And a Mac scanning for it
+  found the pad, connected, and read the PnP ID back as vendor `0x1209` product `0x5350` — the
+  numbers we invented, out of the pool meant for open projects, borrowed from nobody.
+
+  What that is worth is not the Mac. Apple's list is by vendor and product, so choosing our own
+  honest numbers still leaves us off it, and the only way onto it is impersonating a controller
+  that is on it — which is not a thing to ship in an app other people install. The worth is that
+  the identity stops being the handheld's Bluetooth chip. Today every different handheld running
+  this app needs its own mapping line, because the numbers belong to whatever radio is inside it.
+  Over Low Energy every one of them would present the same identity, so one line, and one entry
+  submitted upstream, would cover every device this app is ever installed on.
+
+  The cost is a second transport rather than a replacement: report map and report characteristics
+  with notifications, protocol mode, control point, battery service, bonding. Classic stays,
+  because it is what Windows and Android want. Two things are still unmeasured and should be
+  before any of it is built: what connection interval a host grants, since latency is the whole
+  game and the host chooses it, and whether a host will take reports from us once paired rather
+  than merely reading our name. Note also that a Mac's CoreBluetooth hides HID services from
+  ordinary apps — the probe saw the device-information service and not the HID one — so a scanner
+  written this way cannot see the reports even when they are flowing.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
