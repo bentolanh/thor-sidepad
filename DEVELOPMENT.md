@@ -815,6 +815,43 @@ the app.
   something Eastward in particular wants. Worth adding for completeness either way, and worth
   retrying Eastward afterwards, but it is no longer the explanation of anything.
 
+  **Why one native game refused the pad: two bytes of version.** Eastward keeps its own log at
+  `~/Library/Application Support/Pixpil/Eastward/steam_*/game.log`, and it says so outright:
+
+```
+joystick added   <MOAIJoystickInstanceSDL>
+no joystick mapping found:  030000005e040000e002000000010000  Xbox One S Controller
+joystick added   <MOAIJoystickInstanceSDL>
+joystick mapped  Xbox Wireless Controller
+```
+
+  The game runs on MOAI with SDL and its `JoystickManagerSDL.lua` holds a mapping table of its
+  own, keyed by the whole SDL identifier. Two pads were present; one was in the table and one was
+  not. Decoding the one that was not:
+
+| | |
+| --- | --- |
+| `0300` | bus |
+| `0000` | name hash, zeroed |
+| `5e04 0000` | vendor 045e |
+| `e002 0000` | product 02e0 |
+| `0001` | **version 0x0100 — ours, hardcoded in the PnP ID** |
+
+  Every pad here that a host accepts as Xbox-compatible reports firmware version 9.0.3, which is
+  `0x0903`, so its identifier ends `…e002000003090000` and the game's table has it. Ours ends
+  `…e002000000010000` and it does not. Vendor and product were never the whole of the identity;
+  the version is part of it, and a table keyed by the lot will miss by two bytes as readily as by
+  twenty.
+
+  This also explains the shape of the evidence. Emulators take the pad because SDL's own database
+  and their config files match on vendor and product. Steam takes it because Steam Input hands the
+  game a controller of its own. Cuphead takes it because it reads Apple's framework, which matches
+  on vendor and product too. Only a program carrying its own list keyed by the full identifier
+  notices, and Eastward is one.
+
+  The fix is one line — report `0x0903` as the product version in `BleSink.pnpId()` — and it
+  changes the identity, so every host that has paired will need pairing again. Not done yet.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
