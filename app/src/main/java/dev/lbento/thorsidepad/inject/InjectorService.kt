@@ -373,6 +373,8 @@ class InjectorService() : IInjector.Stub() {
     // ---- forwarding a real controller ----------------------------------------------------------
     @Volatile private var fwdFd = -1
     private var fwdThread: Thread? = null
+    private var fwdDeath: android.os.IBinder.DeathRecipient? = null
+    private var fwdClient: android.os.IBinder? = null
 
     override fun forwardStart(path: String?, grab: Boolean, cb: IPadEvents?): String {
         forwardStop()
@@ -391,6 +393,15 @@ class InjectorService() : IInjector.Stub() {
             Native.absInfo(f, c)?.let { absJson.put(c.toString(), JSONArray(listOf(it[0], it[1]))) }
         }
         fwdFd = f
+        // If the app goes away while we hold its controller, let go at once. Without this the
+        // release waits for the next event to fail, so the controller stays captured until the
+        // player presses something, and that press is swallowed.
+        val death = android.os.IBinder.DeathRecipient {
+            Log.w(TAG, "the app went away; releasing the controller")
+            forwardStop()
+        }
+        try { cb.asBinder().linkToDeath(death, 0); fwdDeath = death; fwdClient = cb.asBinder() }
+        catch (e: Exception) { Log.w(TAG, "linkToDeath", e) }
         val t = Thread({
             while (fwdFd == f) {
                 val e = try { Native.readEvent(f, 250) } catch (ex: Exception) { null } ?: continue
@@ -407,6 +418,8 @@ class InjectorService() : IInjector.Stub() {
     }
 
     override fun forwardStop() {
+        fwdDeath?.let { d -> try { fwdClient?.unlinkToDeath(d, 0) } catch (_: Exception) {} }
+        fwdDeath = null; fwdClient = null
         val t = fwdThread
         fwdFd = -1
         fwdThread = null
