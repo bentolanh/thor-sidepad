@@ -741,7 +741,18 @@ the app.
   and something calling itself GamePad-1 — and a game usually binds player one to the first it
   finds. Untested; disconnect the others and try again before looking anywhere else.
 
-  ### Three rough edges, found 2026-09-19, not yet fixed
+  ### Four rough edges, found 2026-09-19, not yet fixed
+
+  A button the current shape has no room for is swallowed rather than left alone. The controller
+  is taken exclusively with `EVIOCGRAB`, so every press belongs to this app whether or not it has
+  anywhere to send it — and in Xbox mode, which carries ten buttons, that leaves Home, Back, M1
+  and M2 doing nothing at all: not reaching the machine, and no longer working on the handheld
+  either. Dead for no reason a user could guess at.
+
+  Not grabbing is not the answer, since then every mapped press fires twice. The shape knows which
+  codes it has no slot for, so those can be put back where they came from: injected into the
+  handheld through the virtual device the injector already has. The pad keeps what it uses and
+  hands back what it does not.
 
   A device unpaired from Android's own settings still shows as paired in the panel. Nothing tells
   the app the bond has gone, so the list it keeps goes stale. It wants a `BOND_STATE_CHANGED`
