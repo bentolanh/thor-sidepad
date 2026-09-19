@@ -288,16 +288,13 @@ class BleSink(
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 host = device; connected = true
                 Log.i(TAG, "${device.address} connected")
-                // A host that has already bonded does not ask again to be sent reports: keeping
-                // that answer is the peripheral's job, not the host's. Forgetting it is why a pad
-                // that reconnected by itself then sat there silently, waiting for a request that
-                // was never coming again.
-                if (isBonded(device)) {
-                    subscribed = true
-                    Log.i(TAG, "already bonded to ${device.address}; sending reports again")
-                } else {
-                    createBondWith(device)
-                }
+                // A bond only means this host has been here before. Whether it is listening is a
+                // separate question and only it can answer: it says so by subscribing. Assuming
+                // otherwise was tried and was worse than useless — the pad reported itself
+                // connected and sent presses to a host that had not asked for any, so a link that
+                // was plainly broken looked like a working one.
+                if (isBonded(device)) Log.i(TAG, "${device.address} has bonded before")
+                else createBondWith(device)
                 startHeartbeat()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "${device.address} went away")
