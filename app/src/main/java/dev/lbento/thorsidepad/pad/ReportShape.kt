@@ -194,14 +194,19 @@ class XboxShape : ReportShape {
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */
         val DESCRIPTOR = byteArrayOf(
             0x05, 0x01, 0x09, 0x05, 0xA1.toByte(), 0x01, 0x85.toByte(), 0x01,
-            // left stick, two sixteen-bit unsigned axes inside a physical collection
-            0x09, 0x01, 0xA1.toByte(), 0x00,
-            0x09, 0x30, 0x09, 0x31, 0x15, 0x00, 0x27, 0xFF.toByte(), 0xFF.toByte(), 0x00, 0x00,
-            0x95.toByte(), 0x02, 0x75, 0x10, 0x81.toByte(), 0x02, 0xC0.toByte(),
-            // right stick, the same again as Rx and Ry
-            0x09, 0x01, 0xA1.toByte(), 0x00,
-            0x09, 0x33, 0x09, 0x34, 0x15, 0x00, 0x27, 0xFF.toByte(), 0xFF.toByte(), 0x00, 0x00,
-            0x95.toByte(), 0x02, 0x75, 0x10, 0x81.toByte(), 0x02, 0xC0.toByte(),
+            // Both sticks, four sixteen-bit unsigned axes.
+            //
+            // The pad these bytes were copied from wraps each stick in a Usage(Pointer) physical
+            // collection, and that wrapper is left out here deliberately. It makes a host read the
+            // device as a gamepad *and* a pointing device, and macOS answers that by publishing a
+            // second, inert copy of the pad alongside the real one — an `IOHIDEventDummyService`
+            // sharing its LocationID. A game that enumerates raw HID then has two pads to choose
+            // between and no way to tell that one of them never speaks. The axes, their usages,
+            // their widths and their order in the report are all unchanged; only the wrapping is
+            // gone, because nothing needs it.
+            0x09, 0x30, 0x09, 0x31, 0x09, 0x33, 0x09, 0x34,
+            0x15, 0x00, 0x27, 0xFF.toByte(), 0xFF.toByte(), 0x00, 0x00,
+            0x95.toByte(), 0x04, 0x75, 0x10, 0x81.toByte(), 0x02,
             // left trigger: ten bits of travel, six of padding
             0x05, 0x01, 0x09, 0x32, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x03,
             0x95.toByte(), 0x01, 0x75, 0x0A, 0x81.toByte(), 0x02,
