@@ -34,7 +34,12 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     private var hatX = 0
     private var hatY = 0
 
-    fun open(address: String, done: (String) -> Unit) {
+    fun open(address: String, report: (String) -> Unit) {
+        // The status callback fires again when the gamepad is taken down, saying it is no longer
+        // registered. That is not a failure to open, and reporting it as one made switching to a
+        // machine announce that it could not connect at the very moment it had.
+        val answered = java.util.concurrent.atomic.AtomicBoolean(false)
+        val done: (String) -> Unit = { msg -> if (answered.compareAndSet(false, true)) report(msg) }
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
         if (adapter == null || !adapter.isEnabled) { done("Bluetooth is off"); return }
         // Without a chosen host, take a paired computer rather than the first thing in the list,
