@@ -975,8 +975,11 @@ class OverlayService : Service() {
              * plainly on the page is kinder than letting someone discover it.
              */
             override fun setTransport(value: String) {
-                if (prefs.btTransport == value) return
+                if (prefs.btTransport == value && prefs.targetMode == Prefs.MODE_BT) return
                 prefs.btTransport = value
+                // Choosing a radio is choosing to send somewhere, so this no longer depends on a
+                // destination having been picked first on another page.
+                prefs.targetMode = Prefs.MODE_BT
                 btSink?.close(); btSink = null
                 if (visible) { hide(); show() }
                 ov.updatePanel(panelState(ov))
@@ -1009,7 +1012,7 @@ class OverlayService : Service() {
                 prefs.btTransport = Prefs.TRANSPORT_LE
                 btSink?.close(); btSink = null
                 if (visible) { hide(); show() }
-                ControlPanel.page = ControlPanel.Page.APPEARANCE
+                ControlPanel.page = ControlPanel.Page.PAIRING
                 ov.updatePanel(panelState(ov))
             }
 

@@ -219,75 +219,48 @@ object ControlPanel {
                     marginStart = 140; marginEnd = 140
                 })
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
-            } else if (page == Page.PAIRING && state.transport == "le") {
-                if (state.visibleFor > 0) {
-                    card.addView(label("Findable now as \u201C${state.padName}\u201D", 22f))
-                    card.addView(label("${state.visibleFor} seconds left", 16f, grey))
-                    card.addView(label(
-                        "On the computer, open Bluetooth and pick \u201C${state.padName}\u201D from the " +
-                        "nearby devices \u2014 not from the already-paired list.",
-                        13f, grey).apply { setPadding(0, 14, 0, 0) })
-                } else {
-                    card.addView(label("The Thor is not announcing itself", 18f))
-                    card.addView(label(
-                        "The rest of the time it stays quiet, and only the machine it already belongs " +
-                        "to can reach it. This is the pairing button an ordinary controller has: it " +
-                        "lasts two minutes, then stops on its own.",
-                        13f, grey).apply { setPadding(0, 6, 0, 12) })
-                    card.addView(btn("Make the Thor findable") { actions.makeVisible() }.apply {
-                        setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
-                    })
-                }
-                card.addView(label(
-                    "If it has paired before and will not connect, both sides have to forget it: on " +
-                    "the computer, and on the Thor under its own Bluetooth settings. Forgetting on " +
-                    "one side alone leaves keys behind and the next attempt quietly fails.",
-                    13f, grey).apply { setPadding(0, 16, 0, 0) })
-            } else if (page == Page.PAIRING && state.transport == "le_unused") {
-                // Pairing is not one thing. Over Classic the Thor has to be made visible for a
-                // couple of minutes, the way a controller is held until its light blinks. Over
-                // Low Energy it is already calling out for as long as the pad is up, and there is
-                // nothing to press — so this page says where to look instead of offering a button
-                // that would do nothing.
-                card.addView(label("Listening now as \u201C${state.padName}\u201D", 22f))
-                card.addView(label(
-                    "A Low Energy pad is always calling out while the pad is up, so there is nothing " +
-                    "to hold down here. On the computer, open Bluetooth and pick \u201C${state.padName}\u201D " +
-                    "from the nearby devices \u2014 not from the already-paired list.",
-                    13f, grey).apply { setPadding(0, 10, 0, 0) })
-                card.addView(label(
-                    "If it has paired before and will not connect, both sides have to forget it: on " +
-                    "the computer, and on the Thor under its own Bluetooth settings. Forgetting on " +
-                    "one side alone leaves keys behind and the next attempt quietly fails.",
-                    13f, grey).apply { setPadding(0, 14, 0, 0) })
             } else if (page == Page.PAIRING) {
-                // A controller normally has a button you hold until a light blinks. This is that
-                // light: it says the Thor is listening, what to look for, and how long is left.
+                // One screen, one story, whichever radio is underneath. Pick the mode, press the
+                // button, go to the machine and connect. What the two radios do differently to
+                // become findable is ours to worry about and nobody else's: an earlier version
+                // made the mode live on another page and told the user why Low Energy was
+                // different, which is a plumbing detail dressed up as a choice.
+                val le = state.transport == "le"
+                card.addView(label("Mode", 14f, grey))
+                card.addView(btn((if (!le) "\u25CF  " else "") + "Classic Bluetooth", le) { actions.setTransport("classic") })
+                card.addView(btn((if (le) "\u25CF  " else "") + "Bluetooth Low Energy", !le) { actions.setTransport("le") })
+                if (le) {
+                    card.addView(label("Appears as", 14f, grey).apply { setPadding(0, 16, 0, 4) })
+                    val xbox = state.identity == "XBOX"
+                    card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
+                    card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
+                }
+                card.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
+                    .apply { topMargin = 18; bottomMargin = 14 })
                 if (state.visibleFor > 0) {
                     card.addView(label("Visible now as \u201C${state.padName}\u201D", 22f))
                     card.addView(label("${state.visibleFor} seconds left", 16f, grey))
                     card.addView(label(
-                        "On the computer, open Bluetooth and choose \u201C${state.padName}\u201D. " +
-                        "Once it has paired it stays paired; you only do this once per machine.",
+                        "On the computer, open Bluetooth and connect to \u201C${state.padName}\u201D.",
                         13f, grey).apply { setPadding(0, 14, 0, 0) })
                 } else {
-                    card.addView(label("The Thor is not visible to other machines", 18f))
-                    card.addView(label(
-                        "Making it visible is the same as holding the pairing button on an ordinary " +
-                        "controller. It lasts two minutes, then stops on its own.",
-                        13f, grey).apply { setPadding(0, 6, 0, 12) })
                     card.addView(btn("Make the Thor visible") { actions.makeVisible() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                     })
+                    card.addView(label(
+                        "Two minutes, then it stops on its own. Then connect to it from the computer.",
+                        13f, grey).apply { setPadding(0, 8, 0, 0) })
                 }
-                // Something paired with the Thor outside SidePad is not offered as a destination by
-                // itself, since the pairing list is mostly headphones and controllers. It can be
-                // taken on deliberately here, which is a choice rather than a guess.
                 if (state.adoptable.isNotEmpty()) {
                     card.addView(label("Already paired with this Thor", 14f, grey)
                         .apply { setPadding(0, 18, 0, 4) })
                     for (h in state.adoptable) card.addView(btn("Use ${h.label}") { actions.adoptMachine(h.address) })
                 }
+                card.addView(label(
+                    "Changing the mode or what it appears as makes this a different device to the " +
+                    "computer, so it has to be paired again \u2014 and if it will not connect, forget it " +
+                    "on the computer and on the Thor both, since clearing one side leaves keys behind.",
+                    12f, grey).apply { setPadding(0, 18, 0, 0) })
             } else if (page == Page.APPEARANCE) {
                 card.addView(label("Carried over", 14f, grey))
                 val le = state.transport == "le"
@@ -304,12 +277,7 @@ object ControlPanel {
                     card.addView(label(
                         "As SidePad it is honest about what it is, and a machine needs telling once which button is which. As an Xbox pad most games know the layout already, which is what nearly every third-party controller does. Either way this is a different device to the machine, so it needs pairing again after a change.",
                         12f, grey).apply { setPadding(0, 10, 0, 0) })
-                    // The pad keeps quiet until asked, so having chosen what it is there is still
-                    // one step to go. Leaving that to be discovered is how someone ends up staring
-                    // at a machine that shows nothing, having done everything right.
-                    card.addView(label("The pad stays quiet until you ask it to be findable.", 13f, grey)
-                        .apply { setPadding(0, 16, 0, 6) })
-                    card.addView(btn("Make the Thor findable\u2026") { page = Page.PAIRING; render() }.apply {
+                    card.addView(btn("Pair a machine\u2026") { page = Page.PAIRING; render() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                     })
                 }
