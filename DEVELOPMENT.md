@@ -790,11 +790,19 @@ the app.
   of two, usage pairs down to a lone gamepad — and changed nothing about the game, so the shadow
   was innocent. RPCS3 and RetroArch continue to take the pad with no configuration.
 
-  The only structural difference left is that this descriptor is a subset. The pad it was copied
-  from declares four reports: the gamepad, a system-control bit, a rumble **output** report, and
-  battery. This declares the gamepad alone. A game that reaches for rumble on an Xbox controller
-  and finds no output report to write to could reasonably give up on the device, and Unity's input
-  layer does reach for it. Untested, and the next thing to try.
+  **And a native game does take it: Cuphead plays with no Steam Input at all.** Which settles the
+  headline question — claiming the Xbox identity and sending an Xbox-shaped report does buy native
+  game support on macOS, the thing the whole exercise was for. Eastward is an outlier rather than
+  the rule, and one game refusing a pad that another accepts is a much smaller problem than a pad
+  no game accepts.
+
+  It also weakens the theory below. The only structural difference left is that this descriptor is
+  a subset: the pad it was copied from declares four reports — the gamepad, a system-control bit,
+  a rumble **output** report, and battery — where this declares the gamepad alone. A game reaching
+  for rumble and finding nothing to write to could give up, and Unity's input layer does reach for
+  it. But Cuphead manages without them, so their absence is not a general blocker; at most it is
+  something Eastward in particular wants. Worth adding for completeness either way, and worth
+  retrying Eastward afterwards, but it is no longer the explanation of anything.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
