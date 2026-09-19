@@ -77,6 +77,18 @@ class BleSink(
     private var hatX = 0
     private var hatY = 0
 
+    /**
+     * Which bonded hosts have asked to be sent reports, by address.
+     *
+     * A bonded host asks once and expects the answer kept: the specification puts that on the
+     * peripheral, not the host. Measured on 2026-09-19 after a cold restart, the Mac reconnected
+     * on its bond, remembered it had subscribed, and never wrote the request again — while this
+     * side had reset to unsubscribed and sat waiting for it. Guessing instead of remembering was
+     * tried earlier the same evening and was worse: it sent presses to a host that had not asked.
+     * So it is stored when a host writes it and restored when that host comes back.
+     */
+    private val subscriptions = ctx.getSharedPreferences("sidepad_ble", Context.MODE_PRIVATE)
+
     private val lock = Any()
     private val queue = ArrayDeque<ByteArray>()
     private var draining = false
@@ -262,7 +274,7 @@ class BleSink(
                 Log.i(TAG, "could not name the radio to pair over (${e.javaClass.simpleName}); asking plainly")
                 device.createBond()
             }
-            if (!asked) Log.w(TAG, "the pairing request was refused outright")
+            if (!asked) Log.i(TAG, "no new bond was made (one may already exist)")
         } catch (e: SecurityException) { Log.w(TAG, "no permission to pair", e) }
     }
 
@@ -309,10 +321,16 @@ class BleSink(
                 // otherwise was tried and was worse than useless — the pad reported itself
                 // connected and sent presses to a host that had not asked for any, so a link that
                 // was plainly broken looked like a working one.
-                // Asked even when a bond already exists, because the one that matters here is a
-                // Low Energy bond and a machine may well hold only a Classic one with this same
-                // pad. A request for a bond that is genuinely already there is refused harmlessly.
-                createBondWith(device)
+                if (isBonded(device) && subscriptions.getBoolean(device.address, false)) {
+                    subscribed = true
+                    Log.i(TAG, "${device.address} is bonded and had subscribed; sending reports again")
+                    onState("")
+                } else {
+                    // Either never met, or bonded over Classic only and never subscribed here.
+                    // Asking for a Low Energy bond covers both; one that already exists is
+                    // refused harmlessly.
+                    createBondWith(device)
+                }
                 startHeartbeat()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "${device.address} went away")
@@ -355,6 +373,7 @@ class BleSink(
             if (d?.uuid == uuid(CCCD) && d.characteristic?.uuid == uuid(REPORT)) {
                 subscribed = value != null && value.isNotEmpty() && value[0].toInt() and 0x01 != 0
                 Log.i(TAG, if (subscribed) "the host is taking reports" else "the host stopped taking reports")
+                device?.let { subscriptions.edit().putBoolean(it.address, subscribed).apply() }
                 if (subscribed) onState("")
             }
             if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)

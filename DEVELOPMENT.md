@@ -636,15 +636,30 @@ the app.
   connection whatsoever on this side while the Thor still listed the Mac as bonded. There is no
   adb command for it; it is done from the handheld's own Bluetooth settings.
 
-  **Still broken: a host will not re-attach after the server is torn down and rebuilt.** Within one
-  session everything holds. Once the app restarts, the Mac reconnects, bonds, negotiates a packet
-  size — and never creates a HID device again, until it is made to forget the pad and pair afresh.
-  That has the shape of a cached attribute table: a host keeps the service layout of a bonded
-  peripheral and does not look again, while this rebuilds its whole table on every show. A real
-  gamepad's table never changes, which is why real gamepads do not have this problem. The
-  direction is to stand the server up once for the life of the foreground service rather than per
-  show and hide, and that is where to start next; whether it is enough after the process itself
-  dies is not yet known.
+  **Confirmed working within a session, over a genuine Low Energy bond.** On 2026-09-19, with
+  both sides forgotten first and the `TRANSPORT_LE` request honoured, the Mac bonded `[ DUAL ]`
+  (Classic absent from the pair until Android added its own half), created a HID device at
+  `045e:02e0`, and `GCController` reported `category=Xbox One`. Real controls were injected and
+  arrived correct: A as button one, the D-pad as a hat that rested at eight. So the Xbox identity
+  does work over Low Energy — the withdrawn finding above was right in substance and wrong in
+  method, and this is the version that stands, because there was no Classic bond underneath it
+  this time.
+
+  **Still broken: re-attach after the app's process dies.** Hide and show is fine now. A cold
+  restart is not: the Mac reconnects at the GATT level, no new bond is needed, and then nothing —
+  no subscription, no HID device, until both sides forget and pair again. Two things point at the
+  cause and neither is cheap to fix from the app layer. The attribute table is rebuilt from
+  scratch on every process start while a host caches the layout of a bonded peripheral and does
+  not re-read it; the proper cure is the Service Changed indication, and Android owns that
+  characteristic rather than exposing it. And the advertising address comes up different every
+  process start — a scan from the Mac saw a distinct CoreBluetooth identifier each session — so
+  even with an identity key from the bond the host may be failing to resolve the new address to
+  the old pairing, which is why its list fills with entries called Thor that it will not offer to
+  forget. Remembering each host's subscription across restarts is done now and is necessary, but
+  it cannot be exercised until the host re-subscribes, and the host does not, so it is not
+  sufficient. Whether this is solvable without a persistent identity address — which the app-level
+  advertiser does not obviously grant — is the open question, and it is the thing to settle before
+  leaning on Low Energy as anything more than a per-session pairing.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
