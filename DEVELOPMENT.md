@@ -741,11 +741,19 @@ the app.
   and something calling itself GamePad-1 — and a game usually binds player one to the first it
   finds. Untested; disconnect the others and try again before looking anywhere else.
 
-  ### Two rough edges, found 2026-09-19, not yet fixed
+  ### Three rough edges, found 2026-09-19, not yet fixed
 
   A device unpaired from Android's own settings still shows as paired in the panel. Nothing tells
   the app the bond has gone, so the list it keeps goes stale. It wants a `BOND_STATE_CHANGED`
   receiver that drops the address from `pairedHostList`, the way pairing adds it.
+
+  A machine that has just paired does not appear in the panel until the destination is switched
+  away to this device and back. The pairing finishes on the Bluetooth side and nothing asks the
+  panel to look again, so it goes on showing the list it drew before. All three of these are the
+  same fault wearing different hats: the panel is redrawn when something in the app changes it,
+  and never when the Bluetooth stack changes something underneath it. One `BOND_STATE_CHANGED`
+  receiver that refreshes the panel would cover the stale list, the missing new machine, and half
+  of the countdown.
 
   The countdown on the pairing page sticks at 119 seconds. The panel is only asked to redraw twice
   after the button is pressed, so it shows a number from a second ago and then never again; the
