@@ -553,12 +553,32 @@ the app.
 | Classic, this pad's heartbeat | 100/sec | 11.2ms | — | — | 78.7ms |
 | Classic, an 8BitDo pad idling | 82/sec | 11.1ms | — | — | 56.7ms |
 
-  So Low Energy sustains more than a hundred reports a second with a better typical gap than
-  Classic and a worse tail. That is a usable transport — real controllers report at sixty to a
-  hundred and twenty-five — and the question is settled well enough to build on. Two cautions for
-  whoever revisits it: the Classic link to the same Mac was live throughout, so the tail may be
-  contention between the two rather than Low Energy's own, and no host-to-device direction was
-  exercised at all. Re-measure with Classic disconnected before trusting the worst-case number.
+  Classic was then measured on its own, with the pad hidden so nothing else held a link, driven by
+  the same flood:
+
+| | rate | median gap | p90 | p99 | worst |
+| --- | --- | --- | --- | --- | --- |
+| Classic alone, flooded | 168/sec | 1.3ms | 22.3ms | 64.3ms | 155.4ms |
+| Low Energy, flooded | 111/sec | 4.4ms | 22.7ms | 56.5ms | 110.7ms |
+
+  Classic is the quicker of the two where it matters most, three times better at the median, and
+  the worse of the two at the tail. Both are far beyond what a gamepad needs. Neither is a reason
+  to choose one over the other; Low Energy earns its place by owning the identity, not by being
+  faster.
+
+  **Low Energy needs a bond, and that is why the probe kept falling over.** Measuring it in
+  isolation did not work: with Classic disconnected the Mac would read the identity and then never
+  subscribe, while with the Classic link up it subscribed every time. The probe never pairs, so
+  the only bond it ever had was the Classic one the pad already holds with that Mac, which Low
+  Energy could lean on. A real implementation has to pair on its own, and until it does this will
+  keep looking flaky for reasons that have nothing to do with the radio. The Low Energy row above
+  is therefore measured with Classic also connected, and its tail may be the two contending.
+
+  **Closing one link before opening the other is the app's job.** Verified while doing this: when
+  the pad hides, the sink closes and the Mac loses the device completely, no HID entry left at all.
+  The mechanism exists; it wants attaching to the transport choice rather than to hiding the pad,
+  so that picking one identity tears down the other rather than leaving two links to the same host
+  in two modes at once.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
