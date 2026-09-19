@@ -134,13 +134,14 @@ object ControlPanel {
         fun render() {
             card.removeAllViews()
             val bar = LinearLayout(themed).apply { orientation = LinearLayout.HORIZONTAL }
-            if (page == Page.CONTROLLER) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
+            // Every page that is not the main one needs a way back; the scrim only closes the panel.
+            if (page != Page.MAIN) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
             bar.addView(label(when (page) {
                 Page.MAIN -> "Thor SidePad"
                 Page.DESTINATION -> "Send to"
                 else -> "Appears as"
             }, 20f),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page == Page.CONTROLLER) 16 else 0 })
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page != Page.MAIN) 16 else 0 })
             if (page == Page.MAIN) {
                 bar.addView(btn("Open app") { actions.openApp() })
                 bar.addView(btn("Stop SidePad") { actions.stopService() })
