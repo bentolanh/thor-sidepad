@@ -446,6 +446,33 @@ the app.
   Showing this line in the app, with something to copy it, is worth more than a remapping screen
   of our own: it is the whole answer for macOS and it is the same for everybody.
 
+  **Which layer an app reads decides whether it sees us.** Four cases, all on the same Mac on
+  2026-09-19, and together they say the pad we present is ordinary and the trouble is elsewhere.
+
+| App | What it reads | Result |
+| --- | --- | --- |
+| PPSSPP | raw joystick, with its own mapping screen | works, no setup at all |
+| RPCS3 | whichever handler is selected | was set to Keyboard; nothing to do with us |
+| Steam | SDL's named-gamepad layer | blind until a mapping exists for our id |
+| a native macOS game | Apple's GameController framework | never, and nothing will change it |
+
+  PPSSPP is the reassuring one: an app that takes raw joystick input picks us up with no help,
+  which means the descriptor and reports are fine. Everything that fails does so because it will
+  not speak to a device whose name it does not already know.
+
+  Apple's refusal was confirmed the only way worth trusting, with a control. Both pads connected
+  at the HID layer at the same moment; `GCController` reported the 8BitDo and not this one. So the
+  test tool works and the framework simply rejects us, which is a vendor and product number we
+  cannot set. There is no work left to do there — on macOS a native game will not see the Thor,
+  and the route through Steam is the answer.
+
+  That also sharpens what the mapping line is for. It is not a Steam fix. Every SDL-based
+  program — RPCS3, Dolphin, and most of what is not Steam — asks the same database the same
+  question, so one accepted entry upstream covers nearly all of them at once, on every platform.
+  Note the identifier should carry zeroes where the one Steam prints carries a hash of the
+  Bluetooth name, matching the form of every other entry, so that renaming the handheld does not
+  stop it matching.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
