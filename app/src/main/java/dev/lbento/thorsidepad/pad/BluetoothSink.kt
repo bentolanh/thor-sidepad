@@ -34,6 +34,11 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     private var hatX = 0
     private var hatY = 0
 
+    /** Frames waiting for the radio, newest last. Guarded by [lock], drained by [pool]. */
+    private val queue = ArrayDeque<ByteArray>()
+    private val lock = Any()
+    private var draining = false
+
     fun open(address: String, report: (String) -> Unit) {
         // The status callback fires again when the gamepad is taken down, saying it is no longer
         // registered. That is not a failure to open, and reporting it as one made switching to a
@@ -108,15 +113,19 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
         val bit = BUTTONS[code] ?: return            // nothing to say for this one, not a failure
         val i = bit / 8
         val mask = 1 shl (bit % 8)
-        report[i] = if (down) (report[i].toInt() or mask).toByte()
-                    else (report[i].toInt() and mask.inv()).toByte()
+        synchronized(lock) {
+            report[i] = if (down) (report[i].toInt() or mask).toByte()
+                        else (report[i].toInt() and mask.inv()).toByte()
+        }
     }
 
     fun setAbs(code: Int, value: Int) {
-        when (code) {
-            Abs.HAT0X -> { hatX = value; writeHat() }
-            Abs.HAT0Y -> { hatY = value; writeHat() }
-            else -> AXES[code]?.let { report[it] = value.coerceIn(-127, 127).toByte() }
+        synchronized(lock) {
+            when (code) {
+                Abs.HAT0X -> { hatX = value; writeHat() }
+                Abs.HAT0Y -> { hatY = value; writeHat() }
+                else -> AXES[code]?.let { report[it] = value.coerceIn(-127, 127).toByte() }
+            }
         }
     }
 
@@ -143,15 +152,74 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
         report[8] = ((report[8].toInt() and 0xF0) or dir).toByte()
     }
 
+    /**
+     * Queues the current state and makes sure someone is sending.
+     *
+     * The radio will not always take a report the moment it is offered, and a controller offers
+     * far more of them than a Bluetooth link can carry: the Thor's sticks alone report faster than
+     * the interrupt channel drains. The old code handed the report straight to the radio and threw
+     * it away if it was refused, which is why a button press sometimes did nothing. A press made
+     * while a stick was moving survived, because the next stick frame carried the button along
+     * with it; a press made with the sticks at rest produced one report and nothing to repeat it.
+     */
     private fun send(): Int {
-        val h = hid ?: return -1
-        val d = host ?: return -1
-        return try { if (h.sendReport(d, 1, report)) 1 else -1 }
-        catch (e: Exception) { Log.w(TAG, "send failed", e); -1 }
+        if (hid == null || host == null) return -1
+        synchronized(lock) {
+            queue.addLast(report.copyOf())
+            if (!draining) { draining = true; pool.execute(::drain) }
+        }
+        return 1
+    }
+
+    private fun drain() {
+        while (true) {
+            var next: ByteArray? = null
+            synchronized(lock) {
+                collapse()
+                next = queue.removeFirstOrNull()
+                if (next == null) draining = false
+            }
+            deliver(next ?: return)
+        }
+    }
+
+    /**
+     * Throws away frames the radio no longer needs to see.
+     *
+     * A report is a whole picture of the pad rather than a change to it, so an older frame is
+     * worth nothing once a newer one exists — as long as the buttons in it never got their turn.
+     * Axis frames are dropped freely, which is what keeps a moving stick from filling the queue,
+     * while a frame whose buttons differ from the one after it is always sent: that is the press.
+     */
+    private fun collapse() {
+        while (queue.size > 1) {
+            val a = queue[0]; val b = queue[1]
+            // Bytes 0 and 1 are the buttons and byte 8 carries the hat. Both are things a player
+            // taps, so both have to survive; everything between them is stick and trigger travel.
+            if (a[0] != b[0] || a[1] != b[1] || a[8] != b[8]) return
+            queue.removeFirst()
+        }
+    }
+
+    /** Offers one frame until the radio takes it. */
+    private fun deliver(frame: ByteArray) {
+        val h = hid ?: return
+        val d = host ?: return
+        var tries = 0
+        while (tries < RETRIES) {
+            val taken = try { h.sendReport(d, 1, frame) }
+                        catch (e: Exception) { Log.w(TAG, "send failed", e); return }
+            if (taken) return
+            tries++
+            try { Thread.sleep(2) } catch (_: InterruptedException) { return }
+        }
+        Log.w(TAG, "radio refused a report ${RETRIES} times, dropping it")
     }
 
     companion object {
         private const val TAG = "SidePadBtSink"
+        /** About sixteen milliseconds of trying, which outlasts any ordinary link hiccup. */
+        private const val RETRIES = 8
 
         /**
          * evdev button to HID button number, zero-based within the report's sixteen bits.
@@ -168,8 +236,16 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
             Btn.TL to 4, Btn.TR to 5,
             Btn.SELECT to 6, Btn.START to 7,
             Btn.THUMBL to 8, Btn.THUMBR to 9,
-            Btn.TL2 to 10, Btn.TR2 to 11,
-            Btn.MODE to 12,
+            // Ten is Guide, and this is not a matter of taste. Read out of Steam's own log on
+            // 2026-09-19, the layout it guesses for a pad it does not recognise ends
+            // "...leftstick:b8, rightstick:b9, guide:b10", which is the Xbox button order with
+            // the triggers taken off to their axes. Everything above already agreed with it; ten
+            // was the one place we disagreed, and we had the trigger click there, so pulling L2
+            // opened the Steam overlay and the Guide button did nothing.
+            Btn.MODE to 10,
+            // The triggers' own travel is on axes two and five, so these are only the click at
+            // the bottom. Nothing standard claims eleven or twelve, so they sit here.
+            Btn.TL2 to 11, Btn.TR2 to 12,
             Btn.C to 13, Btn.Z to 14,      // the Thor's M1 and M2, after everything standard
         )
 

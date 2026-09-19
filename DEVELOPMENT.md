@@ -353,8 +353,8 @@ the app.
 | L1 / R1 | B4 / B5 | |
 | Select / Start | B6 / B7 | |
 | L3 / R3 | B8 / B9 | stick clicks |
-| L2 / R2 | B10 / B11 | the digital edge; the travel is on an axis |
-| Guide | B12 | |
+| Guide | B10 | where Steam's own guess puts it |
+| L2 / R2 | B11 / B12 | the click at the bottom; the travel is on an axis |
 | M1 / M2 | B13 / B14 | the Thor's own extra pair, placed after everything standard |
 | left stick | AXIS 0, AXIS 1 | up is −1 |
 | right stick | AXIS 3, AXIS 4 | up is −1 |
@@ -367,6 +367,27 @@ the app.
   AXIS 6, 7 and 8 are the slider, dial and wheel usages we never send; they sit at 0 forever.
   Nothing needs changing for them, and B15 is the same kind of spare, since buttons are declared in
   a block of sixteen and we use fifteen.
+
+  **Steam already does the part we cannot.** A host has no layout for us because the vendor and
+  product numbers belong to the Thor's Qualcomm Bluetooth chip and are published by Android's
+  stack from `/system/etc/bluetooth/bt_did.conf`, a root-owned file on a read-only partition. Not
+  reachable from the app, and not from shell either, so there is no version of this we can fix at
+  our end. Steam fixes it at the other end: its log on 2026-09-19 shows it opening us as
+  `Product: XInput Controller #1`, reserving an XInput slot and handing the game an Xbox pad. That
+  makes a remapping screen of our own mostly redundant, and it is where the layout above came
+  from — Steam prints the mapping it guessed, which is a far better source than pressing buttons
+  and reading a tester.
+
+  **The radio will refuse a report, and refusing one used to lose a press.** `sendReport` returns
+  false when the interrupt channel is busy, and a controller produces far more reports than the
+  link can carry — the Thor's sticks alone outrun it. The first version handed each report straight
+  to the radio and dropped it if it was refused. A press made while a stick was moving survived,
+  because the next stick frame carried the button with it; a press made with the sticks at rest was
+  one report, and if that one was refused the press never happened. Hence buttons that registered
+  sometimes and not others. Reports are now queued and offered until taken, on one thread rather
+  than from whichever thread happened to make the press. Frames may still be thrown away when they
+  pile up, but only ones whose buttons and hat match the frame behind them, so a press is never
+  what gets dropped.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
