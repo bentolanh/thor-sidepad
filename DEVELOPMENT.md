@@ -296,10 +296,16 @@ the app.
   asynchronous, so the pad appears before the host answers; the local reopen path is skipped
   entirely for a Bluetooth destination since there is nothing there to reopen.
 
-  **The Thor reports its sticks upside down.** Up is positive on the kernel side, while every host
-  reads up as negative. Android corrects it for its own apps through the device's axis
-  configuration, but reading the kernel directly gets the raw sense, so the forwarder turns Y and
-  RZ over. Measured: pushing up arrived at the far end as +127, which a game showed as down.
+  **The Thor's sticks are the right way up and must be left alone.** This said the opposite for a
+  while and the forwarder turned the two vertical axes over, which is where an inverted stick on
+  the other machine came from. The reading that justified it was of the wrong byte: a report
+  carries a leading report ID, so every axis sits one place further along than a naive count
+  suggests, and the axis being read as Y was really X.
+
+  Settled on 2026-09-19 by holding both sticks at the top and reading what arrived at the far end.
+  With the flip in place they read +127; a host wants up to be negative. The flip is gone, and the
+  same test now reads −127. When checking this again, hold a stick and read the bytes the other
+  machine receives — do not reason from the raw kernel value, which is what went wrong twice.
 
   Shizuku is not required for this. `show()` waits for the injector only when the destination is
   this device; a machine destination opens straight away and the device sliders and media units
@@ -416,6 +422,29 @@ the app.
   changes is a reasonable thing to do and every layer we can measure is happy with it; something
   above them is not. So there is now a heartbeat, and the pad reports its state a hundred times a
   second for as long as it is connected, which is what the hardware it is imitating does.
+
+  **macOS Steam has no fallback; Windows Steam does, and it is not ours.** Under CrossOver the
+  mapping appears by itself, and the log says why: `Controller 0 uses xinput : true`, `reserving
+  XInput slot 0`. Wine presents us as an XInput device and XInput has one fixed layout everybody
+  knows, so nothing had to be worked out. macOS has no XInput. There Steam sees a gamepad with no
+  bindings at all and sends the user to its setup wizard, and the wizard drops the first press of
+  each step: measured on 2026-09-19, every press left this pad as a clean single edge, 105 reports
+  a second flowing, and Steam still needed two or three of them. What it writes is a mapping one
+  step out of line — a stick direction bound to a button, a stick click bound to an axis.
+
+  So do not use the wizard. Steam keeps these as plain text in `config/config.vdf` under
+  `SDL_GamepadBind`, one per line, and a correct line can simply be added with Steam closed, since
+  Steam rewrites that file when it exits. This is the line, and because the vendor and product
+  numbers belong to the Thor's chipset rather than to us, it is the same line on every Thor:
+
+```
+03003c391d0000000012000036140000,Thor,a:b0,b:b1,x:b2,y:b3,back:b6,start:b7,guide:b10,leftshoulder:b4,rightshoulder:b5,leftstick:b8,rightstick:b9,leftx:a0,lefty:a1,rightx:a3,righty:a4,lefttrigger:a2,righttrigger:a5,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,paddle1:b13,paddle2:b14,platform:macOS,
+```
+
+  The identifier holds a hash of the Bluetooth name, so renaming the handheld stops it matching.
+  `paddle1` and `paddle2` are M1 and M2, which have no other name and are otherwise unreachable.
+  Showing this line in the app, with something to copy it, is worth more than a remapping screen
+  of our own: it is the whole answer for macOS and it is the same for everybody.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
