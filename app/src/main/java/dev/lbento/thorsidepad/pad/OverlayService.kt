@@ -998,6 +998,21 @@ class OverlayService : Service() {
             /** The page itself is the pairing screen now; nothing to do but show it. */
             override fun pairMachine() {}
 
+            /**
+             * Points the pad at a machine over Low Energy without one being chosen, because over
+             * Low Energy there is nothing to choose: the machine finds the pad. Asking for a host
+             * first, the way Classic does, made this unreachable for anyone who had not already
+             * paired one — and pairing one needs this set.
+             */
+            override fun useLowEnergy() {
+                prefs.targetMode = Prefs.MODE_BT
+                prefs.btTransport = Prefs.TRANSPORT_LE
+                btSink?.close(); btSink = null
+                if (visible) { hide(); show() }
+                ControlPanel.page = ControlPanel.Page.APPEARANCE
+                ov.updatePanel(panelState(ov))
+            }
+
             override fun makeVisible() {
                 // Two different things wear the same name. Classic asks Android to make the whole
                 // device discoverable, with its consent dialog. Low Energy has nothing to ask:

@@ -64,6 +64,8 @@ interface PanelActions {
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
     /** Empty address = this device; otherwise the paired machine to send to. */
     fun setDestination(address: String)
+    /** Sends to a machine over Low Energy, which needs no machine chosen first: one comes to us. */
+    fun useLowEnergy()
     fun setTransport(value: String)
     fun setIdentity(value: String)
     fun pairMachine()
@@ -316,6 +318,21 @@ object ControlPanel {
                         "Nothing paired yet. Pair a computer and the Thor becomes a controller for it, over Bluetooth."
                     else "Sending to a machine needs no Shizuku: the Thor presents itself as an ordinary Bluetooth gamepad.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
+                // Low Energy has no machine to pick. Over Classic the Thor dials a computer it has
+                // paired with, so the list above is the question; over Low Energy the computer
+                // comes to the pad, and whoever bonds is the answer. Which is why this cannot live
+                // behind a chosen machine the way it first did — there is nothing to choose until
+                // after the pairing, and the pairing needs this set first.
+                val onLe = state.remote && state.transport == "le"
+                card.addView(label("Or wait to be found", 14f, grey).apply { setPadding(0, 22, 0, 4) })
+                card.addView(btn((if (onLe) "\u25CF  " else "") +
+                    "A machine, over Bluetooth Low Energy", !onLe) { actions.useLowEnergy() })
+                card.addView(label(
+                    "No machine to pick here: the computer finds the pad and connects to it. This is " +
+                    "the one where the pad chooses what it calls itself, so a machine can know the " +
+                    "layout without being told.",
+                    12f, grey).apply { setPadding(0, 6, 0, 0) })
+                if (onLe) card.addView(btn("What the machine sees\u2026") { page = Page.APPEARANCE; render() })
             } else {
                 card.addView(label("Presses go to", 14f, grey))
                 for (t in state.targets) {
