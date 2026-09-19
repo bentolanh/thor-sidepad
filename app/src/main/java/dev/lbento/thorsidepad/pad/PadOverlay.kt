@@ -125,6 +125,25 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
     }
 
+    /**
+     * Claims the side edges from the system's back gesture for one of our full-screen windows.
+     *
+     * Without this the system's edge-swipe monitor steals the touch from us mid-swipe and fires a
+     * back. On the pad's screen that back has nothing to act on, since none of our windows take
+     * focus, so the system sends it to whatever does hold focus, which is the app on the top
+     * screen. Watched happening: the monitor stole the stream from the panel, back navigation came
+     * back null, and the press landed on the app above. Claiming the edges stops the steal, and the
+     * swipe simply does nothing, which is what it should do over a pad.
+     */
+    private fun claimBackEdges(v: View) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        v.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+            val strip = (ShieldPadView.BACK_EDGE_DP * view.resources.displayMetrics.density).toInt()
+            view.systemGestureExclusionRects =
+                listOf(Rect(0, 0, strip, view.height), Rect(view.width - strip, 0, view.width, view.height))
+        }
+    }
+
     private fun isFocusableWindow(v: View) =
         ((v.layoutParams as? WindowManager.LayoutParams)?.flags ?: 0) and
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE == 0
@@ -146,6 +165,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     private fun add(v: View, lp: WindowManager.LayoutParams) {
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
+        // Anything of ours that fills the screen has to hold the edges, or the system's edge-swipe
+        // monitor takes the touch and the back lands on the other screen. The small per-button
+        // windows are left alone: between them the screen still belongs to the app underneath.
+        if (lp.width == ViewGroup.LayoutParams.MATCH_PARENT &&
+            lp.height == ViewGroup.LayoutParams.MATCH_PARENT) claimBackEdges(v)
         wm.addView(v, lp); views.add(v)
     }
 
@@ -201,6 +225,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         // says so on the panel itself. Nothing in here needs key input; see ControlPanel.
         val wrap = FrameLayout(themed)
         wrap.addView(h.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        claimBackEdges(wrap)
         val lp = fullScreenParams("SidePad panel")
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
         applyPanelLook(h.scrim, lp, shieldOn, backdrop)
@@ -553,16 +578,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad editor"
-        // The editor does not take focus, so a back swipe would otherwise reach the app behind it,
-        // which the user cannot see. Claim the side edges the way the shield does: the swipe lands
-        // on the editor and does nothing, and Exit is the way out.
-        root.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val strip = (ShieldPadView.BACK_EDGE_DP * v.resources.displayMetrics.density).toInt()
-                v.systemGestureExclusionRects =
-                    listOf(Rect(0, 0, strip, v.height), Rect(v.width - strip, 0, v.width, v.height))
-            }
-        }
         add(root, lp)
     }
 

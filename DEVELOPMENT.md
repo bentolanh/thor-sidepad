@@ -231,6 +231,23 @@ the app.
   some native Mac games may not. Whether the advertised device class can be changed from an app was
   not established.
 
+- **A swipe on the pad's screen could fire a back on the other one.** Caught on 2026-09-19 with the
+  panel open: `InputDispatcher` logged the system's edge-swipe gesture monitor *stealing the touch*
+  from the SidePad panel, `BackAnimationController` reported `BackNavigationInfo is null` because
+  nothing on that screen takes focus and so nothing could receive a back, and the press then landed
+  on the app holding focus, which is on the top screen. The user saw Apple TV go back while swiping
+  the bottom one.
+
+  The shield already claimed the side edges, but the panel sat above it and did not, and a window
+  above suppresses the claim of the one below. So any window of ours that fills the screen has to
+  hold the edges itself; `add()` now does that for every full-screen window, while the small
+  per-button windows are deliberately left alone so the screen between buttons still belongs to the
+  app underneath.
+
+  Injected swipes will not reproduce this. `input swipe` never reaches the gesture monitor, so it
+  takes a real finger; the recipe that worked was to close the top-screen app completely, reopen it
+  so it holds focus, then swipe an edge with the panel open.
+
 - **The whole pad can vanish, and it is not our bug.** An app may set
   `HIDE_NON_SYSTEM_OVERLAY_WINDOWS` on its window, which asks the system to hide every
   non-system overlay while it is showing. Android's own Settings does this on its home screen, as
