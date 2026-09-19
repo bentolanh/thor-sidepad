@@ -509,10 +509,17 @@ the app.
   handheld this app is installed on needs the whole set again, because the identity belongs to
   whatever Bluetooth radio is inside it.
 
-  The experiment that settled it: a throwaway build advertised a Low Energy HID gamepad whose PnP
-  ID claimed `045E:02E0`, and Apple's framework reported `category=Xbox One`. The report
-  descriptor was unchanged and the Class of Device still said Mobile Phone, so neither is the
-  gate — the two numbers are the whole of it. No root, no system file, nothing outside the app.
+  **This decision is not currently supported by evidence and should be treated as open.** What it
+  rested on was a throwaway build advertising a Low Energy HID gamepad claiming `045E:02E0`, after
+  which Apple's framework reported `category=Xbox One`. That looked conclusive and was not: the
+  Classic pairing to the same Bluetooth address was live throughout, and the test was never run
+  without it. Later the same evening the Mac was made to forget the pad, and from then on both
+  `045E:02E0` and an identity of our own behaved identically — connect, read, drop after forty
+  seconds — which is what no bond looks like, not what a rejected identity looks like.
+
+  So Apple's gate may well be the vendor and product numbers. It has not been shown. Whoever picks
+  this up should assume nothing from the paragraph below until it is rerun against a pad that has
+  bonded over Low Energy and nothing else.
 
   Two things were weighed against it and both were tried first. The Class of Device is the more
   honest lever and does not work: the property exists and shell can write it, but this Qualcomm
@@ -565,6 +572,16 @@ the app.
   the worse of the two at the tail. Both are far beyond what a gamepad needs. Neither is a reason
   to choose one over the other; Low Energy earns its place by owning the identity, not by being
   faster.
+
+  **Bonding is the wall, and the probe never got over it.** With the Mac's pairing forgotten, a
+  probe that advertises, serves the identity and carries the Thor's real sticks and buttons gets
+  as far as being found and connected to, and no further. Requiring encryption on the HID
+  characteristics changed nothing; requiring it on the identity itself only made the Mac give up
+  sooner. No bond ever formed on either side. That is not Low Energy's fault and probably not
+  macOS's: the Thor holds a Low Energy bond with an 8BitDo pad quite happily, so the device can do
+  this — a `BluetoothGattServer` that never takes part in pairing cannot. Settling whether a host
+  accepts a Low Energy gamepad from an Android app therefore needs the real transport with real
+  bonding; there is no smaller experiment left that answers it.
 
   **Low Energy needs a bond, and that is why the probe kept falling over.** Measuring it in
   isolation did not work: with Classic disconnected the Mac would read the identity and then never
