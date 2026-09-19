@@ -765,6 +765,26 @@ the app.
   again: read a real one, match it byte for byte. Larger than it sounds, and worth deciding
   whether anything you play actually wants it before starting.
 
+  **Volume is far too coarse on headphones.** Reported 2026-09-19: the step from nothing to the
+  first notch is already loud, which makes the quiet end of the range unusable — exactly where
+  headphones need it most. Unchecked so far; the handheld was off the wire.
+
+  Three things to establish before changing anything, cheapest first. What the device's maximum
+  volume index actually is (`dumpsys audio`): many Android builds ship fifteen steps for media,
+  and fifteen steps across a range the ear hears logarithmically puts an enormous jump at the
+  bottom. Whether the headphones are Bluetooth, because Android hands absolute volume to the
+  headset over AVRCP and then the headset's own coarse ladder is what is heard, not ours —
+  `settings put global bluetooth_disable_absolute_volume 1` takes that back and is worth trying
+  first since it needs no code at all. And whether Android is tracking volume per output device,
+  which it has since 12, in which case the headphone route has its own index range separate from
+  the speaker's and reading the wrong one would explain the slider disagreeing with what is heard.
+
+  Only after those is it worth touching the pad. The slider maps its travel straight onto the
+  index, so with few indices there is nothing to be gained by a curve — a curve cannot invent
+  steps that do not exist. If the count is genuinely the limit, the lever is
+  `ro.config.media_vol_steps`, which is a build property rather than something an app may set, so
+  that would be a question of whether shell can reach it at all.
+
   ### Four rough edges, found 2026-09-19, not yet fixed
 
   A button the current shape has no room for is swallowed rather than left alone. The controller
