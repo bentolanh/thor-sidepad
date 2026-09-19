@@ -389,6 +389,25 @@ the app.
   pile up, but only ones whose buttons and hat match the frame behind them, so a press is never
   what gets dropped.
 
+  **Measured on 2026-09-19, the link is not where input goes missing.** Worth writing down
+  because the next person to feel a dropped press will suspect this first, and four separate
+  measurements say otherwise. Twenty physical presses produced twenty downs and twenty ups at the
+  Thor's own reader and twenty of each at the Mac's HID layer. Twenty injected presses arrived
+  whole again with the sticks sweeping at 2300 events a second. The reader was driven at 4000
+  events a second, five times what the controller produces, with no `SYN_DROPPED`. Forty
+  right-stick changes sent half a second apart arrived forty for forty, spread 517 to 585
+  milliseconds, which is the shell loop and not the radio. Nor is there a wake-up cost: a press
+  after five seconds of silence arrives as fast as one after fifty milliseconds, so the link is
+  not dropping into a low-power mode between presses.
+
+  The way to test this again is in the scratchpad rather than the repo: a blob of `input_event`
+  structs written straight to the device node, sweeping a stick by about two percent of its
+  travel, which is inside any game's dead zone and so generates full event traffic without moving
+  anything on screen. On the other end, a small `IOHIDManager` listener matching 001d/1200 and
+  printing a timestamp per value change. Compare counts, and compare arrival intervals against a
+  known cadence rather than against the host's clock, which keeps `adb`'s own jitter out of the
+  number.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and

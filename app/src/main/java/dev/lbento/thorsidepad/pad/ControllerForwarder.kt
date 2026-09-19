@@ -43,6 +43,8 @@ class ControllerForwarder(private val sink: BluetoothSink) : IPadEvents.Stub() {
         Log.i(TAG, "forwarding ${out.size} axes")
     }
 
+    private var dropped = 0
+
     override fun onEvent(type: Int, code: Int, value: Int) {
         when (type) {
             Ev.KEY -> sink.setKey(code, value != 0)
@@ -57,9 +59,17 @@ class ControllerForwarder(private val sink: BluetoothSink) : IPadEvents.Stub() {
             }
             // A controller ends every batch with a sync, which is the moment to send one report
             // rather than one per axis: a stick moving would otherwise be two reports per frame.
-            Ev.SYN -> sink.sync()
+            Ev.SYN -> {
+                // SYN_DROPPED. The kernel says its buffer for us overflowed and it threw events
+                // away to catch up. Anything lost there was lost before we ever saw it.
+                if (code == SYN_DROPPED) Log.w(TAG, "kernel dropped events, ${++dropped} so far")
+                else sink.sync()
+            }
         }
     }
 
-    private companion object { const val TAG = "SidePadForward" }
+    private companion object {
+        const val TAG = "SidePadForward"
+        const val SYN_DROPPED = 3
+    }
 }
