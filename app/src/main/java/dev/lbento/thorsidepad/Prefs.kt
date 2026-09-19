@@ -11,6 +11,20 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putString("targetMode", v).apply()
 
     /** Last resolved node of the chosen controller; re-resolved from [physicalName] whenever the pad shows. */
+    /**
+     * Machines paired from inside SidePad. The device's own list is full of headphones and other
+     * controllers, and none of those are somewhere to send presses, so only what was paired here is
+     * offered.
+     */
+    var pairedHostList: String
+        get() = sp.getString("pairedHosts", "") ?: ""
+        set(v) = sp.edit().putString("pairedHosts", v).apply()
+
+    fun rememberPairedHost(address: String) {
+        val all = pairedHostList.split(',').filter { it.isNotBlank() }.toMutableSet()
+        if (all.add(address)) pairedHostList = all.joinToString(",")
+    }
+
     /** The paired machine presses are sent to, when the destination is another machine. */
     var btHost: String
         get() = sp.getString("btHost", "") ?: ""

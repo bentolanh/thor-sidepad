@@ -207,6 +207,36 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
     }
 
+    private var linkBadge: View? = null
+
+    /**
+     * Says the link to the other machine is down, and offers to try again.
+     *
+     * Only shown when something is wrong. A working remote pad needs no chrome, but a dropped one
+     * looks exactly like a working one from the player's side: you press, nothing happens, and
+     * there is nothing to tell you why. Passing null takes it away.
+     */
+    fun showLinkBadge(text: String?, onTap: () -> Unit) {
+        linkBadge?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {}; linkBadge = null }
+        if (text == null) return
+        val v = TextView(themed).apply {
+            this.text = text
+            setTextColor(Color.WHITE); textSize = 14f
+            setPadding(26, 12, 26, 12)
+            setBackgroundColor(0xEE8A4B2E.toInt())
+            setOnClickListener { onTap() }
+        }
+        val lp = WindowManager.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+        // Below the top edge strip, so pulling the panel down still works over it.
+        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        lp.y = EdgeCatcherView.HEIGHT_PX + 8
+        lp.title = "SidePad link"
+        lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
+        wm.addView(v, lp); linkBadge = v
+    }
+
     fun removeCatchers() { catchers.forEach { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }; catchers.clear() }
 
     /**
@@ -317,7 +347,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
 
 
-    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide() }
+    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {} }
 
     /** Whether the compositor can blur what is behind a window (needed for the frosted backdrop). */
     val blurSupported: Boolean get() = try { wm.isCrossWindowBlurEnabled } catch (_: Throwable) { false }

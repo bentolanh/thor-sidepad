@@ -199,6 +199,7 @@ class OverlayService : Service() {
             val o = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(ov.displayId)
             startActivity(i, o.toBundle())
         } catch (e: Exception) { Log.w(TAG, "discoverable dialog failed", e) }
+        watchForNewPairing(secs)
         waitForVisible(ov, secs)
     }
 
@@ -207,19 +208,69 @@ class OverlayService : Service() {
         getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.name ?: "this device"
     } catch (e: Exception) { "this device" }
 
+    /**
+     * Machines offered as a destination: the ones paired from inside SidePad, plus whichever is
+     * currently chosen so an existing setup is never dropped. The device's own pairing list is full
+     * of headphones and other controllers, and none of those are somewhere to send presses.
+     */
     private fun pairedHosts(): List<HostChoice> = try {
+        val ours = prefs.pairedHostList.split(',').filter { it.isNotBlank() }.toSet() +
+            setOfNotNull(prefs.btHost.ifEmpty { null })
         val a = getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
         (a?.bondedDevices ?: emptySet())
-            .filter { it.bluetoothClass?.majorDeviceClass == android.bluetooth.BluetoothClass.Device.Major.COMPUTER }
+            .filter { it.address in ours }
             .map { HostChoice(it.address, it.name ?: it.address) }
     } catch (e: Exception) { emptyList() }
+
+    /** Paired computers SidePad does not know about, offered on the Pair page to take on. */
+    private fun adoptableHosts(): List<HostChoice> = try {
+        val known = pairedHosts().map { it.address }.toSet()
+        val a = getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
+        (a?.bondedDevices ?: emptySet())
+            .filter { it.address !in known &&
+                it.bluetoothClass?.majorDeviceClass == android.bluetooth.BluetoothClass.Device.Major.COMPUTER }
+            .map { HostChoice(it.address, it.name ?: it.address) }
+    } catch (e: Exception) { emptyList() }
+
+    /**
+     * While the Thor is visible, anything that finishes pairing did so because of what the user just
+     * did here, so it is remembered as a destination. Nothing else adds to that list.
+     */
+    private var bondWatch: android.content.BroadcastReceiver? = null
+
+    private fun watchForNewPairing(secs: Int) {
+        if (bondWatch != null) return
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) {
+                if (i?.action != android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED) return
+                if (i.getIntExtra(android.bluetooth.BluetoothDevice.EXTRA_BOND_STATE, -1)
+                    != android.bluetooth.BluetoothDevice.BOND_BONDED) return
+                val d = i.getParcelableExtra<android.bluetooth.BluetoothDevice>(
+                    android.bluetooth.BluetoothDevice.EXTRA_DEVICE) ?: return
+                prefs.rememberPairedHost(d.address)
+                Log.i(TAG, "paired from SidePad: ${d.address}")
+                overlay?.let { ov -> main.post { ov.updatePanel(panelState(ov)) } }
+            }
+        }
+        try {
+            registerReceiver(r, android.content.IntentFilter(
+                android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED))
+            bondWatch = r
+            main.postDelayed({ stopWatchingForPairing() }, secs * 1000L + 5_000)
+        } catch (e: Exception) { Log.w(TAG, "bond watch", e) }
+    }
+
+    private fun stopWatchingForPairing() {
+        bondWatch?.let { try { unregisterReceiver(it) } catch (_: Exception) {} }
+        bondWatch = null
+    }
 
     private fun panelState(ov: PadOverlay) = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
         targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL,
         shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset,
         remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
         hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
-        padName = bluetoothName(), visibleFor = secondsVisible())
+        padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts())
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {
@@ -335,7 +386,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         try { getSystemService(InputManager::class.java).unregisterInputDeviceListener(deviceListener) } catch (_: Exception) {}
         hide()
-        stopImeWatch(); stopNowWatch()
+        stopImeWatch(); stopNowWatch(); stopWatchingForPairing()
         overlay?.tearDown()
         try { levelThread.quitSafely() } catch (_: Exception) {}
         running = false
@@ -385,7 +436,8 @@ class OverlayService : Service() {
                     // Another machine. Opening is asynchronous, so the pad goes up now and the first
                     // presses simply do not land until the host answers; the state callback says so.
                     val bt = btSink ?: BluetoothSink(this) { msg ->
-                        if (msg.isNotEmpty()) main.post { toast(msg) }
+                        main.post { refreshLinkBadge() }
+                        if (msg.isNotEmpty()) Log.i(TAG, "link: $msg")
                     }.also { btSink = it }
                     bt.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
                     sink = bt; caps = BluetoothSink.CAPS
@@ -414,6 +466,7 @@ class OverlayService : Service() {
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 visible = true
                 prefs.padShown = true
+                main.postDelayed({ refreshLinkBadge() }, 1500)
                 updateNotification()
                 startImeWatch()
             } catch (e: Exception) {
@@ -425,6 +478,23 @@ class OverlayService : Service() {
 
     private var btSink: BluetoothSink? = null
     private var forwarder: ControllerForwarder? = null
+
+    /**
+     * Shows a badge on the pad only while the link to the machine is down. A connected pad says
+     * nothing, which is right; a dropped one has to say something, because from the player's side
+     * it looks identical to a working one until they wonder why nothing is happening.
+     */
+    private fun refreshLinkBadge() {
+        val ov = overlay ?: return
+        val bt = btSink
+        val remote = prefs.targetMode == Prefs.MODE_BT
+        if (!remote || !visible || bt == null || bt.connected) { ov.showLinkBadge(null) {}; return }
+        val name = pairedHosts().firstOrNull { it.address == prefs.btHost }?.label ?: "the machine"
+        ov.showLinkBadge("Not connected to $name \u2014 tap to try again") {
+            bt.reconnect()
+            main.postDelayed({ refreshLinkBadge() }, 2500)
+        }
+    }
 
     /**
      * Sends the Thor's own sticks and buttons to the machine as well as the on-screen ones. This is
@@ -468,6 +538,7 @@ class OverlayService : Service() {
 
     private fun hide() {
         prefs.padShown = false
+        overlay?.showLinkBadge(null) {}
         stopForwarding()
         btSink?.close(); btSink = null
         stopImeWatch(); stopNowWatch(); imeSuspended = false
@@ -843,7 +914,10 @@ class OverlayService : Service() {
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setDestination(address: String) {
                 prefs.targetMode = if (address.isEmpty()) Prefs.MODE_PHYSICAL else Prefs.MODE_BT
-                prefs.btHost = address
+                // Going back to this device changes where presses go, not which machine is known:
+                // forgetting it here would drop it out of the list and it would have to be paired
+                // again for no reason.
+                if (address.isNotEmpty()) { prefs.btHost = address; prefs.rememberPairedHost(address) }
                 ControlPanel.page = ControlPanel.Page.MAIN
                 if (visible) { hide(); show() }
                 ov.updatePanel(panelState(ov))
@@ -853,6 +927,12 @@ class OverlayService : Service() {
             override fun pairMachine() {}
 
             override fun makeVisible() = makeThorVisible(ov)
+
+            override fun adoptMachine(address: String) {
+                prefs.rememberPairedHost(address)
+                ControlPanel.page = ControlPanel.Page.DESTINATION
+                ov.updatePanel(panelState(ov))
+            }
 
             override fun stopService() {
                 ov.removePanel(); padDirty = false

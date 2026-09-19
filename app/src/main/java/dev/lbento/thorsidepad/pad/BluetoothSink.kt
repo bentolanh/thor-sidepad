@@ -83,6 +83,13 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
         if (!adapter.getProfileProxy(ctx, listener, BluetoothProfile.HID_DEVICE)) done("No gamepad support")
     }
 
+    /** Ask the host again, for when the link has dropped and the player wants it back. */
+    fun reconnect() {
+        val h = hid ?: return
+        val d = host ?: return
+        try { h.connect(d) } catch (e: Exception) { Log.w(TAG, "reconnect", e) }
+    }
+
     fun close() {
         val h = hid ?: return
         try { host?.let { h.disconnect(it) }; h.unregisterApp() } catch (_: Exception) {}

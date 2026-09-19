@@ -47,6 +47,8 @@ data class PanelState(
     /** Pairing: the name a computer will see, and how long the Thor is still visible for. */
     val padName: String = "",
     val visibleFor: Int = 0,
+    /** Computers already paired with this Thor that SidePad does not yet know about. */
+    val adoptable: List<HostChoice> = emptyList(),
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -61,6 +63,7 @@ interface PanelActions {
     fun setDestination(address: String)
     fun pairMachine()
     fun makeVisible()
+    fun adoptMachine(address: String)
     fun stopService()
     fun openApp()
     fun startShizuku()
@@ -226,6 +229,14 @@ object ControlPanel {
                     card.addView(btn("Make the Thor visible") { actions.makeVisible() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                     })
+                }
+                // Something paired with the Thor outside SidePad is not offered as a destination by
+                // itself, since the pairing list is mostly headphones and controllers. It can be
+                // taken on deliberately here, which is a choice rather than a guess.
+                if (state.adoptable.isNotEmpty()) {
+                    card.addView(label("Already paired with this Thor", 14f, grey)
+                        .apply { setPadding(0, 18, 0, 4) })
+                    for (h in state.adoptable) card.addView(btn("Use ${h.label}") { actions.adoptMachine(h.address) })
                 }
             } else if (page == Page.DESTINATION) {
                 card.addView(label("Send presses to", 14f, grey))
