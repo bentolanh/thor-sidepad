@@ -282,7 +282,11 @@ the app.
   existing planning does the rest.
 
   The shape advertised is sixteen buttons, two sticks, two triggers and a hat, in a nine-byte
-  report. `CAPS` deliberately mirrors the local virtual pad: the D-pad is left out of the buttons so
+  report. **The usage names are not free choice.** Hosts assume an unknown pad puts its left stick
+  on X and Y, its right stick on Rx and Ry, and its triggers on Z and Rz. A controller calls the
+  same things ABS_Z/ABS_RZ and ABS_GAS/ABS_BRAKE on the Linux side, and mapping by name rather than
+  by convention puts the triggers where the right stick is expected. A trigger at rest then reads
+  as a stick held hard over, which a game shows as input flying about while nothing is touched. `CAPS` deliberately mirrors the local virtual pad: the D-pad is left out of the buttons so
   it plans onto the hat, and the triggers get `BRAKE` and `GAS` so they do not fight the right
   stick, which lives on `Z`/`RZ`.
 

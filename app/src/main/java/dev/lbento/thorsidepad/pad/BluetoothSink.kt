@@ -161,10 +161,15 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
             Btn.THUMBL to 13, Btn.THUMBR to 14,
         )
 
-        /** evdev axis to its byte in the report. */
+        /**
+         * evdev axis to its byte in the report. The byte order is unchanged; what moved is which
+         * HID usage each byte is declared as. A controller calls its right stick Z and Rz on this
+         * side and Rx and Ry on the other, and its triggers the reverse.
+         */
         private val AXES = mapOf(
-            Abs.X to 2, Abs.Y to 3, Abs.Z to 4, Abs.RZ to 5,
-            Abs.BRAKE to 6, Abs.GAS to 7,
+            Abs.X to 2, Abs.Y to 3,        // left stick, X and Y
+            Abs.Z to 4, Abs.RZ to 5,       // right stick, declared as Rx and Ry
+            Abs.BRAKE to 6, Abs.GAS to 7,  // triggers, declared as Z and Rz
         )
 
         /**
@@ -188,11 +193,13 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
             // sixteen buttons
             0x05, 0x09, 0x19, 0x01, 0x29, 0x10, 0x15, 0x00, 0x25, 0x01,
             0x75, 0x01, 0x95.toByte(), 0x10, 0x81.toByte(), 0x02,
-            // two sticks
-            0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x32, 0x09, 0x35,
+            // Two sticks on X/Y and Rx/Ry, two triggers on Z/Rz. The names are not free choice:
+            // this is the arrangement every host assumes for an unknown pad. Declared the other way
+            // round, a resting trigger reads as a stick held hard over, which is how a game ends up
+            // with input flying about while nothing is being touched.
+            0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x33, 0x09, 0x34,
             0x15, 0x81.toByte(), 0x25, 0x7F, 0x75, 0x08, 0x95.toByte(), 0x04, 0x81.toByte(), 0x02,
-            // two triggers
-            0x09, 0x33, 0x09, 0x34, 0x15, 0x00, 0x25, 0x7F,
+            0x09, 0x32, 0x09, 0x35, 0x15, 0x00, 0x25, 0x7F,
             0x75, 0x08, 0x95.toByte(), 0x02, 0x81.toByte(), 0x02,
             // hat, then four bits of padding to close the byte
             0x09, 0x39, 0x15, 0x00, 0x25, 0x07, 0x35, 0x00, 0x46.toByte(), 0x3B, 0x01,
