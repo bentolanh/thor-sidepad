@@ -28,6 +28,16 @@ Java_dev_lbento_thorsidepad_inject_Native_openDevice(JNIEnv* env, jclass cls, js
     return fd >= 0 ? fd : -err;
 }
 
+// Take a device for ourselves, or give it back. While grabbed, nothing else on this machine sees
+// its events, which is what lets the Thor's own controller drive another machine without also
+// driving this one.
+JNIEXPORT jint JNICALL
+Java_dev_lbento_thorsidepad_inject_Native_grabDevice(JNIEnv* env, jclass cls, jint fd, jboolean on) {
+    if (fd < 0) return -EINVAL;
+    if (ioctl(fd, EVIOCGRAB, on ? 1 : 0) < 0) return -errno;
+    return 0;
+}
+
 JNIEXPORT void JNICALL
 Java_dev_lbento_thorsidepad_inject_Native_closeDevice(JNIEnv* env, jclass cls, jint fd) {
     if (fd >= 0) close(fd);

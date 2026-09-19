@@ -320,6 +320,10 @@ class OverlayService : Service() {
                     }.also { btSink = it }
                     bt.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
                     sink = bt; caps = BluetoothSink.CAPS
+                    // The pad does not wait for Shizuku here, but forwarding the real controller
+                    // does need it, so ask for it in the background and start when it arrives.
+                    if (svc != null) startForwarding(bt, svc)
+                    else Injector.connect(this) { late -> startForwarding(bt, late) }
                 } else {
                     if (svc == null) { toast("Shizuku is not ready"); return@run }
                     val err = openTarget(svc)
@@ -351,9 +355,51 @@ class OverlayService : Service() {
     }
 
     private var btSink: BluetoothSink? = null
+    private var forwarder: ControllerForwarder? = null
+
+    /**
+     * Sends the Thor's own sticks and buttons to the machine as well as the on-screen ones. This is
+     * the half that makes the handheld a controller rather than a touch panel, and it is the one
+     * part of the remote destination that does need Shizuku, because only the shell may read a
+     * controller's events. Without it the on-screen pad still works.
+     *
+     * The controller is taken exclusively, so a press drives the other machine and not this one.
+     */
+    @Volatile private var forwardingWanted = false
+
+    private fun startForwarding(bt: BluetoothSink, svc: IInjector?) {
+        if (svc == null) { Log.i(TAG, "no Shizuku: only the on-screen pad will reach the machine"); return }
+        // Both the direct path and the late connection can arrive; only one may hold the controller.
+        synchronized(this) { if (forwardingWanted) return; forwardingWanted = true }
+        Thread {
+            try {
+                refreshTargets(svc)
+                val path = prefs.physicalPath.ifEmpty { targets.firstOrNull()?.path.orEmpty() }
+                if (path.isEmpty()) { Log.w(TAG, "no controller to forward"); return@Thread }
+                val f = ControllerForwarder(bt)
+                // A helper left over from before this call existed answers null rather than failing.
+                val caps = svc.forwardStart(path, true, f)
+                if (caps.isNullOrEmpty() || caps.startsWith("error")) {
+                    Log.w(TAG, "forward refused: ${caps ?: "the helper is too old; restart SidePad"}")
+                    return@Thread
+                }
+                f.configure(caps)
+                forwarder = f
+                Log.i(TAG, "forwarding the Thor's controller from $path")
+            } catch (e: Exception) { Log.w(TAG, "forward failed", e) }
+        }.start()
+    }
+
+    private fun stopForwarding() {
+        synchronized(this) { if (!forwardingWanted) return; forwardingWanted = false }
+        forwarder = null
+        val svc = Injector.current() ?: return
+        Thread { try { svc.forwardStop() } catch (_: Exception) {} }.start()
+    }
 
     private fun hide() {
         prefs.padShown = false
+        stopForwarding()
         btSink?.close(); btSink = null
         stopImeWatch(); stopNowWatch(); imeSuspended = false
         overlay?.removeAll()

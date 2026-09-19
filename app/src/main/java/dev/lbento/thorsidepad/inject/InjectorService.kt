@@ -370,6 +370,52 @@ class InjectorService() : IInjector.Stub() {
 
     override fun heartbeat() { lastBeat = SystemClock.elapsedRealtime() }
 
+    // ---- forwarding a real controller ----------------------------------------------------------
+    @Volatile private var fwdFd = -1
+    private var fwdThread: Thread? = null
+
+    override fun forwardStart(path: String?, grab: Boolean, cb: IPadEvents?): String {
+        forwardStop()
+        if (path.isNullOrEmpty() || cb == null) return "error: no device"
+        val f = Native.openDevice(path, false)
+        if (f < 0) return "error: ${Native.strerror(f)}"
+        if (grab) {
+            // Taking the device means a press drives the other machine and not this one. If the
+            // kernel refuses, carry on: both machines see it, which is untidy but still works.
+            val g = Native.grabDevice(f, true)
+            if (g < 0) Log.w(TAG, "grab refused: ${Native.strerror(g)}")
+        }
+        val keys = (Native.deviceCodes(f, Ev.KEY) ?: IntArray(0)).toList()
+        val absJson = JSONObject()
+        (Native.deviceCodes(f, Ev.ABS) ?: IntArray(0)).forEach { c ->
+            Native.absInfo(f, c)?.let { absJson.put(c.toString(), JSONArray(listOf(it[0], it[1]))) }
+        }
+        fwdFd = f
+        val t = Thread({
+            while (fwdFd == f) {
+                val e = try { Native.readEvent(f, 250) } catch (ex: Exception) { null } ?: continue
+                if (e[0] < 0) { Log.w(TAG, "forward read ended: ${Native.strerror(e[1])}"); break }
+                try { cb.onEvent(e[0], e[1], e[2]) } catch (ex: Exception) { break }
+            }
+            try { Native.grabDevice(f, false) } catch (_: Exception) {}
+            Native.closeDevice(f)
+            Log.i(TAG, "forwarding stopped")
+        }, "sidepad-forward")
+        t.isDaemon = true; fwdThread = t; t.start()
+        Log.i(TAG, "forwarding $path grab=$grab keys=${keys.size}")
+        return JSONObject().put("keys", JSONArray(keys)).put("abs", absJson).put("virtual", false).toString()
+    }
+
+    override fun forwardStop() {
+        val t = fwdThread
+        fwdFd = -1
+        fwdThread = null
+        // Wait for it: the reader releases the grab as it leaves, and starting again before that
+        // happens means the new grab is refused as busy and the device is quietly left shared.
+        t?.interrupt()
+        try { t?.join(1500) } catch (_: InterruptedException) {}
+    }
+
     override fun probePointer(holdMs: Int): String {
         val report = StringBuilder()
         val f = Native.createUinput(

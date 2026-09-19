@@ -285,6 +285,15 @@ the app.
   steps or the Start button on Shizuku, since someone who only wants a Bluetooth gamepad never
   needs it.
 
+  **A host caches the report descriptor at pairing and does not re-read it.** Changing the shape we
+  advertise therefore does nothing for a machine that is already paired: it keeps parsing our
+  reports with the old map and quietly ignores any bytes the old one did not cover. Seen on
+  2026-09-19, where buttons and the first four axes worked and the triggers and hat did not, and
+  `ioreg -c IOHIDDevice -r -l` showed the Mac still holding the 44-byte descriptor from the probe
+  rather than the 86-byte one. The only cure is to remove the device on the host and pair again.
+  Worth remembering before blaming the report code, and worth telling a user after any change to
+  the descriptor.
+
   Verified against a Mac: tapping A, Y and B on the pad arrived as buttons 1, 5 and 2, down and up.
   The panel asks the two questions separately, because adding a machine split them. **Send to** is
   where presses go, this device or a paired machine; **Appears as** is what the receiver thinks they

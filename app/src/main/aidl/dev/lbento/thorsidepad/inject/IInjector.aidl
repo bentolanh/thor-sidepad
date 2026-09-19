@@ -1,5 +1,7 @@
 package dev.lbento.thorsidepad.inject;
 
+import dev.lbento.thorsidepad.inject.IPadEvents;
+
 interface IInjector {
     // Shizuku convention: this transaction code asks the user service to exit.
     void destroy() = 16777114;
@@ -61,4 +63,11 @@ interface IInjector {
     // is what the Stop button does, so quitting stays quitting.
     void keepAlive(String pkg, int graceMs) = 26;
     void heartbeat() = 27;
+
+    // Read a physical controller's own events and hand them over, so the Thor's real sticks and
+    // buttons can drive another machine. With grab set the device is taken away from this machine
+    // while it runs, so a press does not also act here. Returns that device's capabilities as JSON,
+    // in the same shape as targetCaps, or an "error: " string.
+    String forwardStart(String path, boolean grab, IPadEvents cb) = 28;
+    void forwardStop() = 29;
 }

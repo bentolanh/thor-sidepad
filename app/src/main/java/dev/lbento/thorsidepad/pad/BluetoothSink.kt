@@ -91,26 +91,29 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
 
     // ---- PadSink -----------------------------------------------------------------------------
 
-    override fun key(code: Int, down: Boolean): Int {
-        val bit = BUTTONS[code] ?: return 0          // nothing to say for this one, not a failure
+    /** Updates the report without sending. Used when a burst of events ends in a sync. */
+    fun setKey(code: Int, down: Boolean) {
+        val bit = BUTTONS[code] ?: return            // nothing to say for this one, not a failure
         val i = bit / 8
-        val mask = (1 shl (bit % 8)).toByte()
-        report[i] = if (down) (report[i].toInt() or mask.toInt()).toByte()
-                    else (report[i].toInt() and mask.toInt().inv()).toByte()
-        return send()
+        val mask = 1 shl (bit % 8)
+        report[i] = if (down) (report[i].toInt() or mask).toByte()
+                    else (report[i].toInt() and mask.inv()).toByte()
     }
 
-    override fun abs(code: Int, value: Int): Int {
+    fun setAbs(code: Int, value: Int) {
         when (code) {
             Abs.HAT0X -> { hatX = value; writeHat() }
             Abs.HAT0Y -> { hatY = value; writeHat() }
-            else -> {
-                val at = AXES[code] ?: return 0
-                report[at] = value.coerceIn(-127, 127).toByte()
-            }
+            else -> AXES[code]?.let { report[it] = value.coerceIn(-127, 127).toByte() }
         }
-        return send()
     }
+
+    /** Sends whatever the report currently says. */
+    fun sync(): Int = send()
+
+    override fun key(code: Int, down: Boolean): Int { setKey(code, down); return send() }
+
+    override fun abs(code: Int, value: Int): Int { setAbs(code, value); return send() }
 
     /** Eight compass points, or the null value when the pad is centred. */
     private fun writeHat() {

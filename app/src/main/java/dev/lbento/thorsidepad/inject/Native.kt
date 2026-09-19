@@ -6,6 +6,7 @@ object Native {
 
     @JvmStatic external fun openDevice(path: String, readWrite: Boolean): Int
     @JvmStatic external fun closeDevice(fd: Int)
+    @JvmStatic external fun grabDevice(fd: Int, on: Boolean): Int
     @JvmStatic external fun deviceName(fd: Int): String?
     @JvmStatic external fun deviceCodes(fd: Int, evType: Int): IntArray?
     @JvmStatic external fun absInfo(fd: Int, code: Int): IntArray?
