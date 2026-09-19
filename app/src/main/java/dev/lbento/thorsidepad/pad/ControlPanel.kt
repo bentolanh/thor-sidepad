@@ -217,6 +217,23 @@ object ControlPanel {
                     marginStart = 140; marginEnd = 140
                 })
                 card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
+            } else if (page == Page.PAIRING && state.transport == "le") {
+                // Pairing is not one thing. Over Classic the Thor has to be made visible for a
+                // couple of minutes, the way a controller is held until its light blinks. Over
+                // Low Energy it is already calling out for as long as the pad is up, and there is
+                // nothing to press — so this page says where to look instead of offering a button
+                // that would do nothing.
+                card.addView(label("Listening now as \u201C${state.padName}\u201D", 22f))
+                card.addView(label(
+                    "A Low Energy pad is always calling out while the pad is up, so there is nothing " +
+                    "to hold down here. On the computer, open Bluetooth and pick \u201C${state.padName}\u201D " +
+                    "from the nearby devices \u2014 not from the already-paired list.",
+                    13f, grey).apply { setPadding(0, 10, 0, 0) })
+                card.addView(label(
+                    "If it has paired before and will not connect, both sides have to forget it: on " +
+                    "the computer, and on the Thor under its own Bluetooth settings. Forgetting on " +
+                    "one side alone leaves keys behind and the next attempt quietly fails.",
+                    13f, grey).apply { setPadding(0, 14, 0, 0) })
             } else if (page == Page.PAIRING) {
                 // A controller normally has a button you hold until a light blinks. This is that
                 // light: it says the Thor is listening, what to look for, and how long is left.
@@ -269,7 +286,9 @@ object ControlPanel {
                     val active = state.remote && h.address == state.hostAddress
                     card.addView(btn((if (active) "\u25CF  " else "") + h.label, !active) { actions.setDestination(h.address) })
                 }
-                card.addView(btn("Pair a new machine\u2026") { page = Page.PAIRING; render() })
+                card.addView(btn(if (state.transport == "le") "How to pair a machine\u2026" else "Pair a new machine\u2026") {
+                    page = Page.PAIRING; render()
+                })
                 card.addView(label(
                     if (state.hosts.isEmpty())
                         "Nothing paired yet. Pair a computer and the Thor becomes a controller for it, over Bluetooth."
