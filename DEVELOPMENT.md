@@ -341,6 +341,38 @@ the app.
   has one answer for now. That row stays visible when remote rather than being hidden, because the
   next answer in it is an Xbox-shaped identity chosen so that Mac games accept it.
 
+  **Where each control lands on the host.** Measured on 2026-09-19 against a browser gamepad
+  tester on the Mac, driving one control at a time into the Thor's controller node and reading the
+  numbered slots back. A, X, Y, Select, Start, both sticks, both triggers and a D-pad direction
+  were read directly; the rest follow from the same table in `BluetoothSink`, which every one of
+  those landings agreed with. This is what a remapping screen has to be filled in with.
+
+| Thor | Slot | Notes |
+| --- | --- | --- |
+| A / B / X / Y | B0 / B1 / B2 / B3 | |
+| L1 / R1 | B4 / B5 | |
+| Select / Start | B6 / B7 | |
+| L3 / R3 | B8 / B9 | stick clicks |
+| L2 / R2 | B10 / B11 | the digital edge; the travel is on an axis |
+| Guide | B12 | |
+| M1 / M2 | B13 / B14 | the Thor's own extra pair, placed after everything standard |
+| left stick | AXIS 0, AXIS 1 | up is −1 |
+| right stick | AXIS 3, AXIS 4 | up is −1 |
+| left trigger | AXIS 2 | |
+| right trigger | AXIS 5 | |
+| D-pad | AXIS 9 | one axis, eight directions; right reads −0.43 |
+
+  **The ten axes are not a bug.** A host numbers axes by HID usage and not by the order we declare
+  them: usage 0x30 becomes AXIS 0 and so on up to the hat at 0x39, which is AXIS 9. The gaps at
+  AXIS 6, 7 and 8 are the slider, dial and wheel usages we never send; they sit at 0 forever.
+  Nothing needs changing for them, and B15 is the same kind of spare, since buttons are declared in
+  a block of sixteen and we use fifteen.
+
+  **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
+  untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
+  therefore roughly 0. This is normal for a controller the host does not recognise by name and
+  cannot be fixed in the descriptor; a remapping screen has to know it.
+
 ## Layout
 
 | Path | What |
