@@ -226,6 +226,19 @@ the app.
   handheld is not the machine running the game. `BtHidProbe` reruns all of this: `PROBE_BT` to
   register, `PROBE_BT_SEND` to press. Development only.
 
+  **What a Mac does and does not accept, measured.** macOS's input layer takes it: `hidutil` lists
+  it as a Game Pad bound to `AppleUserHIDEventDriver`, and a browser gamepad tester reads the
+  buttons and sticks. Apple's own GameController framework does not: a tool calling
+  `GCController.controllers()` with the Thor connected reports none, which is why it is absent from
+  System Settings under Game Controllers.
+
+  That is the line. Anything reading raw HID works, which covers Steam, emulators, browsers and
+  SDL-based games. Anything built on Apple's framework does not see it at all. Getting onto the
+  other side of that line means impersonating a controller macOS supports natively, matching both
+  the identifiers and the exact report layout of an Xbox or PlayStation pad, which is what the
+  "Appears as" row was left open for. Note it would also fix our report layout to theirs, and any
+  host already paired would need pairing again, since the descriptor is cached.
+
   The open question is host compatibility rather than plumbing. Apple's controller framework
   favours known controller families, so Steam and emulators are likely to take a generic pad while
   some native Mac games may not. Whether the advertised device class can be changed from an app was
