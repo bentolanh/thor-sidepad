@@ -153,12 +153,24 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     companion object {
         private const val TAG = "SidePadBtSink"
 
-        /** evdev button to HID button number, zero-based within the report's sixteen bits. */
+        /**
+         * evdev button to HID button number, zero-based within the report's sixteen bits.
+         *
+         * The order is not ours to choose. A host with no mapping for a pad falls back to the
+         * arrangement every ordinary controller uses: A, B, X, Y, the two shoulders, Select, Start,
+         * then the two stick clicks. The Thor's extra M1 and M2 sit after all of that. Slotting
+         * them into the middle, which is where they fall if you simply walk the evdev codes in
+         * order, shifts everything after them by two, so Start lands on the number a game reads as
+         * something else entirely and appears not to work.
+         */
         private val BUTTONS = mapOf(
-            Btn.A to 0, Btn.B to 1, Btn.C to 2, Btn.X to 3, Btn.Y to 4, Btn.Z to 5,
-            Btn.TL to 6, Btn.TR to 7, Btn.TL2 to 8, Btn.TR2 to 9,
-            Btn.SELECT to 10, Btn.START to 11, Btn.MODE to 12,
-            Btn.THUMBL to 13, Btn.THUMBR to 14,
+            Btn.A to 0, Btn.B to 1, Btn.X to 2, Btn.Y to 3,
+            Btn.TL to 4, Btn.TR to 5,
+            Btn.SELECT to 6, Btn.START to 7,
+            Btn.THUMBL to 8, Btn.THUMBR to 9,
+            Btn.TL2 to 10, Btn.TR2 to 11,
+            Btn.MODE to 12,
+            Btn.C to 13, Btn.Z to 14,      // the Thor's M1 and M2, after everything standard
         )
 
         /**
