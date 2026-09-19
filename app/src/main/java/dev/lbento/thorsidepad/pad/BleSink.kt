@@ -139,9 +139,20 @@ class BleSink(
         }, seconds.toLong() + 1, TimeUnit.SECONDS)
     }
 
+    /**
+     * Puts the advertisement back up, but only when there is nobody on the other end.
+     *
+     * Advertising while a machine is already attached is not merely wasteful, it is how the pad
+     * arrives twice. Seen on 2026-09-19: the findability timer fired a second after a host
+     * connected, the advertisement went back up, the same Mac connected again, and from then on
+     * there were two of us in its device list. Two pads from one radio is also enough to wedge
+     * `gamecontrollerd`, after which every application that enumerates controllers hangs at launch
+     * — which is a far worse thing to inflict than a missing advertisement.
+     */
     private fun restartAdvertising() {
         if (!wantAdvertising) return
         stopAdvertising()
+        if (host != null) { Log.i(TAG, "a machine already has us; staying quiet"); return }
         ctx.getSystemService(BluetoothManager::class.java)?.adapter?.let { startAdvertising(it) }
     }
 
@@ -299,7 +310,7 @@ class BleSink(
     }
 
     private fun resumeAdvertising() {
-        if (!wantAdvertising || advertiser != null) return
+        if (!wantAdvertising || advertiser != null || host != null) return
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return
         startAdvertising(adapter)
     }
@@ -373,6 +384,15 @@ class BleSink(
         override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
             if (device == null) return
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                // One machine at a time. A pad is a thing you hold; there is no sense in which it
+                // is being used by two computers at once, and serving a second connection puts a
+                // second copy of this pad in somebody's device list.
+                val already = host
+                if (already != null && already.address != device.address) {
+                    Log.w(TAG, "${device.address} also wants the pad; ${already.address} has it")
+                    try { server?.cancelConnection(device) } catch (_: Exception) {}
+                    return
+                }
                 host = device; connected = true
                 Log.i(TAG, "${device.address} connected")
                 // A controller stops calling out the moment a machine takes it, and so should

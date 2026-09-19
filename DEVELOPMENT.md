@@ -752,6 +752,25 @@ the app.
   Classic path had the same shape but its dialog redrew for other reasons. It wants a repeating
   tick while that page is open, stopping when the count reaches zero.
 
+  **Advertising while already connected put the pad in a machine's list twice, and that wedged
+  the machine.** Found 2026-09-19. The findability timer fires a second or two after a host
+  connects, and it restarted the advertisement without checking whether anyone was on the other
+  end; the same Mac connected again and there were two of this pad from then on. The log reads
+  `connected` and then `quietly reachable` one hundred and seventy milliseconds later, which is
+  the whole of it.
+
+  What that costs is out of all proportion to the mistake. Two pads from one radio is enough to
+  wedge `gamecontrollerd`, and once that daemon is stuck every application that enumerates game
+  controllers hangs at launch and cannot be killed — a game, a cloud client, a mouse driver, all
+  parked in uninterruptible wait. Stopping the pad removed both entries at once, which is how it
+  was pinned on us. Worse still, the documented cure for a wedged daemon is `sudo killall
+  gamecontrollerd`, and that makes the daemon tell every client to drop its controllers, which
+  `loginwindow` handles by failing an assertion and aborting — so the fix logs the user out. One
+  missing check produced a chain ending in somebody's session being thrown away.
+
+  So: never advertise while a host is attached, and turn away a second machine rather than serving
+  it alongside the first. A pad is a thing one person holds.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
