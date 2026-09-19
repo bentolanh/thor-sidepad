@@ -741,6 +741,30 @@ the app.
   and something calling itself GamePad-1 — and a game usually binds player one to the first it
   finds. Untested; disconnect the others and try again before looking anywhere else.
 
+  ### Next, in the order they are worth doing
+
+  **Report firmware version 0x0903 rather than 0x0100 in the PnP ID.** One line, diagnosed above:
+  it is the two bytes that put this pad outside Eastward's mapping table. Changing it changes the
+  identity, so everything paired needs pairing again — worth doing first so that the re-pair is
+  shared with anything else in this list.
+
+  **Give M1 and M2 somewhere to go, as paddles.** An Xbox Elite Series 2 carries four of them and
+  Apple's framework exposes `paddleButton1` through `paddleButton4` on `GCXboxGamepad`, so the
+  buttons this handheld has that a standard pad does not are not homeless after all — they just
+  need an identity that admits to having them. Two things to establish: the Elite's own product
+  number and report layout, which the same trick will read off one if ever there is one to hand;
+  and whether a plain Xbox identity tolerates the extra buttons anyway, which is cheaper to try
+  first and costs only a re-pair. Until then they are dropped in Xbox mode, which is also why they
+  are swallowed rather than left alone — see the rough edge below.
+
+  **Motion, if the handheld has any.** Not yet checked: the Thor was off the wire when this was
+  written, and `dumpsys sensorservice` will say. Worth knowing that no Xbox pad reports motion at
+  all, so this cannot ride on the identity above. Apple's `GCMotion` comes from DualSense,
+  DualShock and Switch Pro, which means a third shape and a third identity rather than an addition
+  to the second — and those carry motion inside their own report layouts, so it is the same job
+  again: read a real one, match it byte for byte. Larger than it sounds, and worth deciding
+  whether anything you play actually wants it before starting.
+
   ### Four rough edges, found 2026-09-19, not yet fixed
 
   A button the current shape has no room for is swallowed rather than left alone. The controller
