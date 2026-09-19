@@ -674,6 +674,21 @@ the app.
   It also stops entirely once a machine connects, which is what a controller does and what the
   first version did not.
 
+  **Claiming the Xbox identity without Xbox's report layout is worse than not claiming it.**
+  Confirmed on 2026-09-19 by playing rather than by reading bytes: a Mac paired over Low Energy
+  took the pad as `category=Xbox One`, and then both sticks sat pinned to a corner and no button
+  did anything. The reports leaving the pad were correct throughout — read raw, A arrived as
+  button one and the hat rested at eight — so nothing was wrong with what was sent. The host was
+  reading nine bytes of ours through a map written for about sixteen of Microsoft's, with 16-bit
+  axes where ours are 8-bit, so every field came out of the wrong offset. Steam saw nothing at all.
+
+  This is the cost of the identity, and it is all or nothing: a name that a host recognises brings
+  that host's layout with it, so claiming the name means emitting that layout too, byte for byte.
+  Until that is done the honest identity is the only one that works, because a host with no map
+  for us falls back to reading the descriptor we actually publish. Which is the reverse of how it
+  was first written up here: the Xbox identity is not a shortcut past the mapping files, it is a
+  much larger commitment than them.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
