@@ -294,6 +294,11 @@ the app.
   Worth remembering before blaming the report code, and worth telling a user after any change to
   the descriptor.
 
+  Verified whole after re-pairing, with events driven into the controller node: buttons, both
+  sticks at full travel and centred, both triggers 0 to 127 and back, and the D-pad arriving as hat
+  directions with 8 for centred. Before the re-pair the triggers and hat were silent, which was the
+  cached descriptor above and not the report code.
+
   Verified against a Mac: tapping A, Y and B on the pad arrived as buttons 1, 5 and 2, down and up.
   The panel asks the two questions separately, because adding a machine split them. **Send to** is
   where presses go, this device or a paired machine; **Appears as** is what the receiver thinks they
