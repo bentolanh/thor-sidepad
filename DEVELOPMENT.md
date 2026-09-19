@@ -689,6 +689,30 @@ the app.
   was first written up here: the Xbox identity is not a shortcut past the mapping files, it is a
   much larger commitment than them.
 
+  **What an Xbox-compatible pad actually sends, read off one that works.** Two 8BitDo pads here
+  claim `045E:02E0`, the same numbers this can claim, and a Mac takes them where it will not take
+  this. Their descriptor is readable from the host — `ReportDescriptor` on the `IOHIDDevice` — so
+  the shape does not have to be guessed. Theirs is 306 bytes to our 86, and the input report is
+  sixteen bytes against our nine:
+
+| | an 8BitDo at 045E:02E0 | this pad |
+| --- | --- | --- |
+| order | sticks, triggers, hat, buttons | buttons, sticks, triggers, hat |
+| left stick | X, Y — 16-bit unsigned, 0‥65535 | 8-bit signed, −127‥127 |
+| right stick | Rx, Ry — 16-bit unsigned | 8-bit signed |
+| triggers | Z, Rz — 10-bit, 0‥1023, each padded to two bytes | 8-bit, 0‥127 |
+| hat | four bits, logical 1‥8, zero for centred | four bits, logical 0‥7, eight for centred |
+| buttons | ten, then six bits of padding | sixteen |
+| report | sixteen bytes | nine |
+
+  It carries three more reports beyond the pad itself: a system-control bit under report two,
+  rumble as an output report under three, and battery strength under four. None of those are
+  needed to be believed, but they are what a host expects to find.
+
+  So the sticks pinning was a host reading our button bits as the top half of a sixteen-bit axis,
+  and even the hat is out by one — their centre is zero where ours is eight. Claiming the identity
+  means sending this, and none of it is difficult now that it has been read rather than guessed.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
