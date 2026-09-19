@@ -521,6 +521,15 @@ the app.
   pool meant for open projects — but leaves us off Apple's list, so it solves the portability
   problem and not the recognition one.
 
+  **What it appears as has to be a setting, and not for the reason first argued.** The first
+  version of this decision proposed hiding the Xbox identity behind a toggle out of scruple, which
+  was the wrong reason: a default nobody turns on helps nobody. The right reason is that the
+  identity cannot be fixed at all. An Xbox controller's report has no room for a trackpad, a
+  keyboard or media keys, so a pad offering those cannot claim to be one. A Nintendo layout is a
+  third identity again. Whatever the pad is currently pretending to be follows from what it is
+  currently offering, so the panel needs a row for it beside the existing ones, with the standard
+  gamepad identity as the default because that is what most of this is for.
+
   It is worth being plain about what this is. `045E:02E0` is Microsoft's, used as the de facto
   Xbox-compatible identifier by a great deal of third-party hardware — two 8BitDo pads on the
   bench here ship with exactly it, and a third claims Nintendo's. The project is open source and
@@ -534,10 +543,22 @@ the app.
   layout as well as its numbers. The prize for that is the whole of the first paragraph: no
   mapping line, no database, no profile, on any host, on any handheld.
 
-  **Still unmeasured, and to be measured before any of it is built:** what connection interval a
-  host grants over Low Energy. Reports were never actually sent in the experiment — the
-  characteristic returned zeros and notified nobody — so latency is unknown, and a day of this
-  project has already gone on latency that turned out to matter.
+  **Low Energy carries a gamepad, measured 2026-09-19.** A probe advertised the HID service, a Mac
+  read the eighty-six byte report map out of our characteristic, subscribed, and took notifications
+  for half a minute. Reports were driven as fast as the sender could push them:
+
+| | rate | median gap | p90 | p99 | worst |
+| --- | --- | --- | --- | --- | --- |
+| Low Energy, this probe | 111/sec | 4.4ms | 22.7ms | 56.5ms | 110.7ms |
+| Classic, this pad's heartbeat | 100/sec | 11.2ms | — | — | 78.7ms |
+| Classic, an 8BitDo pad idling | 82/sec | 11.1ms | — | — | 56.7ms |
+
+  So Low Energy sustains more than a hundred reports a second with a better typical gap than
+  Classic and a worse tail. That is a usable transport — real controllers report at sixty to a
+  hundred and twenty-five — and the question is settled well enough to build on. Two cautions for
+  whoever revisits it: the Classic link to the same Mac was live throughout, so the tail may be
+  contention between the two rather than Low Energy's own, and no host-to-device direction was
+  exercised at all. Re-measure with Classic disconnected before trusting the worst-case number.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
