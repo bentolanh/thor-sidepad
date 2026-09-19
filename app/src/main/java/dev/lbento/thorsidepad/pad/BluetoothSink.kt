@@ -10,6 +10,8 @@ import android.util.Log
 import dev.lbento.thorsidepad.inject.Abs
 import dev.lbento.thorsidepad.inject.Btn
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * A destination that is another machine: the pad presents itself as a Bluetooth gamepad and the
@@ -38,6 +40,9 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     private val queue = ArrayDeque<ByteArray>()
     private val lock = Any()
     private var draining = false
+
+    private val ticker = Executors.newSingleThreadScheduledExecutor()
+    private var heartbeat: ScheduledFuture<*>? = null
 
     fun open(address: String, report: (String) -> Unit) {
         // The status callback fires again when the gamepad is taken down, saying it is no longer
@@ -83,6 +88,7 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
                             connected = state == BluetoothProfile.STATE_CONNECTED
                             if (connected && device != null) host = device
                             Log.i(TAG, "connected=$connected")
+                            if (connected) startHeartbeat() else stopHeartbeat()
                             onState(if (connected) "" else "Not connected")
                         }
                     })
@@ -102,6 +108,7 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
 
     fun close() {
         val h = hid ?: return
+        stopHeartbeat()
         try { host?.let { h.disconnect(it) }; h.unregisterApp() } catch (_: Exception) {}
         hid = null; connected = false
     }
@@ -151,6 +158,27 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
         }
         report[8] = ((report[8].toInt() and 0xF0) or dir).toByte()
     }
+
+    /**
+     * Sends the pad's state on a steady beat, whether or not anything changed.
+     *
+     * Every real controller does this: it reports at a fixed rate and keeps reporting while it is
+     * awake. This one used to speak only when something moved, which meant a still pad sent
+     * nothing at all — measured on 2026-09-19, twelve seconds of silence produced not one report.
+     * Everything below the receiver was fine with that, and it is provably fine: a press after
+     * twenty seconds of quiet reached the other machine's input layer as quickly as one after
+     * fifty milliseconds. What is not fine with it is whatever reads the pad further up, where a
+     * first movement after a pause arrived late while a controller that never stops talking did
+     * not. So now this one never stops talking either.
+     */
+    private fun startHeartbeat() {
+        stopHeartbeat()
+        heartbeat = ticker.scheduleAtFixedRate({
+            if (connected) send()
+        }, BEAT_MS, BEAT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun stopHeartbeat() { heartbeat?.cancel(false); heartbeat = null }
 
     /**
      * Queues the current state and makes sure someone is sending.
@@ -220,6 +248,8 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
         private const val TAG = "SidePadBtSink"
         /** About sixteen milliseconds of trying, which outlasts any ordinary link hiccup. */
         private const val RETRIES = 8
+        /** A hundred reports a second, which is an ordinary rate for a Bluetooth gamepad. */
+        private const val BEAT_MS = 10L
 
         /**
          * evdev button to HID button number, zero-based within the report's sixteen bits.

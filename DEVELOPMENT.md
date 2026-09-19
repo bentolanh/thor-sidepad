@@ -408,6 +408,15 @@ the app.
   known cadence rather than against the host's clock, which keeps `adb`'s own jitter out of the
   number.
 
+  **A controller never stops talking, and ours used to.** The measurements above cleared the link
+  of losing or delaying anything, and yet a first movement after a pause still arrived late in a
+  game while an 8BitDo pad in the same game did not. Listening at the report level rather than the
+  value level found the difference in one reading: untouched and idle, the 8BitDo sent 82 reports
+  a second, eleven milliseconds apart, and this pad sent none at all. Speaking only when something
+  changes is a reasonable thing to do and every layer we can measure is happy with it; something
+  above them is not. So there is now a heartbeat, and the pad reports its state a hundred times a
+  second for as long as it is connected, which is what the hardware it is imitating does.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
