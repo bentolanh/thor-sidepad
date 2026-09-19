@@ -502,6 +502,43 @@ the app.
   ordinary apps — the probe saw the device-information service and not the HID one — so a scanner
   written this way cannot see the reports even when they are flowing.
 
+  **Decided 2026-09-19: the pad will present itself as an Xbox-compatible controller.** What
+  forced the question was a day spent writing the same information into four different files —
+  a line in Steam's `config.vdf`, a database for RPCS3, a profile for RetroArch, and nothing at
+  all that could help a native macOS game. Each host wants it in its own format, and each new
+  handheld this app is installed on needs the whole set again, because the identity belongs to
+  whatever Bluetooth radio is inside it.
+
+  The experiment that settled it: a throwaway build advertised a Low Energy HID gamepad whose PnP
+  ID claimed `045E:02E0`, and Apple's framework reported `category=Xbox One`. The report
+  descriptor was unchanged and the Class of Device still said Mobile Phone, so neither is the
+  gate — the two numbers are the whole of it. No root, no system file, nothing outside the app.
+
+  Two things were weighed against it and both were tried first. The Class of Device is the more
+  honest lever and does not work: the property exists and shell can write it, but this Qualcomm
+  Android 13 build ignores it, and the runtime config where it otherwise lives is root-only.
+  Choosing our own numbers works technically — a Mac read back `0x1209:0x5350` verbatim, from the
+  pool meant for open projects — but leaves us off Apple's list, so it solves the portability
+  problem and not the recognition one.
+
+  It is worth being plain about what this is. `045E:02E0` is Microsoft's, used as the de facto
+  Xbox-compatible identifier by a great deal of third-party hardware — two 8BitDo pads on the
+  bench here ship with exactly it, and a third claims Nintendo's. The project is open source and
+  aimed at Android retro handhelds, where presenting as a standard controller is what the category
+  does. It is disclosed in the README rather than hidden behind a setting, which was considered
+  and rejected as needless: a default nobody turns on helps nobody.
+
+  **Being recognised is not the same as working.** Every host that recognises those numbers will
+  apply the Xbox layout, which expects Xbox's report format, so our own byte layout would land
+  wrong everywhere. Doing this properly means emitting Xbox's report descriptor and its report
+  layout as well as its numbers. The prize for that is the whole of the first paragraph: no
+  mapping line, no database, no profile, on any host, on any handheld.
+
+  **Still unmeasured, and to be measured before any of it is built:** what connection interval a
+  host grants over Low Energy. Reports were never actually sent in the experiment — the
+  characteristic returned zeros and notified nobody — so latency is unknown, and a day of this
+  project has already gone on latency that turned out to matter.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and
