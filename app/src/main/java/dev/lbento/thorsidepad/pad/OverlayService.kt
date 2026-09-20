@@ -596,15 +596,21 @@ class OverlayService : Service() {
                 val f = ControllerForwarder(bt) { code, down ->
                     when {
                         code !in passThrough -> Unit
-                        // Home is not handed back as a key. Injected from our own device it has
-                        // no screen attached to it, so Android sends every display home at once
-                        // where the Thor's own handler sends only this one. Asking for home on a
-                        // named display does what the button is supposed to do, and cannot be
-                        // done by pressing it on the real node either: we hold that node, so the
-                        // press would come straight back to us and round again.
+                        // Home is not handed back as a key. Injected from our own device it
+                        // carries no screen with it, so Android sends every display home at once
+                        // where the Thor's own handler sends only this one. It cannot be pressed
+                        // on the real node either, the way the on-screen Home button manages it:
+                        // we hold that node, so the press would be read straight back by our own
+                        // reader and go round again.
+                        //
+                        // Nor can the home activity simply be started on a named display. Beacon
+                        // is a single instance, so "am start --display 4" cannot place a copy
+                        // there and hands the intent to the one already running instead —
+                        // "delivered to currently running top-most instance", and both screens go
+                        // home. A key event aimed at a display goes through that display's window
+                        // manager, which is the same route the Back button here already takes.
                         code == Key.HOME -> if (down) shellAsync(
-                            "am start --display ${overlay?.displayId ?: 0} " +
-                                "-a android.intent.action.MAIN -c android.intent.category.HOME")
+                            "input -d ${overlay?.displayId ?: 0} keyevent 3")
                         else -> try { svc.key(code, down) }
                             catch (e: Exception) { Log.w(TAG, "pass through", e) }
                     }

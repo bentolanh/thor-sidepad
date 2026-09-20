@@ -923,3 +923,38 @@ uses.
 ```bash
 adb shell 'cp /data/app/*/moe.shizuku.privileged.api-*/lib/arm64/libshizuku.so /data/local/tmp/shizuku_starter && chmod 755 /data/local/tmp/shizuku_starter && /data/local/tmp/shizuku_starter --apk=$(pm path moe.shizuku.privileged.api | sed s/package://)'
 ```
+
+## The Thor's Home button, and why the pad cannot do anything sensible with it
+
+Home and Back sit on `/dev/input/event9` — the same node as every stick, trigger and face
+button. `EVIOCGRAB` takes a node whole, so while the pad forwards the controller it necessarily
+holds those two as well. There is no arrangement where the machine gets the sticks and the
+handheld keeps its Home key.
+
+Three ways of handing Home back were measured on 2026-09-20, and all three are wrong in the
+same way — a synthetic press carries no screen with it, where the real one does:
+
+- **Re-injected on our own uinput device.** Android reads it as a plain home key and sends every
+  display home. It also never reaches whatever handles that button natively, because that is
+  watching the controller, which we hold.
+- **`am start --display N` for the home activity.** Refused: the home app is a single instance,
+  so Android answers *"Activity not started, intent has been delivered to currently running
+  top-most instance"* and the one running instance takes the whole device home.
+- **`input -d N keyevent 3`.** Delivered, and the right display is named, but the result is still
+  both screens. This is the route the pad's own Back-on-this-screen button uses, and it works
+  for Back; Home is treated differently.
+
+Pressing it on the real node, which is how the on-screen "Home on this screen" button manages
+it, is not open to us: we are the ones holding that node, so the press would be read straight
+back by our own reader and go round again.
+
+Home is therefore handed back as a plain home key, which is worth more than a button that does
+nothing at all. Back needs none of this — it is a generic navigation key, so re-injecting it
+from any device behaves exactly like the real thing.
+
+Worth knowing before blaming the pad: on this Thor the per-screen Home behaviour was broken
+independently of SidePad, and stayed broken with the app disabled and after a restart. Nine
+installed apps declare `android.intent.category.HOME`, one of them the button interceptor
+itself, and several accessibility services compete for the key. A single press produced one
+`input -d 4 keyevent 3` from us and then two launcher starts from the interceptor — the
+duplication is downstream of anything we send.
