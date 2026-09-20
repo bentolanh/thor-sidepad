@@ -625,18 +625,21 @@ class BleSink(
                 // as near to that as an app is allowed to get.
                 if (secondsFindable() == 0) stopAdvertising()
                 // A bond only means this host has been here before. Whether it is listening is a
-                // separate question and only it can answer: it says so by subscribing. Assuming
-                // otherwise was tried and was worse than useless — the pad reported itself
-                // connected and sent presses to a host that had not asked for any, so a link that
-                // was plainly broken looked like a working one.
-                if (isBonded(device) && subscriptions.getBoolean(device.address, false)) {
-                    subscribed = true
-                    Log.i(TAG, "${device.address} is bonded and had subscribed; sending reports again")
-                    onState("")
-                } else {
-                    // Either never met, or bonded over Classic only and never subscribed here.
-                    // Asking for a Low Energy bond covers both; one that already exists is
-                    // refused harmlessly.
+                // separate question and only it can answer: it says so by subscribing.
+                //
+                // Nor is it something to remember from last time. It was, and the remembered
+                // answer goes stale the moment the machine rebuilds its session — after which
+                // the pad fires reports at a hundred a second into nothing. Measured on
+                // 2026-09-20: macOS answered every one with "received an indication on handle
+                // 0x0087 but no session is subscribed", dropped them all, and hung up about
+                // sixteen seconds later, again and again. Nothing here noticed, because from
+                // this side a link that is up and a link that is listening look identical.
+                //
+                // So wait to be asked, every time. A machine that wants the pad subscribes when
+                // it connects, and that write is the only honest signal there is.
+                if (!isBonded(device)) {
+                    // Never met, or bonded over Classic only. Asking for a Low Energy bond
+                    // covers both; one that already exists is refused harmlessly.
                     createBondWith(device)
                 }
                 startHeartbeat()
