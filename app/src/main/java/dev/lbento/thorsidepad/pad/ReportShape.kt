@@ -247,15 +247,19 @@ class XboxShape(private val rumble: Boolean = true) : ReportShape {
          *
          * The real controller ends its report map with a Physical Interface Device collection —
          * report three, enable-actuators, four magnitudes, duration, delay, loop count — and that
-         * collection is the whole of how a host learns there is a motor to drive. It is also not
-         * free. Measured on 2026-09-20: with it, macOS starts _GCHapticServerManager's run loop
-         * and that loop ticks for as long as the pad is connected, costing 1.02 seconds of
-         * processor per minute with nothing rumbling, nothing running and no traffic on the
-         * radio. An 8BitDo attached to the same machine cost nothing, because it drives its
-         * motors through its own protocol and declares no such collection.
+         * collection is the whole of how a host learns there is a motor to drive, so leaving it
+         * out is how a host that behaves badly when offered motors is told there are none.
          *
-         * So the collection can be left out, at the price of the motors. Everything before it is
-         * untouched and the application collection still has to be closed, which is the last byte.
+         * It was cut out first for a different reason, and that reason turned out to be wrong.
+         * macOS runs _GCHapticServerManager's run loop for as long as this pad is connected —
+         * 1.02 seconds of processor a minute on an untouched pad, against nothing at all for an
+         * 8BitDo on the same machine — and taking this collection away did not change it: 1.07
+         * with the map trimmed to 226 bytes, the host confirmed by ioreg to be holding the
+         * trimmed one, and the same loop still on top of the sample. Whatever wakes that loop is
+         * not this. Measured 2026-09-20.
+         *
+         * Everything before it is untouched and the application collection still has to be
+         * closed, which is the last byte.
          */
         const val PID_AT = 225
         const val PID_END = 316

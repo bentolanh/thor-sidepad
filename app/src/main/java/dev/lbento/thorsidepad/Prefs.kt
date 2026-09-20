@@ -111,11 +111,15 @@ class Prefs(ctx: Context) {
     /**
      * Whether the pad tells a host it has motors in it.
      *
-     * Saying so is what makes rumble work, and it is not free. The claim is a force-feedback
-     * collection at the end of the report map, and macOS answers it by starting a haptics run
-     * loop that ticks for as long as the pad is connected whether or not anything is buzzing —
-     * measured on 2026-09-20 at 1.02 seconds of processor a minute with the pad untouched, next
-     * to nothing at all for an 8BitDo on the same machine.
+     * Saying so is a force-feedback collection at the end of the report map, and leaving it out
+     * is how a host that behaves badly when offered motors can be told there are none.
+     *
+     * It was added expecting it to answer something else, and it did not. macOS runs a haptics
+     * run loop for as long as this pad is connected — 1.02 seconds of processor a minute with
+     * the pad untouched, against nothing at all for an 8BitDo on the same machine — and taking
+     * the collection out changed that figure not at all: 1.07 with the map trimmed to 226 bytes
+     * and the host confirmed to be holding the trimmed one. Whatever starts that loop, it is not
+     * this. Measured 2026-09-20.
      *
      * Changing this changes the shape of what a host was promised, so a host that already knows
      * the pad has to be told to look again before it takes effect.

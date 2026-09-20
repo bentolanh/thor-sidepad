@@ -56,7 +56,7 @@
         <TextView style="@style/StepHelp" android:text="For a handheld with one screen, where every edge swipe belongs to Android and there is no spare gesture to reach the pad with. Drag the button anywhere; tap it to show or hide the pad, hold it to open the panel." />
         <Switch android:id="@+id/rumbleSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Tell a machine the pad can rumble" />
-        <TextView style="@style/StepHelp" android:text="On, games can buzz the handheld. It costs something to offer: a Mac answers the claim by running a haptics loop the whole time the pad is connected, about one second of processor a minute even when nothing is buzzing. Turning this off stops that and loses rumble. Either way the machine has to disconnect and reconnect before it notices the change." />
+        <TextView style="@style/StepHelp" android:text="On, games can buzz the handheld. Off, the pad does not mention motors at all, for a machine that behaves badly when offered them. On a Mac this makes no difference to anything but the rumbling — it runs its haptics loop either way. The machine has to disconnect and reconnect before it notices the change." />
         <TextView style="@style/StatusLine" android:text="App icon" />
         <!-- Two tappable icons; the chosen one is ringed. No names needed. -->
         <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp">
