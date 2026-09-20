@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PadScope</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --edge: #2c313b; --ink: #e7eaf0;
+    --dim: #8b93a3; --hot: #4ade80; --warm: #fbbf24; --cold: #3b4252;
+    --accent: #60a5fa; --bad: #f87171;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 13px; }
+  header {
+    padding: 12px 16px; border-bottom: 1px solid var(--edge);
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  h1 { font-size: 14px; margin: 0 12px 0 0; font-weight: 600; letter-spacing: .02em; }
+  button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--edge);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--edge); }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+  section { background: var(--bg); padding: 14px 16px; min-width: 0; }
+  h2 { font-size: 12px; margin: 0 0 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  .note { color: var(--dim); line-height: 1.5; margin: 0 0 12px; }
+  .scroll { overflow-x: auto; }
+
+  /* Raw byte grid */
+  .bytes { display: flex; flex-wrap: wrap; gap: 4px; }
+  .byte {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 5px;
+    padding: 4px 5px; min-width: 46px; text-align: center;
+  }
+  .byte .i { color: var(--dim); font-size: 10px; }
+  .byte .v { font-size: 14px; font-variant-numeric: tabular-nums; }
+  .byte.moved { border-color: var(--hot); }
+  .byte.moved .v { color: var(--hot); }
+  .byte.ever { border-color: var(--cold); }
+
+  /* Bit rows */
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--edge); }
+  th { color: var(--dim); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  td.on { color: var(--hot); }
+  .bits { letter-spacing: 2px; }
+  .bits b { color: var(--hot); font-weight: 400; }
+
+  /* Learn panel */
+  .learn { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .target { font-size: 18px; color: var(--warm); min-width: 90px; font-weight: 600; }
+  .status { color: var(--dim); }
+  .status.armed { color: var(--warm); }
+  .status.got { color: var(--hot); }
+  .map td:first-child { color: var(--warm); }
+  pre {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 6px;
+    padding: 10px; overflow-x: auto; margin: 10px 0 0; line-height: 1.45;
+  }
+  .axes .bar { position: relative; height: 14px; background: var(--panel);
+               border: 1px solid var(--edge); border-radius: 3px; overflow: hidden; }
+  .axes .bar i { position: absolute; top: 0; bottom: 0; background: var(--accent); opacity: .75; }
+  .prompt { background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+            padding: 16px; margin-bottom: 12px; }
+  .prompt .big { font-size: 22px; font-weight: 600; }
+  .prompt .big span { color: var(--warm); }
+  .prompt.done .big span { color: var(--hot); }
+  .prog { color: var(--dim); font-size: 11px; margin: 6px 0 4px; letter-spacing: .05em; }
+  .byte.noisy { opacity: .45; }
+  .byte.noisy .v { color: var(--dim); }
+  .warnbox { border: 1px solid var(--bad); border-radius: 6px; padding: 10px; color: var(--bad); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PadScope</h1>
+  <button id="pick">Raw HID (optional)</button>
+  <button id="reset">Clear highlights</button>
+  <span id="devinfo" class="status"></span>
+  <span id="diag" class="status"></span>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <h2>Raw HID report</h2>
+    <p class="note">
+      The bytes the controller actually sends. A byte turns green the moment it changes, and keeps
+      a dim border afterwards so you can see which bytes ever move. This is the view the browser's
+      ordinary gamepad API cannot give you &mdash; it shows the layout before macOS translates it.
+    </p>
+    <div id="nohid" class="warnbox" hidden>
+      No WebHID here. Brave disables it by default and macOS claims gamepads for its own HID
+      stack anyway, so this panel will usually stay empty. It is optional &mdash; everything
+      below works without it.
+    </div>
+    <div id="hidquiet" class="warnbox" hidden>
+      Connected, but no reports are arriving. macOS claims gamepads exclusively for its own HID
+      stack, so a browser can open the device and then never hear from it. Nothing to fix here
+      &mdash; the recorder below switches to the translated view automatically, which is the
+      comparison that matters anyway.
+    </div>
+    <div id="bytes" class="bytes"></div>
+    <div class="scroll"><table id="bittable">
+      <thead><tr><th>byte</th><th>bits 7&hellip;0</th><th>hex</th><th>dec</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Guided mapping</h2>
+    <p class="note">
+      It asks for one control at a time. Let go of everything, press what it asks for, and it
+      moves on by itself. Skip anything this pad does not have.
+      <br><br>What gets recorded is what a game sees &mdash; <code>buttons[0]</code> and so on
+      &mdash; with the raw byte noted alongside when the two agree on timing.
+    </p>
+    <div id="prompt" class="prompt">
+      <div class="big">Press <span id="want">Start</span></div>
+      <div id="progress" class="prog">not started</div>
+      <div id="learnstatus" class="status">press Begin</div>
+    </div>
+    <div class="learn">
+      <button id="begin" class="primary">Begin</button>
+      <button id="skip">Skip this one</button>
+      <button id="back">Back</button>
+      <button id="restart">Start over</button>
+    </div>
+    <table class="map"><thead>
+      <tr><th>control</th><th>kind</th><th>where it lands</th></tr></thead>
+      <tbody id="maprows"></tbody>
+    </table>
+    <pre id="export">(nothing recorded yet)</pre>
+  </section>
+
+  <section>
+    <h2>What a game sees (Gamepad API)</h2>
+    <p class="note">
+      The same pad after macOS has translated it. If this looks right while the raw report looks
+      strange, the translation is doing the work &mdash; which is the thing worth copying.
+    </p>
+    <div id="gpinfo" class="status">No gamepad seen yet. Press a button to wake it.</div>
+    <div id="gpbuttons" class="bytes" style="margin-top:10px"></div>
+    <div id="gpaxes" class="axes" style="margin-top:10px"></div>
+  </section>
+
+  <section>
+    <h2>Session log</h2>
+    <p class="note">Connections, disconnections and anything unexpected, with timestamps.</p>
+    <pre id="log">ready</pre>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+const $ = (id) => document.getElementById(id);
+const hex2 = (n) => n.toString(16).padStart(2, '0').toUpperCase();
+const bits8 = (n) => n.toString(2).padStart(8, '0');
+const now = () => new Date().toTimeString().slice(0, 8);
+
+let logLines = [];
+function log(msg) {
+  logLines.push(now() + '  ' + msg);
+  if (logLines.length > 200) logLines = logLines.slice(-200);
+  $('log').textContent = logLines.join('\n');
+  $('log').scrollTop = $('log').scrollHeight;
+}
+
+// ---------------------------------------------------------------- raw HID
+
+let lastReport = null;      // Uint8Array of the previous report
+let everMoved = new Set();  // byte indices that have ever changed
+let recentMove = new Map(); // byte index -> timestamp of last change
+
+// Arming captures the NEXT bit that goes from 0 to 1, along with any byte that
+// moves by a wide margin (which is how an analogue stick or trigger shows up).
+let armed = false;
+let armTarget = null;
+let baseline = null;
+const mapping = [];   // {control, kind, byte, bit?, from?, to?}
+
+function renderBytes(data) {
+  const host = $('bytes');
+  if (host.childElementCount !== data.length) {
+    host.innerHTML = '';
+    for (let i = 0; i < data.length; i++) {
+      const d = document.createElement('div');
+      d.className = 'byte';
+      d.innerHTML = `<div class="i">${i}</div><div class="v">00</div>`;
+      host.appendChild(d);
+    }
+  }
+  const t = performance.now();
+  for (let i = 0; i < data.length; i++) {
+    const cell = host.children[i];
+    cell.children[1].textContent = hex2(data[i]);
+    const moved = recentMove.has(i) && (t - recentMove.get(i)) < 900;
+    const noisy = (churn[i] ?? 0) >= 0.2;
+    cell.className = 'byte' + (moved ? ' moved' : (everMoved.has(i) ? ' ever' : '')) + (noisy ? ' noisy' : '');
+    cell.title = noisy ? 'changes constantly — motion or analogue, not a button' : '';
+  }
+}
+
+function renderBitTable(data) {
+  const body = $('bittable').tBodies[0];
+  // Only bytes that have ever moved are worth a row; a 33-byte report is mostly still.
+  const rows = [...everMoved].sort((a, b) => a - b);
+  if (body.dataset.rows !== rows.join(',')) {
+    body.innerHTML = '';
+    for (const i of rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i}</td><td class="bits"></td><td></td><td></td>`;
+      body.appendChild(tr);
+    }
+    body.dataset.rows = rows.join(',');
+  }
+  rows.forEach((i, r) => {
+    const tr = body.children[r];
+    tr.children[1].innerHTML = [...bits8(data[i])].map(c => c === '1' ? '<b>1</b>' : '0').join('');
+    tr.children[2].textContent = hex2(data[i]);
+    tr.children[3].textContent = String(data[i]);
+  });
+}
+
+function onReport(reportId, data) {
+  const cur = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+
+  if (lastReport && lastReport.length === cur.length) {
+    for (let i = 0; i < cur.length; i++) {
+      if (cur[i] !== lastReport[i]) { everMoved.add(i); recentMove.set(i, performance.now()); }
+    }
+    noteRest(cur);
+    if (armed) tryLearn(cur);
+  } else {
+    noteRest(cur);
+  }
+
+  lastReport = Uint8Array.from(cur);
+  renderBytes(cur);
+  renderBitTable(cur);
+}
+
+// The Gamepad API path. macOS hands the browser an already-translated pad, so what this
+// records is "which standard control does this physical press become" — which is exactly the
+// question when comparing one identity against another.
+// Edge detection against the PREVIOUS FRAME, not against a stored baseline.
+//
+// A baseline snapshot has to be taken at the right moment and cleared at the right moment, and
+// getting either wrong is silent: a snapshot taken while A was held records A as already down,
+// so A can never rise again and the control becomes permanently undetectable. That is exactly
+// what happened — the guided walk armed each step without clearing the snapshot, so one stale
+// frame from a previous run disabled a button for the rest of the session.
+//
+// Comparing each frame to the one before has no such state to get wrong. Press is
+// was-low-now-high, and it cannot go stale.
+const prevFrame = new Map();   // pad index -> {b: number[], a: number[]}
+
+function tryLearnGamepad(p) {
+  const prev = prevFrame.get(p.index);
+  const cur = { b: p.buttons.map(x => x.value), a: [...p.axes] };
+  prevFrame.set(p.index, cur);
+  if (!armed || !prev || prev.b.length !== cur.b.length) return;
+
+  const who = '#' + p.index + ' ' + p.id.split('(')[0].trim();
+  const raw = (lastRaw && performance.now() - lastRaw.at < 250) ? '   raw: ' + lastRaw.text : '';
+
+  for (let i = 0; i < cur.b.length; i++) {
+    if (cur.b[i] > 0.6 && prev.b[i] <= 0.6) {
+      record({ control: armTarget, kind: who,
+               detail: `buttons[${i}]` + (cur.b[i] < 1 ? ` (analogue ${cur.b[i].toFixed(2)})` : '') + raw });
+      return;
+    }
+  }
+  for (let i = 0; i < cur.a.length; i++) {
+    // An axis counts as moved when it crosses well away from centre, having been near it.
+    if (Math.abs(cur.a[i]) > 0.7 && Math.abs(prev.a[i] ?? 0) <= 0.7) {
+      record({ control: armTarget, kind: who,
+               detail: `axes[${i}] ${cur.a[i] > 0 ? '+' : '-'} (${cur.a[i].toFixed(2)})` + raw });
+      return;
+    }
+  }
+}
+
+function tryLearn(cur) {
+  if (seenReports < 30) return;
+  const usable = cur.some((_, i) => isQuiet(i) && restByte[i] !== undefined);
+  if (!usable) return;
+
+  const hits = [];
+  for (let i = 0; i < cur.length; i++) {
+    if (!isQuiet(i) || restByte[i] === undefined || cur[i] === restByte[i]) continue;
+    const rose = cur[i] & ~restByte[i];
+    if (rose) {
+      const n = rose.toString(2).split('1').length - 1;
+      if (n === 1) hits.push({ kind: 'button', byte: i, bit: Math.log2(rose) | 0 });
+      else hits.push({ kind: 'multi', byte: i, n });
+    } else if (Math.abs(cur[i] - restByte[i]) >= 40) {
+      hits.push({ kind: 'analogue', byte: i, from: restByte[i], to: cur[i] });
+    }
+  }
+  if (!hits.length) return;
+  if (hits.length > 1 || hits[0].kind === 'multi') { lastRaw = null; return; }
+  // The raw view does NOT record. It notes what it saw so the gamepad result can carry it as
+  // a footnote. Letting it record was the mistake: it wrote down byte-and-bit guesses while the
+  // translated view — the one a game actually reads, and the one that says A is b0 — was right
+  // there and being ignored.
+  const h = hits[0];
+  lastRaw = { at: performance.now(),
+              text: h.kind === 'button' ? `byte ${h.byte} bit ${h.bit}`
+                                        : `byte ${h.byte} ${h.from}->${h.to}` };
+}
+let lastRaw = null;
+
+function say(m) { $('learnstatus').textContent = m; $('learnstatus').className = 'status armed'; }
+
+function record(entry) {
+  mapping.push(entry);
+  $('learnstatus').textContent = 'got ' + entry.control + ': ' + entry.detail;
+  $('learnstatus').className = 'status got';
+  log('learned ' + entry.control + ' -> ' + entry.detail);
+  renderMap();
+  armed = false;
+  // A moment to see the confirmation, and to get a finger off the button, before the next ask.
+  setTimeout(() => { if (!armed) nextStep(); }, 450);
+}
+
+function renderMap() {
+  const body = $('maprows');
+  body.innerHTML = '';
+  for (const m of mapping) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${m.control}</td><td>${m.kind}</td><td>${m.detail}</td>`;
+    body.appendChild(tr);
+  }
+  $('export').textContent = mapping.length
+    ? mapping.map(m => `${m.control.padEnd(14)} ${m.detail}`).join('\n')
+    : '(nothing recorded yet)';
+}
+
+// The walk. Order matters: the four face buttons first, because they are the ones that decide
+// whether an identity is worth having, and a run abandoned halfway still answers that.
+const STEPS = [
+  'A', 'B', 'X', 'Y',
+  'LB', 'RB', 'LT', 'RT',
+  'View/Back', 'Menu/Start', 'Guide',
+  'LS click', 'RS click',
+  'LS right', 'LS down', 'RS right', 'RS down',
+  'D-up', 'D-down', 'D-left', 'D-right',
+  'M1', 'M2', 'Record/Share',
+];
+let step = -1;
+
+function showStep() {
+  const el = $('prompt');
+  if (step < 0) {
+    $('want').textContent = 'Begin';
+    $('progress').textContent = STEPS.length + ' controls to go through';
+    el.classList.remove('done');
+    return;
+  }
+  if (step >= STEPS.length) {
+    armed = false; armTarget = null;
+    $('want').textContent = 'all done';
+    $('progress').textContent = mapping.length + ' of ' + STEPS.length + ' recorded';
+    $('learnstatus').textContent = 'copy the block below';
+    $('learnstatus').className = 'status got';
+    el.classList.add('done');
+    $('begin').textContent = 'Begin';
+    return;
+  }
+  el.classList.remove('done');
+  armTarget = STEPS[step];
+  armed = true;
+  $('want').textContent = STEPS[step];
+  $('progress').textContent = 'control ' + (step + 1) + ' of ' + STEPS.length;
+  $('learnstatus').textContent = 'press it now';
+  $('learnstatus').className = 'status armed';
+  $('learnstatus').className = 'status armed';
+  $('begin').textContent = 'Pause';
+}
+
+function nextStep() { step++; showStep(); }
+
+$('begin').onclick = () => {
+  if (armed) { armed = false; $('begin').textContent = 'Resume'; $('learnstatus').textContent = 'paused'; $('learnstatus').className = 'status'; return; }
+  if (step < 0 || step >= STEPS.length) { step = 0; mapping.length = 0; renderMap(); }
+  showStep();
+};
+$('skip').onclick = () => { if (step >= 0) { log('skipped ' + STEPS[step]); nextStep(); } };
+$('back').onclick = () => {
+  if (step <= 0) return;
+  // Drop whatever was recorded for the step we are going back to, so a redo replaces it.
+  const prev = STEPS[step - 1];
+  for (let i = mapping.length - 1; i >= 0; i--) if (mapping[i].control === prev) { mapping.splice(i, 1); break; }
+  renderMap(); step--; showStep();
+};
+$('restart').onclick = () => { step = -1; mapping.length = 0; armed = false; renderMap(); showStep(); $('begin').textContent = 'Begin'; };
+$('reset').onclick = () => {
+  everMoved.clear(); recentMove.clear();
+  $('bittable').tBodies[0].dataset.rows = '';
+  log('highlights cleared');
+};
+showStep();
+
+// ---------------------------------------------------------------- connect
+
+async function attach(dev) {
+  if (!dev.opened) await dev.open();
+  dev.addEventListener('inputreport', (e) => onReport(e.reportId, e.data));
+  $('devinfo').textContent =
+    `${dev.productName}  ${hex4(dev.vendorId)}:${hex4(dev.productId)}`;
+  log(`connected ${dev.productName} ${hex4(dev.vendorId)}:${hex4(dev.productId)}`);
+  everMoved.clear(); recentMove.clear(); lastReport = null;
+  // If nothing arrives within a few seconds the device is almost certainly claimed by macOS.
+  setTimeout(() => {
+    if (!lastReport) { $('hidquiet').hidden = false; log('no raw reports after 4s — macOS has the device; using the translated view'); }
+  }, 4000);
+}
+const hex4 = (n) => n.toString(16).padStart(4, '0').toUpperCase();
+
+$('pick').onclick = async () => {
+  if (!('hid' in navigator)) { $('nohid').hidden = false; return; }
+  try {
+    // Generic Desktop / Joystick and Gamepad. Asking for both covers pads that
+    // declare themselves either way.
+    const devs = await navigator.hid.requestDevice({ filters: [
+      { usagePage: 0x01, usage: 0x04 },
+      { usagePage: 0x01, usage: 0x05 },
+    ]});
+    if (!devs.length) { log('no device chosen'); return; }
+    for (const d of devs) await attach(d);
+  } catch (err) {
+    log('connect failed: ' + err.message);
+  }
+};
+
+if (!('hid' in navigator)) $('nohid').hidden = false;
+else navigator.hid.getDevices().then(ds => { if (ds.length) log(ds.length + ' device(s) already permitted — click Connect to pick one'); });
+
+// ---------------------------------------------------------------- gamepad api
+
+let stampMoves = 0, lastStampAt = 0;
+const stamps = new Map();     // pad index -> last timestamp seen
+
+// Every connected pad is shown and every connected pad is watched. Looking only at the first
+// one meant that with two controllers attached you could map one pad while reading another —
+// which is precisely what happened with an SN30 Pro and an Ultimate 2 both awake.
+function pollPads() {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  const host = $('gpinfo'), bhost = $('gpbuttons'), ahost = $('gpaxes');
+
+  if (!pads.length) {
+    host.textContent = 'No gamepad seen. Press a button to wake one.';
+    bhost.innerHTML = ''; ahost.innerHTML = '';
+  } else {
+    for (const p of pads) {
+      if (stamps.get(p.index) !== p.timestamp) {
+        stamps.set(p.index, p.timestamp); stampMoves++; lastStampAt = performance.now();
+      }
+    }
+    host.innerHTML = pads.map(p =>
+      `<div style="margin:2px 0">#${p.index} <strong>${p.id}</strong> mapping="${p.mapping || '(none)'}" ` +
+      `buttons=${p.buttons.length} axes=${p.axes.length}</div>`).join('');
+
+    bhost.innerHTML = '';
+    ahost.innerHTML = '';
+    for (const p of pads) {
+      const label = document.createElement('div');
+      label.style.cssText = 'width:100%;color:var(--dim);font-size:11px;margin:6px 0 2px';
+      label.textContent = `#${p.index} ${p.id.split('(')[0].trim()}`;
+      bhost.appendChild(label);
+      p.buttons.forEach((b, i) => {
+        const d = document.createElement('div');
+        d.className = 'byte' + (b.pressed ? ' moved' : '');
+        d.innerHTML = `<div class="i">b${i}</div><div class="v">${b.value.toFixed(2).replace(/\.00$/, '')}</div>`;
+        bhost.appendChild(d);
+      });
+      const alab = label.cloneNode(true); ahost.appendChild(alab);
+      p.axes.forEach((v, i) => {
+        const row = document.createElement('div');
+        row.style.margin = '3px 0';
+        const w = Math.abs(v) * 50, left = v < 0 ? 50 - w : 50;
+        row.innerHTML = `<div style="color:var(--dim);font-size:11px">axis ${i} ${v.toFixed(3)}</div>` +
+                        `<div class="bar"><i style="left:${left}%;width:${w}%"></i></div>`;
+        ahost.appendChild(row);
+      });
+      tryLearnGamepad(p);
+    }
+  }
+
+  const focused = document.hasFocus();
+  const anyValue = pads.some(p => p.buttons.some(b => b.value > 0) || p.axes.some(v => Math.abs(v) > 0.2));
+  $('diag').textContent =
+    (focused ? 'focused' : 'NOT FOCUSED — click the page') +
+    '  ·  updates: ' + stampMoves +
+    (stampMoves > 20 && !anyValue
+      ? '  ·  values all zero while the pad reports — Brave is blocking this; use Chrome or lower Shields'
+      : '');
+  $('diag').className = 'status' + ((stampMoves > 20 && !anyValue) ? ' armed' : '');
+  requestAnimationFrame(pollPads);
+}
+
+window.addEventListener('gamepadconnected', (e) => log('gamepad api saw: ' + e.gamepad.id));
+window.addEventListener('gamepaddisconnected', (e) => log('gamepad api lost: ' + e.gamepad.id));
+requestAnimationFrame(pollPads);
+</script>
+</body>
+</html>

@@ -18,7 +18,11 @@ say() { echo "$(date '+%F %T')  == $*" >> "$OUT"; }
 # carrying this very pattern in its arguments otherwise reports itself as the running game. The
 # path may well contain spaces — this user's library is "/Volumes/Mac SSD/Steam Games Mac" — so
 # anchoring on a run of non-spaces silently matches nothing, which reads exactly like no game.
-game() { ps -eo args | grep -E "^/.*steamapps/common/" | grep -viE "steamwebhelper|Steam Helper" \
+# `ps -eo comm` is the executable path and nothing else. Using `args` instead means every
+# command that merely MENTIONS a game path — a grep, a pgrep, the shell heredoc that wrote
+# this file — reports itself as the running game. That happened three times in one evening,
+# each time producing a plausible-looking entry in what is meant to be evidence.
+game() { ps -eo comm= | grep -E "^/.*steamapps/common/" | grep -viE "steamwebhelper|Steam Helper" \
          | sed -E 's|^/.*steamapps/common/([^/]+)/.*|\1|' | sort -u | paste -sd, - ; }
 
 # Steam's pad is not called "Virtual GamePad" anywhere macOS can see. It arrives as GamePad-1
