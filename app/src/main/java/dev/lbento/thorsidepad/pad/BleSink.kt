@@ -80,6 +80,9 @@ class BleSink(
     /** While this is in the future the pad is findable by anyone; otherwise only by its own host. */
     @Volatile private var findableUntil = 0L
     private var reportChar: BluetoothGattCharacteristic? = null
+    /** The second report, when the shape has one: the button in the middle. */
+    private var systemChar: BluetoothGattCharacteristic? = null
+    private var lastSystem: ByteArray? = null
     /** Where a host writes to ask the pad to buzz. */
     private var rumbleChar: BluetoothGattCharacteristic? = null
 
@@ -226,7 +229,7 @@ class BleSink(
         try { host?.let { server?.cancelConnection(it) } } catch (_: Exception) {}
         try { server?.close() } catch (_: Exception) {}
         try { ctx.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
-        server = null; advertiser = null; reportChar = null; rumbleChar = null
+        server = null; advertiser = null; reportChar = null; systemChar = null; rumbleChar = null
         host = null; connected = false; subscribed = false
     }
 
@@ -274,6 +277,26 @@ class BleSink(
             BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED))
         hid.addCharacteristic(rep)
         reportChar = rep
+        // A shape with a second report needs a second characteristic to carry it: one report per
+        // characteristic is how this profile works, and the reference descriptor on each is what
+        // tells a host which is which.
+        if (shape.systemSnapshot() != null) {
+            val sys = BluetoothGattCharacteristic(uuid(REPORT),
+                BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED)
+            sys.addDescriptor(BluetoothGattDescriptor(uuid(CCCD),
+                BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED or
+                    BluetoothGattDescriptor.PERMISSION_WRITE_ENCRYPTED))
+            sys.addDescriptor(BluetoothGattDescriptor(uuid(REPORT_REF),
+                BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED))
+            hid.addCharacteristic(sys)
+            systemChar = sys
+        }
+        hid.addCharacteristic(BluetoothGattCharacteristic(uuid(PROTOCOL_MODE),
+            BluetoothGattCharacteristic.PROPERTY_READ or
+                BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+            BluetoothGattCharacteristic.PERMISSION_READ or
+                BluetoothGattCharacteristic.PERMISSION_WRITE))
         // A host that means to rumble the pad needs somewhere to write it. The shape describes the
         // report; this is the characteristic that carries it, and its reference descriptor says
         // report three and that it travels host to device rather than the other way.
@@ -464,7 +487,8 @@ class BleSink(
                 uuid(PNP_ID) -> pnpId()
                 uuid(HID_INFO) -> HID_INFORMATION
                 uuid(REPORT_MAP) -> shape.descriptor
-                uuid(REPORT) -> shape.snapshot()
+                uuid(REPORT) -> if (ch === systemChar) (shape.systemSnapshot() ?: ByteArray(1))
+                                else shape.snapshot()
                 uuid(PROTOCOL_MODE) -> byteArrayOf(REPORT_PROTOCOL)
                 uuid(BATTERY_LEVEL) -> byteArrayOf(100)
                 else -> ByteArray(0)
@@ -476,9 +500,11 @@ class BleSink(
                 offset: Int, d: BluetoothGattDescriptor?) {
             val value = when (d?.uuid) {
                 // Report one, and it travels from us to the host. The one in the report map.
-                uuid(REPORT_REF) ->
-                    if (d.characteristic === rumbleChar) byteArrayOf(RUMBLE_REPORT_ID, OUTPUT_REPORT)
-                    else byteArrayOf(REPORT_ID, INPUT_REPORT)
+                uuid(REPORT_REF) -> when {
+                    d.characteristic === systemChar -> byteArrayOf(SYSTEM_REPORT_ID, INPUT_REPORT)
+                    d.characteristic === rumbleChar -> byteArrayOf(RUMBLE_REPORT_ID, OUTPUT_REPORT)
+                    else -> byteArrayOf(REPORT_ID, INPUT_REPORT)
+                }
                 uuid(CCCD) -> if (subscribed) NOTIFY_ON else NOTIFY_OFF
                 else -> ByteArray(0)
             }
@@ -542,42 +568,10 @@ class BleSink(
 
     // ---- the pad's side ------------------------------------------------------------------------
 
-    override fun setKey(code: Int, down: Boolean) = shape.setKey(code, down)
-
-    /**
-     * Buzzes the handheld as hard as a host asked for.
-     *
-     * A rumble instruction says how hard but not really for how long — a game sends them
-     * continuously while something is shaking and stops sending when it stops. So each one runs
-     * for a little longer than the gap between them and is replaced by the next, which keeps a
-     * long rumble smooth and lets a forgotten one die on its own rather than buzzing forever.
-     */
-    private fun buzz(amplitude: Int) {
-        try {
-            val v = ctx.getSystemService(android.os.Vibrator::class.java) ?: return
-            if (amplitude <= 0) { v.cancel(); return }
-            v.vibrate(android.os.VibrationEffect.createOneShot(
-                RUMBLE_MS, amplitude.coerceIn(1, 255)))
-        } catch (e: Exception) { Log.w(TAG, "rumble", e) }
+    override fun setKey(code: Int, down: Boolean) {
+        shape.setKey(code, down)
+        sendSystemIfChanged()
     }
-
-    /** Answers a read, handing back only the part from [offset] on, as a long read expects. */
-    private fun respond(device: BluetoothDevice?, requestId: Int, offset: Int, value: ByteArray) {
-        val slice = if (offset >= value.size) ByteArray(0) else value.copyOfRange(offset, value.size)
-        try { server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, slice) }
-        catch (e: Exception) { Log.w(TAG, "respond", e) }
-    }
-
-    private fun pnpId(): ByteArray = byteArrayOf(
-        0x02,                                       // the numbers are USB-IF's kind
-        (identity.vendor and 0xFF).toByte(), ((identity.vendor shr 8) and 0xFF).toByte(),
-        (identity.product and 0xFF).toByte(), ((identity.product shr 8) and 0xFF).toByte(),
-        (identity.version and 0xFF).toByte(), ((identity.version shr 8) and 0xFF).toByte(),
-    )
-
-    // ---- the pad's side ------------------------------------------------------------------------
-
-    override fun setKey(code: Int, down: Boolean) = shape.setKey(code, down)
 
     /**
      * Sends the second report when it changes.
@@ -687,6 +681,7 @@ class BleSink(
         const val CCCD = "2902"
 
         const val REPORT_ID = 1.toByte()
+        const val SYSTEM_REPORT_ID = 2.toByte()
         const val RUMBLE_REPORT_ID = 3.toByte()
         const val OUTPUT_REPORT = 2.toByte()
         /** Longer than a host's usual gap between instructions, so a held rumble does not stutter. */
