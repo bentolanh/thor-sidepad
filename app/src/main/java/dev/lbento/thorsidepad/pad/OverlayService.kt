@@ -519,7 +519,39 @@ class OverlayService : Service() {
      * nothing, which is right; a dropped one has to say something, because from the player's side
      * it looks identical to a working one until they wonder why nothing is happening.
      */
+    /**
+     * Keeps the handheld's processor running while a machine is actually holding the pad.
+     *
+     * With the screen off the Thor suspends, and a suspended handheld reads nothing from its own
+     * controller: the link to the machine stays up, the pad looks connected, and not one press
+     * arrives. Which is the state someone playing on another screen will be in most of the time,
+     * since there is no reason to leave the handheld's displays lit.
+     *
+     * Held only while a machine is connected and the pad is up, so putting it down still lets the
+     * Thor sleep properly.
+     */
+    private var awake: android.os.PowerManager.WakeLock? = null
+
+    private fun holdAwake(on: Boolean) {
+        try {
+            if (on) {
+                if (awake?.isHeld == true) return
+                val pm = getSystemService(android.os.PowerManager::class.java) ?: return
+                val w = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "SidePad:controller")
+                w.setReferenceCounted(false)
+                w.acquire()
+                awake = w
+                Log.i(TAG, "keeping the Thor awake while the machine has the pad")
+            } else {
+                awake?.let { if (it.isHeld) { it.release(); Log.i(TAG, "letting the Thor sleep again") } }
+                awake = null
+            }
+        } catch (e: Exception) { Log.w(TAG, "wake lock", e) }
+    }
+
     private fun refreshLinkBadge() {
+        val bt0 = btSink
+        holdAwake(prefs.targetMode == Prefs.MODE_BT && visible && bt0?.connected == true)
         val ov = overlay ?: return
         val bt = btSink
         val remote = prefs.targetMode == Prefs.MODE_BT
@@ -614,6 +646,7 @@ class OverlayService : Service() {
     }
 
     private fun stopForwarding() {
+        holdAwake(false)
         synchronized(this) { if (!forwardingWanted) return; forwardingWanted = false }
         forwarder = null
         val svc = Injector.current() ?: return
