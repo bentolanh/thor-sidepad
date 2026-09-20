@@ -23,6 +23,12 @@ interface ReportShape {
     fun setKey(code: Int, down: Boolean)
     fun setAbs(code: Int, value: Int)
     fun snapshot(): ByteArray
+    /**
+     * A second report, for anything the pad's own report has no room for. Null when the shape has
+     * only one, which is the ordinary case; the Xbox shape uses it for the button in the middle,
+     * because that is where the hardware it imitates puts it.
+     */
+    fun systemSnapshot(): ByteArray? = null
 }
 
 /**
@@ -102,6 +108,7 @@ class StandardShape : ReportShape {
  */
 class XboxShape : ReportShape {
     private val report = ByteArray(15)
+    private val system = ByteArray(1)
     private var hatX = 0
     private var hatY = 0
 
@@ -114,7 +121,14 @@ class XboxShape : ReportShape {
     override val discreteBytes = intArrayOf(12, 13, 14)
 
     override fun setKey(code: Int, down: Boolean) {
-        val bit = BUTTONS[code] ?: return          // no room for the Thor's extra pair here
+        // The button in the middle travels in its own report, the way it does on the hardware
+        // this imitates: an Xbox pad's guide is a system-menu bit under report two, not one of
+        // the buttons in the pad's own report.
+        if (code == dev.lbento.thorsidepad.inject.Btn.MODE) {
+            synchronized(report) { system[0] = if (down) 0x01 else 0x00 }
+            return
+        }
+        val bit = BUTTONS[code] ?: return
         val i = 13 + bit / 8
         val mask = 1 shl (bit % 8)
         synchronized(report) {
@@ -170,6 +184,8 @@ class XboxShape : ReportShape {
 
     override fun snapshot(): ByteArray = synchronized(report) { report.copyOf() }
 
+    override fun systemSnapshot(): ByteArray = synchronized(report) { system.copyOf() }
+
     private companion object {
         const val CENTRE = 0x8000
 
@@ -189,6 +205,13 @@ class XboxShape : ReportShape {
             dev.lbento.thorsidepad.inject.Btn.START to 7,
             dev.lbento.thorsidepad.inject.Btn.THUMBL to 8,
             dev.lbento.thorsidepad.inject.Btn.THUMBR to 9,
+            // The Thor's own extra pair. A standard Xbox pad declares ten buttons and has nowhere
+            // for these; an Elite carries four paddles and does. Declaring twelve is the cheap
+            // half of that question — whether a host that knows the name tolerates two more than
+            // the name implies, or quietly ignores them. Costs a re-pair to find out, and the
+            // report is the same fifteen bytes either way since the padding absorbs it.
+            dev.lbento.thorsidepad.inject.Btn.C to 10,
+            dev.lbento.thorsidepad.inject.Btn.Z to 11,
         )
 
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */
@@ -221,10 +244,18 @@ class XboxShape : ReportShape {
             0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x42,
             0x75, 0x04, 0x95.toByte(), 0x01, 0x15, 0x00, 0x25, 0x00,
             0x35, 0x00, 0x45, 0x00, 0x65, 0x00, 0x81.toByte(), 0x03,
-            // ten buttons, then six bits of nothing
-            0x05, 0x09, 0x19, 0x01, 0x29, 0x0A, 0x15, 0x00, 0x25, 0x01,
-            0x75, 0x01, 0x95.toByte(), 0x0A, 0x81.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x06, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
+            // twelve buttons, then four bits of nothing
+            0x05, 0x09, 0x19, 0x01, 0x29, 0x0C, 0x15, 0x00, 0x25, 0x01,
+            0x75, 0x01, 0x95.toByte(), 0x0C, 0x81.toByte(), 0x02,
+            0x15, 0x00, 0x25, 0x00, 0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
+            0xC0.toByte(),
+            // Report two: the button in the middle, as a system main menu bit. Copied in shape
+            // from the pad this was read off, which carries it exactly here and not among the
+            // buttons — a host that knows the name looks for it in this report.
+            0x05, 0x01, 0x09, 0x80.toByte(), 0x85.toByte(), 0x02, 0xA1.toByte(), 0x00,
+            0x09, 0x85.toByte(), 0x15, 0x00, 0x25, 0x01,
+            0x95.toByte(), 0x01, 0x75, 0x01, 0x81.toByte(), 0x02,
+            0x15, 0x00, 0x25, 0x00, 0x75, 0x07, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
             0xC0.toByte(),
         )
     }

@@ -80,6 +80,9 @@ class BleSink(
     /** While this is in the future the pad is findable by anyone; otherwise only by its own host. */
     @Volatile private var findableUntil = 0L
     private var reportChar: BluetoothGattCharacteristic? = null
+    /** The second report, when the shape has one: the button in the middle. */
+    private var systemChar: BluetoothGattCharacteristic? = null
+    private var lastSystem: ByteArray? = null
 
     /**
      * What this pad tells a host it is, and therefore what it sends.
@@ -136,6 +139,18 @@ class BleSink(
     fun makeFindable(seconds: Int) {
         findableUntil = android.os.SystemClock.elapsedRealtime() + seconds * 1000L
         Log.i(TAG, "findable by anything for $seconds seconds")
+        // Asking to be found means asking to be found by something else. Every controller lets go
+        // of whatever has it when its pairing button is held, and for good reason: a pad that
+        // stays attached to one machine cannot be picked up by the next, and the person holding it
+        // has already said which they want by pressing the button. Letting go also puts the
+        // advertisement back up, since this will not call out while a machine has it.
+        host?.let { d ->
+            Log.i(TAG, "letting go of ${d.address} so something else can take the pad")
+            try { server?.cancelConnection(d) } catch (_: Exception) {}
+            host = null; connected = false; subscribed = false
+            stopHeartbeat()
+            onState("Not connected")
+        }
         restartAdvertising()
         ticker.schedule({
             if (secondsFindable() == 0) {
@@ -211,7 +226,7 @@ class BleSink(
         } catch (_: Exception) {}
         try { host?.let { server?.cancelConnection(it) } } catch (_: Exception) {}
         try { server?.close() } catch (_: Exception) {}
-        server = null; advertiser = null; reportChar = null
+        server = null; advertiser = null; reportChar = null; systemChar = null
         host = null; connected = false; subscribed = false
     }
 
@@ -259,6 +274,21 @@ class BleSink(
             BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED))
         hid.addCharacteristic(rep)
         reportChar = rep
+        // A shape with a second report needs a second characteristic to carry it: one report per
+        // characteristic is how this profile works, and the reference descriptor on each is what
+        // tells a host which is which.
+        if (shape.systemSnapshot() != null) {
+            val sys = BluetoothGattCharacteristic(uuid(REPORT),
+                BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED)
+            sys.addDescriptor(BluetoothGattDescriptor(uuid(CCCD),
+                BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED or
+                    BluetoothGattDescriptor.PERMISSION_WRITE_ENCRYPTED))
+            sys.addDescriptor(BluetoothGattDescriptor(uuid(REPORT_REF),
+                BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED))
+            hid.addCharacteristic(sys)
+            systemChar = sys
+        }
         hid.addCharacteristic(BluetoothGattCharacteristic(uuid(PROTOCOL_MODE),
             BluetoothGattCharacteristic.PROPERTY_READ or
                 BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
@@ -441,7 +471,8 @@ class BleSink(
                 uuid(PNP_ID) -> pnpId()
                 uuid(HID_INFO) -> HID_INFORMATION
                 uuid(REPORT_MAP) -> shape.descriptor
-                uuid(REPORT) -> shape.snapshot()
+                uuid(REPORT) -> if (ch === systemChar) (shape.systemSnapshot() ?: ByteArray(1))
+                                else shape.snapshot()
                 uuid(PROTOCOL_MODE) -> byteArrayOf(REPORT_PROTOCOL)
                 uuid(BATTERY_LEVEL) -> byteArrayOf(100)
                 else -> ByteArray(0)
@@ -453,7 +484,9 @@ class BleSink(
                 offset: Int, d: BluetoothGattDescriptor?) {
             val value = when (d?.uuid) {
                 // Report one, and it travels from us to the host. The one in the report map.
-                uuid(REPORT_REF) -> byteArrayOf(REPORT_ID, INPUT_REPORT)
+                uuid(REPORT_REF) ->
+                    if (d.characteristic === systemChar) byteArrayOf(SYSTEM_REPORT_ID, INPUT_REPORT)
+                    else byteArrayOf(REPORT_ID, INPUT_REPORT)
                 uuid(CCCD) -> if (subscribed) NOTIFY_ON else NOTIFY_OFF
                 else -> ByteArray(0)
             }
@@ -499,7 +532,31 @@ class BleSink(
 
     // ---- the pad's side ------------------------------------------------------------------------
 
-    override fun setKey(code: Int, down: Boolean) = shape.setKey(code, down)
+    override fun setKey(code: Int, down: Boolean) {
+        shape.setKey(code, down)
+        sendSystemIfChanged()
+    }
+
+    /**
+     * Sends the second report when it changes.
+     *
+     * It is not worth the queue the pad's own report gets: one bit, pressed rarely, and nothing
+     * else is competing for the radio when it moves.
+     */
+    private fun sendSystemIfChanged() {
+        val c = systemChar ?: return
+        val now = shape.systemSnapshot() ?: return
+        if (lastSystem != null && now.contentEquals(lastSystem)) return
+        lastSystem = now
+        if (!subscribed) return
+        val d = host ?: return
+        try {
+            @Suppress("DEPRECATION")
+            c.value = now
+            @Suppress("DEPRECATION")
+            server?.notifyCharacteristicChanged(d, c, false)
+        } catch (e: Exception) { Log.w(TAG, "system report", e) }
+    }
 
     override fun setAbs(code: Int, value: Int) = shape.setAbs(code, value)
 
@@ -588,6 +645,7 @@ class BleSink(
         const val CCCD = "2902"
 
         const val REPORT_ID = 1.toByte()
+        const val SYSTEM_REPORT_ID = 2.toByte()
         const val INPUT_REPORT = 1.toByte()
         const val REPORT_PROTOCOL = 1.toByte()
         val NOTIFY_ON = byteArrayOf(0x01, 0x00)
