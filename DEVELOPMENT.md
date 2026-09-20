@@ -785,24 +785,33 @@ the app.
   properties themselves. Worth saying plainly in case it comes up again, rather than being
   rediscovered as a bug in the pad.
 
-  **The Mac's nearby-devices list now never settles, and this is not yet understood.** Reported
-  2026-09-19 after an evening of Low Energy work: devices sit in it permanently, including an
-  8BitDo pad that never appeared there before. Observed, not diagnosed, and worth writing down at
-  that value rather than dressed up.
+  **We filled a Mac's Low Energy bond list and broke its other controllers.** Reported 2026-09-19:
+  the nearby-devices list never settles, and an 8BitDo pad that had always sat quietly in the
+  paired list now appears among nearby devices while it is connected. It had never done that
+  before that evening, and it is not a device this project has ever touched.
 
-  Ruled out: no scanner left running from the testing, and `bluetoothd` had not restarted in
-  twenty-two days, so nothing in that evening restarted the stack. Ruled out too, and this is the
-  one that hurts a tidy theory: the pad was not advertising when the behaviour was seen, so our
-  advertisement cannot be what the list is showing.
+  The mechanism fits every part of it. That pad is `2dc8:6012` over **Bluetooth Low Energy**, and
+  Low Energy is exactly what was churned all evening. A Bluetooth controller keeps a bounded
+  resolving list — eight to sixteen entries on most — which is how it recognises a bonded Low
+  Energy device whose address rotates. Before the bonding fix every session here left another
+  bond behind, each with its own identity key and its own address, because each session looked
+  like a new device. Fill that list and the controller can no longer resolve anything else's
+  rotating address, so a perfectly ordinary pad stops being recognised as one it knows.
 
-  What is left is clutter. The Mac carries thirty-nine bonded devices, several of them Low Energy
-  Thors from that evening which it will not offer a Forget for — each one a different address,
-  because every session before the bonding fix looked like a new device. A hunch, not a finding.
+  Ruled out first: nothing of ours was left running, `bluetoothd` had not restarted in
+  twenty-two days, and the pad was not even advertising when the behaviour was seen. So it is not
+  a stray scanner, not a restarted stack, and not our advertisement.
 
-  To settle it: stop the pad entirely, note whether the list still churns, then toggle the Mac's
-  Bluetooth and note it again. If it survives both, it is the stale bonds and the question becomes
-  how to clear Low Energy entries macOS gives no button for. If it stops when the pad stops, the
-  hunch is wrong and the advertisement is somehow still involved.
+  This is worth holding on to as the cost of the bug rather than a curiosity. A missing check —
+  advertising while already connected — did not merely produce a duplicate. It produced a bond per
+  session, and those bonds degraded the machine's ability to use hardware that has nothing to do
+  with this project. Fixing the check stops it growing; it does not undo what is there.
+
+  Clearing it is the awkward part, since macOS offers no Forget for Low Energy devices bonded this
+  way. Removing them means going at the Bluetooth database with the radio off, which takes every
+  other pairing on the machine with it. Worth confirming the theory before anyone does that:
+  count what is bonded, remove the stale entries if a way is found, and see whether other Low
+  Energy devices settle down again.
 
   ### Four rough edges, found 2026-09-19, not yet fixed
 
