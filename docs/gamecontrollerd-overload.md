@@ -102,9 +102,9 @@ flood that hung games, and it should not be confused with it.
 
 ## Next time it overloads
 
-Everything needed is already installed under
-`~/Library/Application Support/thor-sidepad/gcwatch/`. Start all three and leave them
-running:
+The watchers live in `tools/gcwatch/` in this repo and are copied to
+`~/Library/Application Support/thor-sidepad/gcwatch/` to run. Start all three and leave
+them running:
 
 ```bash
 nohup ~/Library/Application\ Support/thor-sidepad/gcwatch/driverflood.sh >/dev/null 2>&1 &
@@ -143,3 +143,17 @@ wedged daemon's stack is the one piece of evidence that cannot be recovered afte
 - **`system_profiler` and the Bluetooth menu disagree about "connected".** The menu
   showed a blue icon for a device `system_profiler` reported as not connected. Trust the
   command.
+- **This machine's `awk` is not GNU awk, and there is no `gawk`.** `systime()` and
+  `strftime()` abort the script the moment a line arrives. `driverflood.sh` was written
+  with both and therefore never worked at all: its counter died on the first line
+  `gamecontrollerd` logged, which closed the pipe, which the script reported as "stream
+  ended". Every clean result it produced on 2026-09-20 is void. It is perl now, and it
+  has a self-test:
+
+  ```bash
+  ~/Library/Application\ Support/thor-sidepad/gcwatch/driverflood.sh --selftest
+  ```
+
+  Run that before trusting a quiet log. A watcher that cannot be shown to fire is not a
+  watcher — that is three separate silent failures in one evening, each of which looked
+  exactly like good news.
