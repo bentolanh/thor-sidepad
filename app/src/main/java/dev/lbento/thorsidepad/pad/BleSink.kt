@@ -357,7 +357,7 @@ class BleSink(
         try {
             val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
             adapter?.bluetoothLeAdvertiser?.stopAdvertising(cb)
-            Log.i(TAG, "stopped calling out; a machine has us")
+            Log.i(TAG, "stopped calling out")
         } catch (e: Exception) { Log.w(TAG, "stopAdvertising", e) }
         advertiser = null
     }
@@ -473,20 +473,29 @@ class BleSink(
                 // One machine at a time. A pad is a thing you hold; there is no sense in which it
                 // is being used by two computers at once, and serving a second connection puts a
                 // second copy of this pad in somebody's device list.
+                // One machine at a time, and now that the advertisement stays up through a
+                // pairing window, that includes a second link from the machine which already has
+                // us. Two links from one radio is how the pad arrives twice in a device list.
                 val already = host
-                if (already != null && already.address != device.address) {
+                if (already != null) {
                     Log.w(TAG, "${device.address} also wants the pad; ${already.address} has it")
                     try { server?.cancelConnection(device) } catch (_: Exception) {}
                     return
                 }
                 host = device; connected = true
                 Log.i(TAG, "${device.address} connected")
-                // A controller stops calling out the moment a machine takes it, and so should
-                // this. Advertising while already connected is no use to anyone: the machine that
-                // has us cannot use it, every other device in the room is shown a gamepad it will
-                // never be offered, and each session leaves another entry in their lists that
-                // nobody asked for. It goes back up if the link drops.
-                stopAdvertising()
+                // Outside a pairing window a controller stops calling out the moment a machine
+                // takes it, and so should this: the machine that has us cannot use it, every
+                // other device in the room is shown a gamepad it will never be offered, and each
+                // session leaves another entry in their lists that nobody asked for.
+                //
+                // Inside a pairing window it must not stop. Android hands out a fresh random
+                // address every time advertising starts, so stopping here and starting again
+                // when a failed pairing drops the link moves the pad: the host retries against an
+                // address that no longer answers, and another "Thor" nobody can clear is left in
+                // its list. A real controller holds one address for the whole window, and this is
+                // as near to that as an app is allowed to get.
+                if (secondsFindable() == 0) stopAdvertising()
                 // A bond only means this host has been here before. Whether it is listening is a
                 // separate question and only it can answer: it says so by subscribing. Assuming
                 // otherwise was tried and was worse than useless — the pad reported itself
