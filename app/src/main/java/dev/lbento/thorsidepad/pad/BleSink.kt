@@ -115,6 +115,8 @@ class BleSink(
     private val pool = Executors.newSingleThreadExecutor()
     private val ticker = Executors.newSingleThreadScheduledExecutor()
     private var heartbeat: ScheduledFuture<*>? = null
+    /** How many more times to repeat the current report before falling silent. */
+    private val repeatsLeft = java.util.concurrent.atomic.AtomicInteger(0)
     private var changedChar: BluetoothGattCharacteristic? = null
     private var goodbye: java.util.concurrent.CountDownLatch? = null
     private val sendLock = Any()
@@ -802,7 +804,11 @@ class BleSink(
 
     override fun setAbs(code: Int, value: Int) = shape.setAbs(code, value)
 
-    override fun sync(): Int = send()
+    override fun sync(): Int {
+        // Something moved, so say it now and again a few times in case a packet goes missing.
+        repeatsLeft.set(REPEATS)
+        return send()
+    }
 
     override fun key(code: Int, down: Boolean): Int { setKey(code, down); return send() }
     override fun abs(code: Int, value: Int): Int { setAbs(code, value); return send() }
@@ -931,10 +937,26 @@ class BleSink(
         }, 400, TimeUnit.MILLISECONDS)
     }
 
+    /**
+     * Repeats a report for a moment after something changes, then goes quiet.
+     *
+     * This used to send a hundred a second for as long as a machine was attached, whether or not
+     * anything had moved — which is the one way the pad behaved unlike every real controller. A
+     * controller you put down stops talking. Ours did not, and with Steam Input in the chain each
+     * report drives an update of the virtual gamepad it publishes, which is exactly the device
+     * Apple says the system is meant to be ignoring to avoid "looping game controller input back
+     * into the OS". On 2026-09-20 that loop reached about 2,500 driver connections a second and
+     * hung every game that asked the daemon for controllers.
+     *
+     * The repeats are still wanted: they are what stopped presses going missing over a link that
+     * drops the odd packet. So a change is sent at once and then repeated a few times, and after
+     * that the pad is silent until something else happens.
+     */
     private fun startHeartbeat() {
         stopHeartbeat()
-        heartbeat = ticker.scheduleAtFixedRate({ if (subscribed) send() }, BEAT_MS, BEAT_MS,
-            TimeUnit.MILLISECONDS)
+        heartbeat = ticker.scheduleAtFixedRate({
+            if (subscribed && repeatsLeft.getAndUpdate { if (it > 0) it - 1 else 0 } > 0) send()
+        }, BEAT_MS, BEAT_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun stopHeartbeat() { heartbeat?.cancel(false); heartbeat = null }
@@ -950,6 +972,8 @@ class BleSink(
         const val SLEEP_AFTER_MS = 10 * 60 * 1000L
         /** Longest we wait for the radio to report a frame gone before giving up on it. */
         const val SEND_WAIT_MS = 60L
+        /** Repeats after a change: enough to survive a lost packet, few enough to fall silent. */
+        const val REPEATS = 3
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
