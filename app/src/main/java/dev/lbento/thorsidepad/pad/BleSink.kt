@@ -50,6 +50,8 @@ class BleSink(
     private val onState: (String) -> Unit = {},
     /** Whether to tell a host there are motors here. See Prefs.rumble for what it costs. */
     private val rumble: Boolean = true,
+    /** Send buttons counted straight through, for a host that does not know the identity. */
+    private val plainButtons: Boolean = false,
 ) : PadTransport {
 
     /**
@@ -97,7 +99,7 @@ class BleSink(
      * then read as two sticks jammed into a corner.
      */
     private val shape: ReportShape =
-        if (identity == Identity.XBOX) XboxShape(rumble) else StandardShape()
+        if (identity == Identity.XBOX) XboxShape(rumble, plainButtons) else StandardShape()
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.

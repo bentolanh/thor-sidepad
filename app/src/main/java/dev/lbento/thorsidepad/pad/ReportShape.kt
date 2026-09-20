@@ -124,7 +124,11 @@ class StandardShape : ReportShape {
  *    12     hat              four bits, 1 is north through 8 north-west, 0 is centred
  *    13‥14  ten buttons      then six bits of nothing
  */
-class XboxShape(private val rumble: Boolean = true) : ReportShape {
+class XboxShape(
+    private val rumble: Boolean = true,
+    /** Which of the two button orders below to send. See [BUTTONS] and [BUTTONS_PLAIN]. */
+    private val plainButtons: Boolean = false,
+) : ReportShape {
     private val report = ByteArray(16)
     /** Report two: one bit, the button in the middle, exactly as the real controller sends it. */
     private val system = ByteArray(1)
@@ -139,24 +143,28 @@ class XboxShape(private val rumble: Boolean = true) : ReportShape {
     override val descriptor = if (rumble) DESCRIPTOR else NO_RUMBLE
     override val discreteBytes = intArrayOf(12, 13, 14, 15)
 
-    override fun handles(code: Int): Boolean = BUTTONS.containsKey(code)
+    override fun handles(code: Int): Boolean =
+        (if (plainButtons) BUTTONS_PLAIN else BUTTONS).containsKey(code)
 
     override fun setKey(code: Int, down: Boolean) {
         // View and Guide do not live among the buttons. The controller this imitates sends
         // them on the Consumer page — View as AC Back, the last bit of this report, and Guide as
         // AC Home in a report of its own. A host that knows this identity looks for them there
         // and nowhere else.
-        if (code == dev.lbento.thorsidepad.inject.Btn.SELECT) {
+        // Only where the host knows the identity. A host that counts buttons expects Back and
+        // Guide among them, at seven and nine, and never looks at the Consumer page at all —
+        // so in that order they are ordinary buttons and fall through to the table below.
+        if (!plainButtons && code == dev.lbento.thorsidepad.inject.Btn.SELECT) {
             synchronized(report) {
                 report[15] = if (down) 1 else 0
             }
             return
         }
-        if (code == dev.lbento.thorsidepad.inject.Btn.MODE) {
+        if (!plainButtons && code == dev.lbento.thorsidepad.inject.Btn.MODE) {
             synchronized(system) { system[0] = if (down) 1 else 0 }
             return
         }
-        val bit = BUTTONS[code] ?: return
+        val bit = (if (plainButtons) BUTTONS_PLAIN else BUTTONS)[code] ?: return
         val i = 13 + bit / 8
         val mask = 1 shl (bit % 8)
         synchronized(report) {
@@ -291,6 +299,37 @@ class XboxShape(private val rumble: Boolean = true) : ReportShape {
             dev.lbento.thorsidepad.inject.Btn.START to 11,
             dev.lbento.thorsidepad.inject.Btn.THUMBL to 13,
             dev.lbento.thorsidepad.inject.Btn.THUMBR to 14,
+        )
+
+        /**
+         * The same buttons, numbered straight through, for a host that does not know us.
+         *
+         * Nothing in a report map says which button is A. It declares fifteen buttons and the
+         * host decides what they mean — from the vendor and product numbers if it recognises
+         * them, and otherwise by counting: button one is A, two is B, three is X, four is Y,
+         * then the shoulders, then Back and Start. The real controller's order leaves buttons
+         * three and six empty, so a host that counts reads everything after B one or two places
+         * late. Measured in Eastward on 2026-09-20: R1 arrived as Start, Y arrived as a
+         * shoulder, X arrived as nothing, with Steam Input on and off alike.
+         *
+         * So this is the counted order, for those. It is wrong for anything that does recognise
+         * the identity, which is why it is not the default and why the choice is the player's.
+         * M1 and M2 have nowhere to go here — a counted host has no name for a ninth button that
+         * every layout would read differently — so they are left out rather than sent somewhere
+         * arbitrary.
+         */
+        val BUTTONS_PLAIN = mapOf(
+            dev.lbento.thorsidepad.inject.Btn.A to 0,
+            dev.lbento.thorsidepad.inject.Btn.B to 1,
+            dev.lbento.thorsidepad.inject.Btn.X to 2,
+            dev.lbento.thorsidepad.inject.Btn.Y to 3,
+            dev.lbento.thorsidepad.inject.Btn.TL to 4,
+            dev.lbento.thorsidepad.inject.Btn.TR to 5,
+            dev.lbento.thorsidepad.inject.Btn.SELECT to 6,
+            dev.lbento.thorsidepad.inject.Btn.START to 7,
+            dev.lbento.thorsidepad.inject.Btn.MODE to 8,
+            dev.lbento.thorsidepad.inject.Btn.THUMBL to 9,
+            dev.lbento.thorsidepad.inject.Btn.THUMBR to 10,
         )
 
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */

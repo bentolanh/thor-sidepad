@@ -118,6 +118,18 @@ class MainActivity : AppCompatActivity() {
             OverlayService.send(this, OverlayService.ACTION_START)
         }
 
+        val plainButtons = findViewById<Switch>(R.id.plainButtonsSwitch)
+        plainButtons.isChecked = prefs.plainButtons
+        plainButtons.setOnCheckedChangeListener { _, on ->
+            prefs.plainButtons = on
+            OverlayService.send(this, OverlayService.ACTION_START)
+            android.widget.Toast.makeText(
+                this,
+                "Button order changed. Reconnect the machine for it to notice.",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+
         val rumble = findViewById<Switch>(R.id.rumbleSwitch)
         rumble.isChecked = prefs.rumble
         rumble.setOnCheckedChangeListener { _, on ->

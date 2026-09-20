@@ -128,6 +128,22 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("rumble", true)
         set(v) = sp.edit().putBoolean("rumble", v).apply()
 
+    /**
+     * Which button order the Xbox identity sends.
+     *
+     * Off — the default — is the real controller's own order, which leaves buttons three and six
+     * empty and is what any host that recognises the identity expects. On is the counted order,
+     * for a game that numbers buttons straight through instead: without it such a game reads
+     * everything after B one or two places late, which in Eastward on 2026-09-20 put R1 on
+     * Start, Y on a shoulder and X on nothing at all, with Steam Input on and off alike.
+     *
+     * There is no way to satisfy both, and nothing in what the pad sends says which a game will
+     * do, so it is the player's to pick. Changing it needs the machine to reconnect.
+     */
+    var plainButtons: Boolean
+        get() = sp.getBoolean("plainButtons", false)
+        set(v) = sp.edit().putBoolean("plainButtons", v).apply()
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()
