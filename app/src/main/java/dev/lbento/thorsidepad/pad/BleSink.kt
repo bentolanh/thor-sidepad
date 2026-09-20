@@ -60,9 +60,15 @@ class BleSink(
      * has no room for a trackpad or media keys, so what this should claim depends on what the pad
      * is currently offering, and that is a decision for the panel rather than for this file.
      */
-    enum class Identity(val vendor: Int, val product: Int, val label: String) {
-        OWN(0x1209, 0x5350, "SidePad"),
-        XBOX(0x045E, 0x02E0, "Xbox-compatible"),
+    enum class Identity(val vendor: Int, val product: Int, val version: Int, val label: String) {
+        OWN(0x1209, 0x5350, 0x0100, "SidePad"),
+        // The version is part of the identity and not decoration. A program carrying its own list
+        // of controllers keys it on the whole thing, so two bytes of firmware number are enough to
+        // miss by: Eastward logged `no joystick mapping found` against
+        // `030000005e040000e002000000010000`, which is this pad ending in a version of 1.0, while
+        // every pad here that it does accept reports 9.0.3 and ends in `0309`. Same vendor, same
+        // product, different answer.
+        XBOX(0x045E, 0x02E0, 0x0903, "Xbox-compatible"),
     }
 
     @Volatile override var connected = false; private set
@@ -488,7 +494,7 @@ class BleSink(
         0x02,                                       // the numbers are USB-IF's kind
         (identity.vendor and 0xFF).toByte(), ((identity.vendor shr 8) and 0xFF).toByte(),
         (identity.product and 0xFF).toByte(), ((identity.product shr 8) and 0xFF).toByte(),
-        0x00, 0x01,                                 // version 1.0
+        (identity.version and 0xFF).toByte(), ((identity.version shr 8) and 0xFF).toByte(),
     )
 
     // ---- the pad's side ------------------------------------------------------------------------
