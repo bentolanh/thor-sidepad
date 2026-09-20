@@ -83,6 +83,8 @@ class BleSink(
     /** The second report, when the shape has one: the button in the middle. */
     private var systemChar: BluetoothGattCharacteristic? = null
     private var lastSystem: ByteArray? = null
+    /** Where a host writes to ask the pad to buzz. */
+    private var rumbleChar: BluetoothGattCharacteristic? = null
 
     /**
      * What this pad tells a host it is, and therefore what it sends.
@@ -226,7 +228,8 @@ class BleSink(
         } catch (_: Exception) {}
         try { host?.let { server?.cancelConnection(it) } } catch (_: Exception) {}
         try { server?.close() } catch (_: Exception) {}
-        server = null; advertiser = null; reportChar = null; systemChar = null
+        try { ctx.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
+        server = null; advertiser = null; reportChar = null; systemChar = null; rumbleChar = null
         host = null; connected = false; subscribed = false
     }
 
@@ -294,6 +297,19 @@ class BleSink(
                 BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
             BluetoothGattCharacteristic.PERMISSION_READ or
                 BluetoothGattCharacteristic.PERMISSION_WRITE))
+        // A host that means to rumble the pad needs somewhere to write it. The shape describes the
+        // report; this is the characteristic that carries it, and its reference descriptor says
+        // report three and that it travels host to device rather than the other way.
+        if (shape.rumbleFrom(ByteArray(8)) != null) {
+            val out = BluetoothGattCharacteristic(uuid(REPORT),
+                BluetoothGattCharacteristic.PROPERTY_WRITE or
+                    BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED)
+            out.addDescriptor(BluetoothGattDescriptor(uuid(REPORT_REF),
+                BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED))
+            hid.addCharacteristic(out)
+            rumbleChar = out
+        }
         hid.addCharacteristic(BluetoothGattCharacteristic(uuid(CONTROL_POINT),
             BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
             BluetoothGattCharacteristic.PERMISSION_WRITE))
@@ -484,9 +500,11 @@ class BleSink(
                 offset: Int, d: BluetoothGattDescriptor?) {
             val value = when (d?.uuid) {
                 // Report one, and it travels from us to the host. The one in the report map.
-                uuid(REPORT_REF) ->
-                    if (d.characteristic === systemChar) byteArrayOf(SYSTEM_REPORT_ID, INPUT_REPORT)
-                    else byteArrayOf(REPORT_ID, INPUT_REPORT)
+                uuid(REPORT_REF) -> when {
+                    d.characteristic === systemChar -> byteArrayOf(SYSTEM_REPORT_ID, INPUT_REPORT)
+                    d.characteristic === rumbleChar -> byteArrayOf(RUMBLE_REPORT_ID, OUTPUT_REPORT)
+                    else -> byteArrayOf(REPORT_ID, INPUT_REPORT)
+                }
                 uuid(CCCD) -> if (subscribed) NOTIFY_ON else NOTIFY_OFF
                 else -> ByteArray(0)
             }
@@ -508,12 +526,30 @@ class BleSink(
         override fun onCharacteristicWriteRequest(device: BluetoothDevice?, requestId: Int,
                 ch: BluetoothGattCharacteristic?, preparedWrite: Boolean, responseNeeded: Boolean,
                 offset: Int, value: ByteArray?) {
+            if (ch === rumbleChar && value != null) shape.rumbleFrom(value)?.let { buzz(it) }
             if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
         }
 
         override fun onMtuChanged(device: BluetoothDevice?, mtu: Int) {
             Log.i(TAG, "the host asked for $mtu bytes a packet")
         }
+    }
+
+    /**
+     * Buzzes the handheld as hard as a host asked for.
+     *
+     * A rumble instruction says how hard but not really for how long — a game sends them
+     * continuously while something is shaking and stops sending when it stops. So each one runs
+     * for a little longer than the gap between them and is replaced by the next, which keeps a
+     * long rumble smooth and lets a forgotten one die on its own rather than buzzing forever.
+     */
+    private fun buzz(amplitude: Int) {
+        try {
+            val v = ctx.getSystemService(android.os.Vibrator::class.java) ?: return
+            if (amplitude <= 0) { v.cancel(); return }
+            v.vibrate(android.os.VibrationEffect.createOneShot(
+                RUMBLE_MS, amplitude.coerceIn(1, 255)))
+        } catch (e: Exception) { Log.w(TAG, "rumble", e) }
     }
 
     /** Answers a read, handing back only the part from [offset] on, as a long read expects. */
@@ -646,6 +682,10 @@ class BleSink(
 
         const val REPORT_ID = 1.toByte()
         const val SYSTEM_REPORT_ID = 2.toByte()
+        const val RUMBLE_REPORT_ID = 3.toByte()
+        const val OUTPUT_REPORT = 2.toByte()
+        /** Longer than a host's usual gap between instructions, so a held rumble does not stutter. */
+        const val RUMBLE_MS = 120L
         const val INPUT_REPORT = 1.toByte()
         const val REPORT_PROTOCOL = 1.toByte()
         val NOTIFY_ON = byteArrayOf(0x01, 0x00)

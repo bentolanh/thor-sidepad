@@ -24,6 +24,13 @@ interface ReportShape {
     fun setAbs(code: Int, value: Int)
     fun snapshot(): ByteArray
     /**
+     * What a host has asked the pad to do, read out of an output report it wrote. Returns how
+     * hard to buzz, nought to two hundred and fifty-five, or null when the shape has no such
+     * report or the bytes say nothing.
+     */
+    fun rumbleFrom(bytes: ByteArray): Int? = null
+
+    /**
      * A second report, for anything the pad's own report has no room for. Null when the shape has
      * only one, which is the ordinary case; the Xbox shape uses it for the button in the middle,
      * because that is where the hardware it imitates puts it.
@@ -191,6 +198,27 @@ class XboxShape : ReportShape {
 
     override fun systemSnapshot(): ByteArray = synchronized(report) { system.copyOf() }
 
+    /**
+     * Reads a rumble instruction the way the pad this imitates describes one.
+     *
+     * Its output report carries a nibble saying which motors to run, then four magnitudes from
+     * nought to a hundred — the two triggers first, then the two handles — and a duration. This
+     * handheld has one motor where that pad has four, so the loudest of the four is what it gets;
+     * a game asking for a gentle trigger tick and a hard left rumble at once means a hard rumble,
+     * which is nearer the intent than averaging them into something limp.
+     */
+    override fun rumbleFrom(bytes: ByteArray): Int? {
+        if (bytes.size < 5) return null
+        val enabled = bytes[0].toInt() and 0x0F
+        if (enabled == 0) return 0
+        var worst = 0
+        for (i in 1..4) {
+            val m = bytes[i].toInt() and 0xFF
+            if (m > worst) worst = m
+        }
+        return (worst.coerceIn(0, 100) * 255 / 100)
+    }
+
     private companion object {
         const val CENTRE = 0x8000
 
@@ -265,6 +293,21 @@ class XboxShape : ReportShape {
             0x09, 0x85.toByte(), 0x15, 0x00, 0x25, 0x01,
             0x95.toByte(), 0x01, 0x75, 0x01, 0x81.toByte(), 0x02,
             0x15, 0x00, 0x25, 0x00, 0x75, 0x07, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
+            0xC0.toByte(),
+            // Report three, the one the host writes to us: which motors, how hard, for how long.
+            // Copied in shape from the pad this was read off. Four magnitudes because that pad has
+            // four motors; this handheld has one and takes the loudest of them.
+            0x05, 0x0F, 0x09, 0x21, 0x85.toByte(), 0x03, 0xA1.toByte(), 0x02,
+            0x09, 0x97.toByte(), 0x15, 0x00, 0x25, 0x01, 0x75, 0x04, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
+            0x15, 0x00, 0x25, 0x00, 0x75, 0x04, 0x95.toByte(), 0x01, 0x91.toByte(), 0x03,
+            0x09, 0x70, 0x15, 0x00, 0x25, 0x64, 0x75, 0x08, 0x95.toByte(), 0x04, 0x91.toByte(), 0x02,
+            0x09, 0x50, 0x66, 0x01, 0x10, 0x55, 0x0E, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x00,
+            0x75, 0x08, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
+            0x09, 0xA7.toByte(), 0x15, 0x00, 0x26, 0xFF.toByte(), 0x00,
+            0x75, 0x08, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
+            0x65, 0x00, 0x55, 0x00,
+            0x09, 0x7C, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x00,
+            0x75, 0x08, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
             0xC0.toByte(),
         )
     }
