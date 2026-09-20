@@ -115,6 +115,7 @@ class BleSink(
     private val pool = Executors.newSingleThreadExecutor()
     private val ticker = Executors.newSingleThreadScheduledExecutor()
     private var heartbeat: ScheduledFuture<*>? = null
+    private var changedChar: BluetoothGattCharacteristic? = null
 
     // ---- opening and closing -------------------------------------------------------------------
 
@@ -236,6 +237,28 @@ class BleSink(
     // ---- the services --------------------------------------------------------------------------
 
     private fun addServices(srv: BluetoothGattServer) {
+        // How a peripheral tells a host that already knows it to look again.
+        //
+        // A bonded host does not re-read the attribute table on every connection; it keeps the
+        // one it found the first time. That is a sensible saving until the table changes, and
+        // ours changes whenever the app is reinstalled or the pad is made to appear as something
+        // else. On 2026-09-20 a reinstall left a Mac asking for a handle that no longer existed:
+        // nothing answered, its ATT transaction timed out thirty seconds later, it hung up, and
+        // it came straight back with the same stale table. Every death left another dead gamepad
+        // in its device list. The only cure was forgetting the pad and pairing it again.
+        //
+        // Indicating on this characteristic is how that is meant to be avoided, so it goes first,
+        // where the handle range it reports begins.
+        val gatt = BluetoothGattService(uuid(GATT_SERVICE), BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val changed = BluetoothGattCharacteristic(uuid(SERVICE_CHANGED),
+            BluetoothGattCharacteristic.PROPERTY_INDICATE, 0)
+        changed.addDescriptor(BluetoothGattDescriptor(uuid(CCCD),
+            BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE))
+        gatt.addCharacteristic(changed)
+        changedChar = changed
+        srv.addService(gatt)
+        awaitService()
+
         // Device information, holding the identity. Readable without encryption on purpose: a host
         // that cannot see who we are before bonding has no reason to want to bond.
         val dis = BluetoothGattService(uuid(DEVICE_INFO), BluetoothGattService.SERVICE_TYPE_PRIMARY)
@@ -478,6 +501,7 @@ class BleSink(
                     createBondWith(device)
                 }
                 startHeartbeat()
+                announceLayoutIfChanged(device)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "${device.address} went away")
                 if (host?.address == device.address) {
@@ -514,7 +538,13 @@ class BleSink(
                     d.characteristic === rumbleChar -> byteArrayOf(RUMBLE_REPORT_ID, OUTPUT_REPORT)
                     else -> byteArrayOf(REPORT_ID, INPUT_REPORT)
                 }
-                uuid(CCCD) -> if (subscribed) NOTIFY_ON else NOTIFY_OFF
+                uuid(CCCD) -> when {
+                    d.characteristic === changedChar ->
+                        if (device != null && subscriptions.getBoolean("sc:${device.address}", false))
+                            INDICATE_ON else NOTIFY_OFF
+                    subscribed -> NOTIFY_ON
+                    else -> NOTIFY_OFF
+                }
                 else -> ByteArray(0)
             }
             respond(device, requestId, offset, value)
@@ -523,6 +553,12 @@ class BleSink(
         override fun onDescriptorWriteRequest(device: BluetoothDevice?, requestId: Int,
                 d: BluetoothGattDescriptor?, preparedWrite: Boolean, responseNeeded: Boolean,
                 offset: Int, value: ByteArray?) {
+            if (d?.uuid == uuid(CCCD) && d.characteristic === changedChar) {
+                // The spec asks a server to remember this one across a bonded reconnection, and
+                // Android's remembers nothing, so it is written down here.
+                val on = value != null && value.isNotEmpty() && value[0].toInt() and 0x03 != 0
+                device?.let { subscriptions.edit().putBoolean("sc:${it.address}", on).apply() }
+            }
             if (d?.uuid == uuid(CCCD) && d.characteristic?.uuid == uuid(REPORT)) {
                 subscribed = value != null && value.isNotEmpty() && value[0].toInt() and 0x01 != 0
                 Log.i(TAG, if (subscribed) "the host is taking reports" else "the host stopped taking reports")
@@ -663,6 +699,38 @@ class BleSink(
     }
 
     /** The same steady beat the Classic sink keeps, and for the same reason: silence reads badly. */
+    /**
+     * Tells a returning host to read our services again, if they are not what it last saw.
+     *
+     * Only when they have actually changed: rediscovery costs a second or so at every connection
+     * and there is no sense spending it when nothing moved. What counts as changed is the shape
+     * of the attribute table — the identity we claim and the report descriptor that goes with it
+     * — which is exactly what a reinstall or a change of "appears as" disturbs.
+     */
+    private fun announceLayoutIfChanged(device: BluetoothDevice) {
+        val fingerprint = identity.name.hashCode() * 31 + shape.descriptor.contentHashCode()
+        val key = "fp:${device.address}"
+        if (subscriptions.getInt(key, 0) == fingerprint) return
+        ticker.schedule({
+            val ch = changedChar ?: return@schedule
+            if (host?.address != device.address) return@schedule
+            if (!subscriptions.getBoolean("sc:${device.address}", false)) {
+                // Never subscribed, so it cannot be told. It will discover us from scratch
+                // anyway, which is the case this is trying to avoid a second time.
+                subscriptions.edit().putInt(key, fingerprint).apply()
+                return@schedule
+            }
+            try {
+                @Suppress("DEPRECATION")
+                ch.value = EVERYTHING_CHANGED
+                @Suppress("DEPRECATION")
+                server?.notifyCharacteristicChanged(device, ch, true)
+                Log.i(TAG, "told ${device.address} our services changed; it should look again")
+                subscriptions.edit().putInt(key, fingerprint).apply()
+            } catch (e: Exception) { Log.w(TAG, "service changed", e) }
+        }, 400, TimeUnit.MILLISECONDS)
+    }
+
     private fun startHeartbeat() {
         stopHeartbeat()
         heartbeat = ticker.scheduleAtFixedRate({ if (subscribed) send() }, BEAT_MS, BEAT_MS,
@@ -673,9 +741,14 @@ class BleSink(
 
     private companion object {
         const val TAG = "SidePadBle"
+        /** Every handle there is: read all of it again. */
+        val EVERYTHING_CHANGED = byteArrayOf(0x01, 0x00, 0xFF.toByte(), 0xFF.toByte())
+        val INDICATE_ON = byteArrayOf(0x02, 0x00)
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
+        const val GATT_SERVICE = "1801"
+        const val SERVICE_CHANGED = "2a05"
         const val DEVICE_INFO = "180a"
         const val PNP_ID = "2a50"
         const val BATTERY = "180f"
