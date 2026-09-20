@@ -117,6 +117,7 @@ class BleSink(
     private var heartbeat: ScheduledFuture<*>? = null
     /** How many more times to repeat the current report before falling silent. */
     private val repeatsLeft = java.util.concurrent.atomic.AtomicInteger(0)
+    private val dropped = java.util.concurrent.atomic.AtomicInteger(0)
     private var changedChar: BluetoothGattCharacteristic? = null
     private var goodbye: java.util.concurrent.CountDownLatch? = null
     private val sendLock = Any()
@@ -865,6 +866,12 @@ class BleSink(
             tries++
             try { Thread.sleep(2) } catch (_: InterruptedException) { return }
         }
+        // Every retry refused. The report is gone, and until now that happened in silence — which
+        // is why the missed presses this was built to survive were never diagnosed, only covered
+        // over by resending the whole state a hundred times a second. Count them instead, so the
+        // question "is anything actually being dropped" has an answer.
+        val n = dropped.incrementAndGet()
+        if (n == 1 || n % 25 == 0) Log.w(TAG, "report dropped, $n so far (the radio would not take it)")
     }
 
     /**
