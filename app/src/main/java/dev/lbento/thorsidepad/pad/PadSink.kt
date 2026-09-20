@@ -30,6 +30,8 @@ interface PadSink {
 interface PadTransport : PadSink {
     /** Whether a machine is on the other end right now. */
     val connected: Boolean
+    /** Whether this pad has anywhere to put a button of that code. See ReportShape.handles. */
+    fun handles(code: Int): Boolean
     /** Changes the state without sending. Used when a burst of events ends in a sync. */
     fun setKey(code: Int, down: Boolean)
     fun setAbs(code: Int, value: Int)

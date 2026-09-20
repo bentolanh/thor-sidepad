@@ -17,7 +17,11 @@ import org.json.JSONObject
  * tens of thousands wide, while the gamepad we advertise is a single signed byte. The ranges are
  * read from the device itself rather than assumed.
  */
-class ControllerForwarder(private val sink: PadTransport) : IPadEvents.Stub() {
+class ControllerForwarder(
+    private val sink: PadTransport,
+    /** Where a button the pad has no room for goes instead. See [onEvent]. */
+    private val passThrough: (Int, Boolean) -> Unit = { _, _ -> },
+) : IPadEvents.Stub() {
 
     private var scalers: Map<Int, (Int) -> Int> = emptyMap()
 
@@ -46,7 +50,12 @@ class ControllerForwarder(private val sink: PadTransport) : IPadEvents.Stub() {
 
     override fun onEvent(type: Int, code: Int, value: Int) {
         when (type) {
-            Ev.KEY -> sink.setKey(code, value != 0)
+            // Taking the controller takes all of it, so a button with no slot in the report is
+            // not merely unsent — it is destroyed, and the handheld stops seeing it too. That is
+            // how the Thor's volume keys went dead whenever the pad was running, and Home and
+            // Back with them. Anything the pad cannot carry goes back to Android instead.
+            Ev.KEY -> if (sink.handles(code)) sink.setKey(code, value != 0)
+                      else passThrough(code, value != 0)
             Ev.ABS -> {
                 // No axis is turned over here. An earlier version flipped the two vertical ones,
                 // on a reading that turned out to be of the wrong byte; the Thor already reports

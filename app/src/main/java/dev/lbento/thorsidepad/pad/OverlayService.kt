@@ -539,16 +539,19 @@ class OverlayService : Service() {
      */
     @Volatile private var forwardingWanted = false
 
-    private fun startForwarding(bt: PadTransport, svc: IInjector?) {
+    private fun startForwarding(bt: PadTransport, svc: IInjector?, attempt: Int = 1) {
         if (svc == null) { Log.i(TAG, "no Shizuku: only the on-screen pad will reach the machine"); return }
         // Both the direct path and the late connection can arrive; only one may hold the controller.
         synchronized(this) { if (forwardingWanted) return; forwardingWanted = true }
         Thread {
+            var held = false
             try {
                 refreshTargets(svc)
                 val path = prefs.physicalPath.ifEmpty { targets.firstOrNull()?.path.orEmpty() }
                 if (path.isEmpty()) { Log.w(TAG, "no controller to forward"); return@Thread }
-                val f = ControllerForwarder(bt)
+                val f = ControllerForwarder(bt) { code, down ->
+                    try { svc.key(code, down) } catch (e: Exception) { Log.w(TAG, "pass through", e) }
+                }
                 // A helper left over from before this call existed answers null rather than failing.
                 val caps = svc.forwardStart(path, true, f)
                 if (caps.isNullOrEmpty() || caps.startsWith("error")) {
@@ -556,10 +559,56 @@ class OverlayService : Service() {
                     return@Thread
                 }
                 f.configure(caps)
+                openPassThrough(svc, bt, caps)
                 forwarder = f
+                held = true
                 Log.i(TAG, "forwarding the Thor's controller from $path")
             } catch (e: Exception) { Log.w(TAG, "forward failed", e) }
+            finally {
+                if (!held) {
+                    // Leaving the flag set would block every later attempt, so a failure has to
+                    // put it back. Reinstalling the app is the common way to get here: the
+                    // process is killed, Shizuku's binding with it, and the first try after it
+                    // comes back is too early. Until this retried, the controller stayed with
+                    // Android and every press went to whatever was on the top screen.
+                    synchronized(this) { forwardingWanted = false }
+                    if (attempt < 4 && visible) main.postDelayed({
+                        if (visible && forwarder == null) {
+                            Log.i(TAG, "controller not held yet; trying again (attempt ${attempt + 1})")
+                            Injector.connect(this) { late -> startForwarding(bt, late, attempt + 1) }
+                        }
+                    }, 1500L * attempt)
+                }
+            }
         }.start()
+    }
+
+    /**
+     * Opens somewhere to put the buttons the pad cannot carry.
+     *
+     * Grabbing the controller takes every button on it, including the ones no gamepad report has
+     * a place for: Home, Back, the volume pair, recents. Those were simply destroyed — the
+     * machine never saw them and neither did the handheld, so the Thor's volume keys stopped
+     * working whenever the pad was running. This is a small keyboard-shaped device to hand them
+     * back through. Buttons in the gamepad ranges are deliberately left out: those belong to the
+     * machine, and echoing them here would drive Android at the same time.
+     */
+    private fun openPassThrough(svc: IInjector, bt: PadTransport, caps: String) {
+        try {
+            val declared = JSONObject(caps).optJSONArray("keys") ?: return
+            val spare = ArrayList<Int>()
+            for (i in 0 until declared.length()) {
+                val code = declared.getInt(i)
+                if (bt.handles(code)) continue
+                if (code in 0x130..0x13F || code in 0x220..0x223) continue
+                spare.add(code)
+            }
+            if (spare.isEmpty()) return
+            val err = svc.openVirtual("SidePad keys", spare.toIntArray(),
+                IntArray(0), IntArray(0), IntArray(0))
+            if (err.isNotEmpty()) { Log.w(TAG, "pass-through device: $err"); return }
+            Log.i(TAG, "handing ${spare.size} unmapped buttons back to Android")
+        } catch (e: Exception) { Log.w(TAG, "pass-through device", e) }
     }
 
     private fun stopForwarding() {

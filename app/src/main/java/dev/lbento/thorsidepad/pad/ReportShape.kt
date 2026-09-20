@@ -23,6 +23,15 @@ interface ReportShape {
     fun setKey(code: Int, down: Boolean)
     fun setAbs(code: Int, value: Int)
     fun snapshot(): ByteArray
+
+    /**
+     * Whether a button of this code has anywhere to go in this report.
+     *
+     * Taking the controller takes all of it, so a button with no slot here is not merely unsent,
+     * it is destroyed: the handheld no longer sees it either. Knowing which those are is what
+     * lets them be handed back to Android instead.
+     */
+    fun handles(code: Int): Boolean
     /**
      * What a host has asked the pad to do, read out of an output report it wrote. Returns how
      * hard to buzz, nought to two hundred and fifty-five, or null when the shape has no such
@@ -52,6 +61,8 @@ class StandardShape : ReportShape {
 
     override val descriptor: ByteArray get() = BluetoothSink.reportDescriptor()
     override val discreteBytes = intArrayOf(0, 1, 8)
+
+    override fun handles(code: Int): Boolean = BluetoothSink.buttonBit(code) != null
 
     override fun setKey(code: Int, down: Boolean) {
         val bit = BluetoothSink.buttonBit(code) ?: return
@@ -125,6 +136,8 @@ class XboxShape : ReportShape {
 
     override val descriptor = DESCRIPTOR
     override val discreteBytes = intArrayOf(12, 13, 14)
+
+    override fun handles(code: Int): Boolean = BUTTONS.containsKey(code)
 
     override fun setKey(code: Int, down: Boolean) {
         // The button in the middle travels in its own report, the way it does on the hardware
@@ -236,13 +249,6 @@ class XboxShape : ReportShape {
             // Ten is where the mapping SDL holds for these numbers expects the middle button, so
             // that is where it goes and the extra pair starts after it.
             dev.lbento.thorsidepad.inject.Btn.MODE to 10,
-            // The Thor has no separate Guide button: what is printed as Home sends KEY_HOME on
-            // the controller node, and until now that landed nowhere — grabbed away from Android
-            // and given no slot here, so it was dead on the handheld and dead on the host both.
-            // It sits in the Guide slot because that is the button a player's thumb is looking
-            // for in that position. BTN_MODE stays mapped alongside it in case a later unit does
-            // send it.
-            dev.lbento.thorsidepad.inject.Key.HOME to 10,
             // The Thor's own pair, which a standard pad has no name for. They are sent all the
             // same: anything reading raw buttons — a layout editor, an emulator's binding screen —
             // can see and bind them, even though the built-in mapping stops at ten and will not.

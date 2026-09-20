@@ -9,7 +9,6 @@ import android.content.Context
 import android.util.Log
 import dev.lbento.thorsidepad.inject.Abs
 import dev.lbento.thorsidepad.inject.Btn
-import dev.lbento.thorsidepad.inject.Key
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -126,6 +125,8 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     }
 
     // ---- PadSink -----------------------------------------------------------------------------
+
+    override fun handles(code: Int): Boolean = buttonBit(code) != null
 
     /** Updates the report without sending. Used when a burst of events ends in a sync. */
     override fun setKey(code: Int, down: Boolean) {
@@ -291,13 +292,6 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
             // was the one place we disagreed, and we had the trigger click there, so pulling L2
             // opened the Steam overlay and the Guide button did nothing.
             Btn.MODE to 10,
-            // The Thor has no separate Guide button: what is printed as Home sends KEY_HOME on
-            // the controller node, and until now that landed nowhere — grabbed away from Android
-            // and given no slot here, so it was dead on the handheld and dead on the host both.
-            // It sits in the Guide slot because that is the button a player's thumb is looking
-            // for in that position. BTN_MODE stays mapped alongside it in case a later unit does
-            // send it.
-            Key.HOME to 10,
             // The triggers' own travel is on axes two and five, so these are only the click at
             // the bottom. Nothing standard claims eleven or twelve, so they sit here.
             Btn.TL2 to 11, Btn.TR2 to 12,

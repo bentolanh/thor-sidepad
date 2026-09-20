@@ -116,6 +116,7 @@ class BleSink(
     private val ticker = Executors.newSingleThreadScheduledExecutor()
     private var heartbeat: ScheduledFuture<*>? = null
     private var changedChar: BluetoothGattCharacteristic? = null
+    private var goodbye: java.util.concurrent.CountDownLatch? = null
 
     // ---- opening and closing -------------------------------------------------------------------
 
@@ -227,7 +228,19 @@ class BleSink(
             val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
             advertiser?.let { adapter?.bluetoothLeAdvertiser?.stopAdvertising(it) }
         } catch (_: Exception) {}
-        try { host?.let { server?.cancelConnection(it) } } catch (_: Exception) {}
+        // Say goodbye properly and wait for it to land. Cancelling and closing on the next line
+        // tore the server down before the disconnection had gone out, so a machine saw the link
+        // vanish rather than end — and a host that loses a device that way keeps the dead one in
+        // its list instead of removing it.
+        try {
+            host?.let { d ->
+                val done = java.util.concurrent.CountDownLatch(1)
+                goodbye = done
+                server?.cancelConnection(d)
+                done.await(300, TimeUnit.MILLISECONDS)
+            }
+        } catch (_: Exception) {}
+        goodbye = null
         try { server?.close() } catch (_: Exception) {}
         try { ctx.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
         server = null; advertiser = null; reportChar = null; systemChar = null; rumbleChar = null
@@ -503,6 +516,7 @@ class BleSink(
                 startHeartbeat()
                 announceLayoutIfChanged(device)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                goodbye?.countDown()
                 Log.i(TAG, "${device.address} went away")
                 if (host?.address == device.address) {
                     host = null; connected = false; subscribed = false
@@ -558,6 +572,10 @@ class BleSink(
                 // Android's remembers nothing, so it is written down here.
                 val on = value != null && value.isNotEmpty() && value[0].toInt() and 0x03 != 0
                 device?.let { subscriptions.edit().putBoolean("sc:${it.address}", on).apply() }
+                // Worth saying out loud: without this subscription the pad cannot tell this host
+                // its services moved, and the next install poisons that host's cache again.
+                Log.i(TAG, if (on) "${device?.address} will listen for service changes"
+                           else "${device?.address} is not listening for service changes")
             }
             if (d?.uuid == uuid(CCCD) && d.characteristic?.uuid == uuid(REPORT)) {
                 subscribed = value != null && value.isNotEmpty() && value[0].toInt() and 0x01 != 0
@@ -639,6 +657,8 @@ class BleSink(
         } catch (e: Exception) { Log.w(TAG, "system report", e) }
     }
 
+    override fun handles(code: Int): Boolean = shape.handles(code)
+
     override fun setAbs(code: Int, value: Int) = shape.setAbs(code, value)
 
     override fun sync(): Int = send()
@@ -708,16 +728,29 @@ class BleSink(
      * — which is exactly what a reinstall or a change of "appears as" disturbs.
      */
     private fun announceLayoutIfChanged(device: BluetoothDevice) {
-        val fingerprint = identity.name.hashCode() * 31 + shape.descriptor.contentHashCode()
+        // What the host has to re-read if it changed. The identity and the report descriptor are
+        // the obvious parts, but the server itself counts: reinstalling the app builds a new one,
+        // and a host holding the old session will sit on a link that works while publishing no
+        // gamepad at all. Measured on 2026-09-20 — no churn, no timeouts, simply no controller.
+        // The install time is what says "this is not the server you met".
+        val built = try {
+            ctx.packageManager.getPackageInfo(ctx.packageName, 0).lastUpdateTime
+        } catch (e: Exception) { 0L }
+        var fingerprint = identity.name.hashCode() * 31 + shape.descriptor.contentHashCode()
+        fingerprint = fingerprint * 31 + built.hashCode()
         val key = "fp:${device.address}"
         if (subscriptions.getInt(key, 0) == fingerprint) return
         ticker.schedule({
             val ch = changedChar ?: return@schedule
             if (host?.address != device.address) return@schedule
             if (!subscriptions.getBoolean("sc:${device.address}", false)) {
-                // Never subscribed, so it cannot be told. It will discover us from scratch
-                // anyway, which is the case this is trying to avoid a second time.
+                // It never subscribed, so it cannot be told. Hanging up to force a rebuild was
+                // tried on 2026-09-20 and is worse: the machine goes on believing it is
+                // connected, so it never comes back and the link is simply gone. Say so and
+                // leave it alone; clearing this needs a disconnect from the machine's own side.
                 subscriptions.edit().putInt(key, fingerprint).apply()
+                Log.i(TAG, "${device.address} is not listening for service changes; " +
+                    "it may be holding a session from before this build")
                 return@schedule
             }
             try {
