@@ -163,6 +163,61 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         if (held && !anyFocusableWindow()) onFocusReturn?.invoke()
     }
 
+    private var bubble: View? = null
+
+    /**
+     * A floating button that shows and hides the pad.
+     *
+     * Kept out of [views] on purpose: everything in there is torn down when the pad is hidden,
+     * and this is the way back. It is deliberately small and half-transparent — it sits on top of
+     * whatever is playing, so it has to be findable without being in the way.
+     */
+    fun showBubble(x: Int, y: Int, onMoved: (Int, Int) -> Unit, onTap: () -> Unit) {
+        if (bubble != null) return
+        val d = themed.resources.displayMetrics.density
+        val size = (52 * d).toInt()
+        val v = View(themed).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(0xCC31507E.toInt())
+                setStroke((2 * d).toInt(), 0x66FFFFFF)
+            }
+        }
+        val lp = WindowManager.LayoutParams(size, size,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+        lp.title = "SidePad bubble"
+        lp.gravity = android.view.Gravity.TOP or android.view.Gravity.START
+        lp.x = x; lp.y = y
+        // A drag has to be told from a tap, or the button fires every time it is moved.
+        val slop = android.view.ViewConfiguration.get(themed).scaledTouchSlop
+        var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var dragged = false
+        v.setOnTouchListener { _, e ->
+            when (e.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downX = e.rawX; downY = e.rawY; startX = lp.x; startY = lp.y; dragged = false
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - downX; val dy = e.rawY - downY
+                    if (!dragged && kotlin.math.hypot(dx, dy) > slop) dragged = true
+                    if (dragged) {
+                        lp.x = startX + dx.toInt(); lp.y = startY + dy.toInt()
+                        try { wm.updateViewLayout(v, lp) } catch (_: Exception) {}
+                    }
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (dragged) onMoved(lp.x, lp.y) else onTap()
+                }
+            }
+            true
+        }
+        try { wm.addView(v, lp); bubble = v } catch (e: Exception) { Log.w(TAG, "bubble", e) }
+    }
+
+    fun removeBubble() {
+        bubble?.let { v -> try { wm.removeView(v) } catch (_: Exception) {} }
+        bubble = null
+    }
+
     private fun add(v: View, lp: WindowManager.LayoutParams) {
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
         // Anything of ours that fills the screen has to hold the edges, or the system's edge-swipe

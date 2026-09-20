@@ -85,6 +85,9 @@ class MainActivity : AppCompatActivity() {
             // The service comes up a moment later; refresh once it has.
             findViewById<View>(R.id.btnStart).postDelayed({ refresh() }, 900)
         }
+        findViewById<Button>(R.id.btnTogglePad).setOnClickListener {
+            OverlayService.send(this, OverlayService.ACTION_TOGGLE)
+        }
         findViewById<Button>(R.id.btnExport).setOnClickListener { exportPresets.launch("thor-sidepad-presets.json") }
         findViewById<Button>(R.id.btnImport).setOnClickListener { importPresets.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*")) }
         findViewById<Button>(R.id.btnGuide).setOnClickListener {
@@ -102,6 +105,15 @@ class MainActivity : AppCompatActivity() {
         val boot = findViewById<Switch>(R.id.bootSwitch)
         boot.isChecked = prefs.startAtBoot
         boot.setOnCheckedChangeListener { _, on -> prefs.startAtBoot = on }
+
+        val bubble = findViewById<Switch>(R.id.bubbleSwitch)
+        bubble.isChecked = prefs.bubble
+        bubble.setOnCheckedChangeListener { _, on ->
+            prefs.bubble = on
+            // START puts the button up or takes it down straight away, rather than at the next
+            // time something else happens to ask.
+            OverlayService.send(this, OverlayService.ACTION_START)
+        }
 
         fillDisplays()
         displaySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {

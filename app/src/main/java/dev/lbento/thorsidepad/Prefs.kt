@@ -68,6 +68,25 @@ class Prefs(ctx: Context) {
         get() = sp.getString("physicalName", "") ?: ""
         set(v) = sp.edit().putString("physicalName", v).apply()
 
+    /**
+     * A floating button on the pad's own screen that shows and hides it.
+     *
+     * The Thor does not need one: the pad has a screen to itself, and an edge swipe there means
+     * nothing else. A handheld with a single screen has no such spare edge — every gesture
+     * belongs to Android — so without this there is no way to reach the pad at all.
+     */
+    var bubble: Boolean
+        get() = sp.getBoolean("bubble", false)
+        set(v) = sp.edit().putBoolean("bubble", v).apply()
+
+    var bubbleX: Int
+        get() = sp.getInt("bubbleX", 0)
+        set(v) = sp.edit().putInt("bubbleX", v).apply()
+
+    var bubbleY: Int
+        get() = sp.getInt("bubbleY", 0)
+        set(v) = sp.edit().putInt("bubbleY", v).apply()
+
     /** -1 = first non-default display. */
     var displayId: Int
         get() = sp.getInt("displayId", -1)

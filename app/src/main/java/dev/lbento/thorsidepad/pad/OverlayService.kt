@@ -724,6 +724,7 @@ class OverlayService : Service() {
         visible = false
         updateNotification()
         ensureCatcher()
+        syncBubble()
     }
 
     private fun overlayOrCreate(): PadOverlay =
@@ -753,6 +754,22 @@ class OverlayService : Service() {
     /** Keeps the edge strips on the pad's screen whenever the shield is not covering it. */
     private fun ensureCatcher() {
         try { val ov = overlayOrCreate(); ov.showCatchers(onPullDown = { showPanel() }, onPullUp = { toggle() }, tracker = ov.pullTracker) } catch (e: Exception) { Log.w(TAG, "catcher failed", e) }
+        syncBubble()
+    }
+
+    /**
+     * Puts the floating button up, or takes it away, to match the setting.
+     *
+     * Called wherever the catchers are, because the two answer the same need by different means:
+     * on a handheld whose pad has a screen to itself an edge swipe is free, and on one with a
+     * single screen every edge belongs to Android and a button is the only way in.
+     */
+    private fun syncBubble() {
+        val ov = overlay ?: return
+        if (!prefs.bubble) { ov.removeBubble(); return }
+        ov.showBubble(prefs.bubbleX, prefs.bubbleY,
+            onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
+            onTap = { toggle() })
     }
 
     /**
