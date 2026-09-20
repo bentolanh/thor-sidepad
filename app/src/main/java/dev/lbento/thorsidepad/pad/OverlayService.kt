@@ -594,8 +594,19 @@ class OverlayService : Service() {
                 val path = prefs.physicalPath.ifEmpty { targets.firstOrNull()?.path.orEmpty() }
                 if (path.isEmpty()) { Log.w(TAG, "no controller to forward"); return@Thread }
                 val f = ControllerForwarder(bt) { code, down ->
-                    if (code in passThrough) {
-                        try { svc.key(code, down) } catch (e: Exception) { Log.w(TAG, "pass through", e) }
+                    when {
+                        code !in passThrough -> Unit
+                        // Home is not handed back as a key. Injected from our own device it has
+                        // no screen attached to it, so Android sends every display home at once
+                        // where the Thor's own handler sends only this one. Asking for home on a
+                        // named display does what the button is supposed to do, and cannot be
+                        // done by pressing it on the real node either: we hold that node, so the
+                        // press would come straight back to us and round again.
+                        code == Key.HOME -> if (down) shellAsync(
+                            "am start --display ${overlay?.displayId ?: 0} " +
+                                "-a android.intent.action.MAIN -c android.intent.category.HOME")
+                        else -> try { svc.key(code, down) }
+                            catch (e: Exception) { Log.w(TAG, "pass through", e) }
                     }
                 }
                 // A helper left over from before this call existed answers null rather than failing.
@@ -655,24 +666,23 @@ class OverlayService : Service() {
         try {
             val declared = JSONObject(caps).optJSONArray("keys") ?: return
             val spare = ArrayList<Int>()
+            var home = false
             for (i in 0 until declared.length()) {
                 val code = declared.getInt(i)
                 if (bt.handles(code)) continue
                 if (code in 0x130..0x13F || code in 0x220..0x223) continue
-                // Home goes back too. It cannot behave exactly as it does when SidePad is not
-                // running — handed back it arrives from this device rather than from the
-                // controller, so whatever the Thor's own button handler keys off is not
-                // reproduced and Android simply does the ordinary thing with a home key. Plain
-                // Home is still worth more than a button that does nothing at all, which is what
-                // leaving it out gave.
+                // Home is handled rather than handed back; it needs a screen naming. It still
+                // belongs in the set the forwarder watches, just not on the device we inject to.
+                if (code == Key.HOME) { home = true; continue }
                 spare.add(code)
             }
-            passThrough = spare.toSet()
+            passThrough = if (home) spare.toSet() + Key.HOME else spare.toSet()
             if (spare.isEmpty()) return
             val err = svc.openVirtual("SidePad keys", spare.toIntArray(),
                 IntArray(0), IntArray(0), IntArray(0))
             if (err.isNotEmpty()) { Log.w(TAG, "pass-through device: $err"); return }
-            Log.i(TAG, "handing these back to Android: " + spare.joinToString { name(it) })
+            Log.i(TAG, "handing these back to Android: " +
+                passThrough.sorted().joinToString { name(it) })
         } catch (e: Exception) { Log.w(TAG, "pass-through device", e) }
     }
 
