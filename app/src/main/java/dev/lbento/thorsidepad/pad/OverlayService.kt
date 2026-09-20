@@ -139,7 +139,6 @@ class OverlayService : Service() {
     }
 
     // ---- pairing: the Thor's own "hold the button until it blinks" -------------------------------
-    @Volatile private var visibleUntil = 0L
     private val visibleTick = object : Runnable {
         override fun run() {
             val ov = overlay ?: return
@@ -148,62 +147,33 @@ class OverlayService : Service() {
         }
     }
 
-    /**
-     * After handing the user Android's dialog, watch for the answer rather than guessing at it: when
-     * the device actually goes visible, the panel comes back on the pairing page with the countdown
-     * running, so the moment of "it is listening now" is not missed.
-     */
-    private fun waitForVisible(ov: PadOverlay, secs: Int) {
-        val deadline = SystemClock.elapsedRealtime() + 30_000
-        val check = object : Runnable {
-            override fun run() {
-                // Reading the scan mode needs the scan permission, which this app has no business
-                // asking for: it is the one tied to finding nearby devices. When we may not look,
-                // take the user at their word and start counting; the worst case is a countdown
-                // shown after they pressed Deny, which the next screen corrects anyway.
-                val mode = try {
-                    getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.scanMode
-                } catch (e: SecurityException) { android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE }
-                catch (e: Exception) { null }
-                if (mode == android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
-                    visibleUntil = SystemClock.elapsedRealtime() + secs * 1000L
-                    ControlPanel.page = ControlPanel.Page.PAIRING
-                    showPanel(keepPage = true)
-                    main.removeCallbacks(visibleTick); main.post(visibleTick)
-                } else if (SystemClock.elapsedRealtime() < deadline) main.postDelayed(this, 500)
-            }
-        }
-        main.postDelayed(check, 500)
-    }
-
     private fun secondsVisible(): Int {
-        // Over Low Energy findability belongs to the gamepad itself rather than to the adapter:
-        // there is no system-wide discoverable mode to ask for, only what this pad chooses to say.
-        (btSink as? BleSink)?.let { return it.secondsFindable() }
-        val left = visibleUntil - SystemClock.elapsedRealtime()
-        return if (left <= 0) 0 else ((left + 999) / 1000).toInt()
+        // Findability belongs to the gamepad itself rather than to the adapter: there is no
+        // system-wide discoverable mode to ask for, only what this pad chooses to say.
+        return (btSink as? BleSink)?.secondsFindable() ?: 0
+    }
+
+    /** What the link badge and the log want to hear whenever the connection changes. */
+    private fun linkNote(): (String) -> Unit = { msg ->
+        main.post { refreshLinkBadge() }
+        if (msg.isNotEmpty()) Log.i(TAG, "link: $msg")
     }
 
     /**
-     * Turns discoverability on and counts it down on the panel. The shell can do it outright, which
-     * keeps the whole thing on the pad; if it cannot, Android's own dialog is the fallback and the
-     * panel steps aside for it, since a dialog is an activity and would otherwise sit underneath.
+     * The pad a computer talks to, made now if it does not exist yet.
+     *
+     * Showing the pad creates one, but the panel can ask to be findable before that has happened,
+     * and until this existed that case fell through to making the whole Thor discoverable instead.
      */
-    private fun makeThorVisible(ov: PadOverlay) {
-        val secs = 120
-        // Android's own dialog is the moment of consent, and it doubles as the "pairing mode" ritual
-        // a person expects: something asks, they agree, and then it is listening. Asked by us rather
-        // than through the shell, so it names SidePad and not "Shell".
-        ov.removePanel()
-        try {
-            val i = Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
-                .putExtra(android.bluetooth.BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, secs)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            val o = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(ov.displayId)
-            startActivity(i, o.toBundle())
-        } catch (e: Exception) { Log.w(TAG, "discoverable dialog failed", e) }
-        watchForNewPairing(secs)
-        waitForVisible(ov, secs)
+    private fun ensureBleSink(): BleSink? {
+        (btSink as? BleSink)?.let { return it }
+        if (btSink != null) return null
+        return try {
+            BleSink(this, bleIdentity(), linkNote()).also { s ->
+                btSink = s
+                s.open { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+            }
+        } catch (e: Exception) { Log.w(TAG, "could not present a pad", e); null }
     }
 
     /** Machines the Thor is paired with, computers first since those are what this is for. */
@@ -473,10 +443,7 @@ class OverlayService : Service() {
                 if (prefs.targetMode == Prefs.MODE_BT) {
                     // Another machine. Opening is asynchronous, so the pad goes up now and the first
                     // presses simply do not land until the host answers; the state callback says so.
-                    val note: (String) -> Unit = { msg ->
-                        main.post { refreshLinkBadge() }
-                        if (msg.isNotEmpty()) Log.i(TAG, "link: $msg")
-                    }
+                    val note = linkNote()
                     // Low Energy unless something has deliberately asked for Classic, which
                     // nothing in the panel does any more.
                     val bt = btSink ?: if (prefs.btTransport != Prefs.TRANSPORT_CLASSIC) {
@@ -1052,15 +1019,18 @@ class OverlayService : Service() {
             }
 
             override fun makeVisible() {
-                // Two different things wear the same name. Classic asks Android to make the whole
-                // device discoverable, with its consent dialog. Low Energy has nothing to ask:
-                // the pad simply starts saying its name for a while and then stops.
-                val ble = btSink as? BleSink
-                // The countdown is only honest if something redraws it. The Classic path got that
-                // for free — it polls the adapter until it sees the device go discoverable, and
-                // starts the tick when it does. Low Energy has nothing to wait for, so it was
-                // never started, and the number sat at 119 for two minutes.
-                if (ble != null) ble.makeFindable(120) else makeThorVisible(ov)
+                // Findability belongs to the pad, never to the handheld. Pressing this before the
+                // pad had been shown used to ask Android to make the whole Thor discoverable,
+                // which offered a phone over Classic where a gamepad was wanted: the computer
+                // listed "Thor" with nothing to pair with.
+                val ble = ensureBleSink()
+                if (ble == null) { toast("The pad is busy talking to a machine."); return }
+                ble.makeFindable(120)
+                // Whatever bonds inside this window is the machine the user just walked over to.
+                // Nothing else records a pairing, so without opening it here the list of machines
+                // stays empty however many times they pair.
+                watchForNewPairing(120)
+                // The countdown is only honest if something redraws it.
                 main.removeCallbacks(visibleTick); main.post(visibleTick)
             }
 
