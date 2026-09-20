@@ -125,7 +125,9 @@ class StandardShape : ReportShape {
  *    13‥14  ten buttons      then six bits of nothing
  */
 class XboxShape : ReportShape {
-    private val report = ByteArray(15)
+    private val report = ByteArray(16)
+    /** Report two: one bit, the button in the middle, exactly as the real controller sends it. */
+    private val system = ByteArray(1)
     private var hatX = 0
     private var hatY = 0
 
@@ -135,21 +137,25 @@ class XboxShape : ReportShape {
     }
 
     override val descriptor = DESCRIPTOR
-    override val discreteBytes = intArrayOf(12, 13, 14)
+    override val discreteBytes = intArrayOf(12, 13, 14, 15)
 
     override fun handles(code: Int): Boolean = BUTTONS.containsKey(code)
 
     override fun setKey(code: Int, down: Boolean) {
-        // The button in the middle travels in its own report, the way it does on the hardware
-        // this imitates: an Xbox pad's guide is a system-menu bit under report two, not one of
-        // the buttons in the pad's own report.
-        // The middle button lives at bit ten and nowhere else. It was briefly also sent as a
-        // system-menu bit in a second report, the way the hardware this imitates carries it, as
-        // insurance against the two readers disagreeing. The insurance cost more than the risk:
-        // System Control is a second top-level usage, and a host answers that by publishing a
-        // second, inert copy of the whole pad beside the real one. Two pads from one radio is what
-        // wedges a Mac's controller daemon. The mapping already held for these numbers says
-        // `guide:b10`, so bit ten is where it goes.
+        // View and Guide do not live among the buttons. The controller this imitates sends
+        // them on the Consumer page — View as AC Back, the last bit of this report, and Guide as
+        // AC Home in a report of its own. A host that knows this identity looks for them there
+        // and nowhere else.
+        if (code == dev.lbento.thorsidepad.inject.Btn.SELECT) {
+            synchronized(report) {
+                report[15] = if (down) 1 else 0
+            }
+            return
+        }
+        if (code == dev.lbento.thorsidepad.inject.Btn.MODE) {
+            synchronized(system) { system[0] = if (down) 1 else 0 }
+            return
+        }
         val bit = BUTTONS[code] ?: return
         val i = 13 + bit / 8
         val mask = 1 shl (bit % 8)
@@ -206,6 +212,8 @@ class XboxShape : ReportShape {
 
     override fun snapshot(): ByteArray = synchronized(report) { report.copyOf() }
 
+    override fun systemSnapshot(): ByteArray = synchronized(system) { system.copyOf() }
+
     /**
      * Reads a rumble instruction the way the pad this imitates describes one.
      *
@@ -235,80 +243,59 @@ class XboxShape : ReportShape {
          * an Xbox pad has no such buttons, and inventing an eleventh would be describing a shape
          * no host is expecting. They are simply not sent in this mode.
          */
+        /**
+         * Where each button sits in the real controller's fifteen, which is the order every host
+         * expects from this identity: A, B, C, X, Y, Z, the shoulders, the trigger clicks, View,
+         * Menu, Guide, then the two stick clicks.
+         *
+         * Microsoft leaves C and Z unused, so the Thor's own extra pair lands in slots a host has
+         * no name for but will still report. View and Guide are absent here on purpose: the real
+         * controller sends those on the Consumer page instead, View as AC Back at the end of this
+         * report and Guide as AC Home in a report of its own.
+         */
         val BUTTONS = mapOf(
             dev.lbento.thorsidepad.inject.Btn.A to 0,
             dev.lbento.thorsidepad.inject.Btn.B to 1,
-            dev.lbento.thorsidepad.inject.Btn.X to 2,
-            dev.lbento.thorsidepad.inject.Btn.Y to 3,
-            dev.lbento.thorsidepad.inject.Btn.TL to 4,
-            dev.lbento.thorsidepad.inject.Btn.TR to 5,
-            dev.lbento.thorsidepad.inject.Btn.SELECT to 6,
-            dev.lbento.thorsidepad.inject.Btn.START to 7,
-            dev.lbento.thorsidepad.inject.Btn.THUMBL to 8,
-            dev.lbento.thorsidepad.inject.Btn.THUMBR to 9,
-            // Ten is where the mapping SDL holds for these numbers expects the middle button, so
-            // that is where it goes and the extra pair starts after it.
-            dev.lbento.thorsidepad.inject.Btn.MODE to 10,
-            // The Thor's own pair, which a standard pad has no name for. They are sent all the
-            // same: anything reading raw buttons — a layout editor, an emulator's binding screen —
-            // can see and bind them, even though the built-in mapping stops at ten and will not.
-            // The alternative was claiming an Elite, which carries paddles legitimately; its own
-            // entry in that database maps none of them and its report runs to button fifty-three,
-            // so it would be a great deal of guessing for something that may not even work.
-            dev.lbento.thorsidepad.inject.Btn.C to 11,
-            dev.lbento.thorsidepad.inject.Btn.Z to 12,
+            dev.lbento.thorsidepad.inject.Btn.C to 2,
+            dev.lbento.thorsidepad.inject.Btn.X to 3,
+            dev.lbento.thorsidepad.inject.Btn.Y to 4,
+            dev.lbento.thorsidepad.inject.Btn.Z to 5,
+            dev.lbento.thorsidepad.inject.Btn.TL to 6,
+            dev.lbento.thorsidepad.inject.Btn.TR to 7,
+            dev.lbento.thorsidepad.inject.Btn.START to 11,
+            dev.lbento.thorsidepad.inject.Btn.THUMBL to 13,
+            dev.lbento.thorsidepad.inject.Btn.THUMBR to 14,
         )
 
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */
         val DESCRIPTOR = byteArrayOf(
-            0x05, 0x01, 0x09, 0x05, 0xA1.toByte(), 0x01, 0x85.toByte(), 0x01,
-            // Both sticks, four sixteen-bit unsigned axes.
-            //
-            // The pad these bytes were copied from wraps each stick in a Usage(Pointer) physical
-            // collection, and that wrapper is left out here deliberately. It makes a host read the
-            // device as a gamepad *and* a pointing device, and macOS answers that by publishing a
-            // second, inert copy of the pad alongside the real one — an `IOHIDEventDummyService`
-            // sharing its LocationID. A game that enumerates raw HID then has two pads to choose
-            // between and no way to tell that one of them never speaks. The axes, their usages,
-            // their widths and their order in the report are all unchanged; only the wrapping is
-            // gone, because nothing needs it.
-            0x09, 0x30, 0x09, 0x31, 0x09, 0x33, 0x09, 0x34,
-            0x15, 0x00, 0x27, 0xFF.toByte(), 0xFF.toByte(), 0x00, 0x00,
-            0x95.toByte(), 0x04, 0x75, 0x10, 0x81.toByte(), 0x02,
-            // left trigger: ten bits of travel, six of padding
-            0x05, 0x01, 0x09, 0x32, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x03,
-            0x95.toByte(), 0x01, 0x75, 0x0A, 0x81.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x06, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
-            // right trigger
-            0x05, 0x01, 0x09, 0x35, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x03,
-            0x95.toByte(), 0x01, 0x75, 0x0A, 0x81.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x06, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
-            // hat, one to eight, with a null state for centred
-            0x05, 0x01, 0x09, 0x39, 0x15, 0x01, 0x25, 0x08,
-            0x35, 0x00, 0x46.toByte(), 0x3B, 0x01, 0x66, 0x14, 0x00,
-            0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x42,
-            0x75, 0x04, 0x95.toByte(), 0x01, 0x15, 0x00, 0x25, 0x00,
-            0x35, 0x00, 0x45, 0x00, 0x65, 0x00, 0x81.toByte(), 0x03,
-            // thirteen buttons, then three bits of nothing
-            0x05, 0x09, 0x19, 0x01, 0x29, 0x0D, 0x15, 0x00, 0x25, 0x01,
-            0x75, 0x01, 0x95.toByte(), 0x0D, 0x81.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x03, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
-            0xC0.toByte(),
-            // Report three, the one the host writes to us: which motors, how hard, for how long.
-            // Copied in shape from the pad this was read off. Four magnitudes because that pad has
-            // four motors; this handheld has one and takes the loudest of them.
-            0x05, 0x0F, 0x09, 0x21, 0x85.toByte(), 0x03, 0xA1.toByte(), 0x02,
-            0x09, 0x97.toByte(), 0x15, 0x00, 0x25, 0x01, 0x75, 0x04, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x04, 0x95.toByte(), 0x01, 0x91.toByte(), 0x03,
-            0x09, 0x70, 0x15, 0x00, 0x25, 0x64, 0x75, 0x08, 0x95.toByte(), 0x04, 0x91.toByte(), 0x02,
-            0x09, 0x50, 0x66, 0x01, 0x10, 0x55, 0x0E, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x00,
-            0x75, 0x08, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
-            0x09, 0xA7.toByte(), 0x15, 0x00, 0x26, 0xFF.toByte(), 0x00,
-            0x75, 0x08, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
-            0x65, 0x00, 0x55, 0x00,
-            0x09, 0x7C, 0x15, 0x00, 0x26, 0xFF.toByte(), 0x00,
-            0x75, 0x08, 0x95.toByte(), 0x01, 0x91.toByte(), 0x02,
-            0xC0.toByte(),
+            0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x05.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x85.toByte(), 0x01.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(),
+            0x09.toByte(), 0x30.toByte(), 0x09.toByte(), 0x31.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(),
+            0x02.toByte(), 0x75.toByte(), 0x10.toByte(), 0x81.toByte(), 0x02.toByte(), 0xC0.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(), 0x09.toByte(), 0x32.toByte(),
+            0x09.toByte(), 0x35.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(), 0x02.toByte(), 0x75.toByte(),
+            0x10.toByte(), 0x81.toByte(), 0x02.toByte(), 0xC0.toByte(), 0x05.toByte(), 0x02.toByte(), 0x09.toByte(), 0xC5.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(),
+            0x03.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x0A.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(),
+            0x06.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x02.toByte(), 0x09.toByte(), 0xC4.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(),
+            0xFF.toByte(), 0x03.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x0A.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(),
+            0x75.toByte(), 0x06.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x39.toByte(), 0x15.toByte(), 0x01.toByte(),
+            0x25.toByte(), 0x08.toByte(), 0x35.toByte(), 0x00.toByte(), 0x46.toByte(), 0x3B.toByte(), 0x01.toByte(), 0x66.toByte(), 0x14.toByte(), 0x00.toByte(), 0x75.toByte(), 0x04.toByte(),
+            0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x42.toByte(), 0x75.toByte(), 0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(),
+            0x35.toByte(), 0x00.toByte(), 0x45.toByte(), 0x00.toByte(), 0x65.toByte(), 0x00.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x09.toByte(), 0x19.toByte(), 0x01.toByte(),
+            0x29.toByte(), 0x0F.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x95.toByte(), 0x0F.toByte(), 0x81.toByte(), 0x02.toByte(),
+            0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x0C.toByte(),
+            0x0A.toByte(), 0x24.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x81.toByte(),
+            0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x07.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(),
+            0x0C.toByte(), 0x09.toByte(), 0x01.toByte(), 0x85.toByte(), 0x02.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x05.toByte(), 0x0C.toByte(), 0x0A.toByte(), 0x23.toByte(), 0x02.toByte(),
+            0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(),
+            0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x07.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0xC0.toByte(), 0x05.toByte(), 0x0F.toByte(), 0x09.toByte(),
+            0x21.toByte(), 0x85.toByte(), 0x03.toByte(), 0xA1.toByte(), 0x02.toByte(), 0x09.toByte(), 0x97.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x75.toByte(),
+            0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x04.toByte(), 0x95.toByte(),
+            0x01.toByte(), 0x91.toByte(), 0x03.toByte(), 0x09.toByte(), 0x70.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x64.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(),
+            0x04.toByte(), 0x91.toByte(), 0x02.toByte(), 0x09.toByte(), 0x50.toByte(), 0x66.toByte(), 0x01.toByte(), 0x10.toByte(), 0x55.toByte(), 0x0E.toByte(), 0x15.toByte(), 0x00.toByte(),
+            0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x09.toByte(), 0xA7.toByte(), 0x15.toByte(),
+            0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x65.toByte(), 0x00.toByte(),
+            0x55.toByte(), 0x00.toByte(), 0x09.toByte(), 0x7C.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(),
+            0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0xC0.toByte(), 0xC0.toByte()
         )
     }
 }
