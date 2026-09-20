@@ -594,7 +594,9 @@ class OverlayService : Service() {
                 val path = prefs.physicalPath.ifEmpty { targets.firstOrNull()?.path.orEmpty() }
                 if (path.isEmpty()) { Log.w(TAG, "no controller to forward"); return@Thread }
                 val f = ControllerForwarder(bt) { code, down ->
-                    try { svc.key(code, down) } catch (e: Exception) { Log.w(TAG, "pass through", e) }
+                    if (code in passThrough) {
+                        try { svc.key(code, down) } catch (e: Exception) { Log.w(TAG, "pass through", e) }
+                    }
                 }
                 // A helper left over from before this call existed answers null rather than failing.
                 val caps = svc.forwardStart(path, true, f)
@@ -637,6 +639,8 @@ class OverlayService : Service() {
      * back through. Buttons in the gamepad ranges are deliberately left out: those belong to the
      * machine, and echoing them here would drive Android at the same time.
      */
+    @Volatile private var passThrough: Set<Int> = emptySet()
+
     private fun openPassThrough(svc: IInjector, bt: PadTransport, caps: String) {
         try {
             val declared = JSONObject(caps).optJSONArray("keys") ?: return
@@ -645,8 +649,16 @@ class OverlayService : Service() {
                 val code = declared.getInt(i)
                 if (bt.handles(code)) continue
                 if (code in 0x130..0x13F || code in 0x220..0x223) continue
+                // Home is left out on purpose. Handed back it arrives from this device rather than
+                // from the controller, so Android treats it as a plain home key and opens the home
+                // app — stepping over Mjolnir, which is what handles that button on the Thor and
+                // cannot see it while the controller is held. Nothing we can do from here behaves
+                // the way the button does when SidePad is not running, so it does nothing at all
+                // rather than something wrong.
+                if (code == Key.HOME) continue
                 spare.add(code)
             }
+            passThrough = spare.toSet()
             if (spare.isEmpty()) return
             val err = svc.openVirtual("SidePad keys", spare.toIntArray(),
                 IntArray(0), IntArray(0), IntArray(0))
@@ -657,6 +669,7 @@ class OverlayService : Service() {
 
     private fun stopForwarding() {
         holdAwake(false)
+        passThrough = emptySet()
         synchronized(this) { if (!forwardingWanted) return; forwardingWanted = false }
         forwarder = null
         val svc = Injector.current() ?: return
