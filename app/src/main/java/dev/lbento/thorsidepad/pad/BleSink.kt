@@ -361,6 +361,15 @@ class BleSink(
 
     private fun startAdvertising(adapter: BluetoothAdapter): Boolean {
         val le = adapter.bluetoothLeAdvertiser ?: return false
+        // Never while a machine already has us, unless it is a pairing window and we are meant to
+        // be findable by something else. restartAdvertising checked this; open() did not, and a
+        // host that reconnected while the server was still coming up left the pad calling out
+        // through the whole session. A machine sees that and reattaches the instant the link
+        // drops — so pressing Disconnect on a Mac undid itself inside a second, every time.
+        if (host != null && secondsFindable() == 0) {
+            Log.i(TAG, "a machine already has us; staying quiet")
+            return true
+        }
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
@@ -517,12 +526,23 @@ class BleSink(
                 announceLayoutIfChanged(device)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 goodbye?.countDown()
-                Log.i(TAG, "${device.address} went away")
+                Log.i(TAG, "${device.address} went away (status $status)")
                 if (host?.address == device.address) {
                     host = null; connected = false; subscribed = false
                     stopHeartbeat()
-                    // Findable again, now that being findable means something.
-                    resumeAdvertising()
+                    if (status == REMOTE_HUNG_UP) {
+                        // Somebody pressed Disconnect. A controller does not climb back into a
+                        // machine that has just put it down — it waits to be picked up, and the
+                        // pad's own "tap to try again" is how that is done here. Calling out
+                        // again would simply undo the request: a Mac reattaches to a bonded pad
+                        // the moment it sees one advertise, which it did inside a second.
+                        Log.i(TAG, "it let go on purpose; waiting to be asked rather than calling out")
+                    } else {
+                        // A drop rather than a decision: a pocket, a door, a flat battery. Go back
+                        // on air, but not instantly — a machine needs a moment to put the old
+                        // device away, and 358ms was not enough for one measured on 2026-09-20.
+                        ticker.schedule({ resumeAdvertising() }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
+                    }
                     onState("Not connected")
                 }
             }
@@ -777,6 +797,10 @@ class BleSink(
         /** Every handle there is: read all of it again. */
         val EVERYTHING_CHANGED = byteArrayOf(0x01, 0x00, 0xFF.toByte(), 0xFF.toByte())
         val INDICATE_ON = byteArrayOf(0x02, 0x00)
+        /** How long the pad stays off the air after a machine lets go of it. */
+        /** The machine chose to end it, rather than the link failing. */
+        const val REMOTE_HUNG_UP = 0x13
+        const val QUIET_AFTER_MS = 2500L
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
