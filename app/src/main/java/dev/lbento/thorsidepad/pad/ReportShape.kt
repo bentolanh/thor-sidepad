@@ -236,6 +236,13 @@ class XboxShape : ReportShape {
             // Ten is where the mapping SDL holds for these numbers expects the middle button, so
             // that is where it goes and the extra pair starts after it.
             dev.lbento.thorsidepad.inject.Btn.MODE to 10,
+            // The Thor has no separate Guide button: what is printed as Home sends KEY_HOME on
+            // the controller node, and until now that landed nowhere — grabbed away from Android
+            // and given no slot here, so it was dead on the handheld and dead on the host both.
+            // It sits in the Guide slot because that is the button a player's thumb is looking
+            // for in that position. BTN_MODE stays mapped alongside it in case a later unit does
+            // send it.
+            dev.lbento.thorsidepad.inject.Key.HOME to 10,
             // The Thor's own pair, which a standard pad has no name for. They are sent all the
             // same: anything reading raw buttons — a layout editor, an emulator's binding screen —
             // can see and bind them, even though the built-in mapping stops at ten and will not.
