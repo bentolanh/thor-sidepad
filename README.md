@@ -130,3 +130,13 @@ This app is developed using Claude Code.
 ## License
 
 MIT. See `LICENSE`. Developer notes are in `DEVELOPMENT.md`.
+
+## Watching macOS's controller daemon
+
+`tools/gcwatch/` holds three recorders for the times `gamecontrollerd` misbehaves — what it
+costs, whether anything is flooding its driver endpoint, and what was running when. Copy them
+to `~/Library/Application Support/thor-sidepad/gcwatch/` and run them from there. Run
+`driverflood.sh --selftest` before trusting a quiet log.
+
+What they have already told us, and what to do next time, is in the vault note
+"gamecontrollerd overload — what we know" under `Claude/thor-sidepad/`.
