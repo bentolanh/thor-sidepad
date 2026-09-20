@@ -115,6 +115,7 @@ class BleSink(
     private val pool = Executors.newSingleThreadExecutor()
     private val ticker = Executors.newSingleThreadScheduledExecutor()
     private var heartbeat: ScheduledFuture<*>? = null
+    private var courtesy: ScheduledFuture<*>? = null
 
     // ---- opening and closing -------------------------------------------------------------------
 
@@ -377,6 +378,31 @@ class BleSink(
      * the hint — it connected, read what was in the clear, and hung up forty seconds later without
      * ever trying. Asking first costs nothing when the host would have asked anyway.
      */
+    /**
+     * Asks to pair, but only after the host has had its turn.
+     *
+     * The report characteristics can only be read once the link is encrypted, so a machine that
+     * actually wants the pad starts pairing by itself — and one the user has just pressed Connect
+     * on is already doing it before we see the connection at all. Asking at that same moment is a
+     * race, and it is ours to lose: measured against a Mac on 2026-09-20, our security request
+     * arrived "before the link is ready", the Mac's own encryption attempt failed, and it hung up
+     * four seconds later without pairing. Every attempt looked like the Thor refusing to pair.
+     *
+     * So the request survives, as an answer for a host that never asks rather than as the opening
+     * move. If the host starts pairing in the meantime, this stands down.
+     */
+    private fun askForBondLater(device: BluetoothDevice) {
+        cancelBondRequest()
+        courtesy = ticker.schedule({
+            if (host?.address == device.address && !isBonded(device)) {
+                Log.i(TAG, "${device.address} has not asked to pair; asking it")
+                createBondWith(device)
+            }
+        }, COURTESY_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelBondRequest() { courtesy?.cancel(false); courtesy = null }
+
     private fun createBondWith(device: BluetoothDevice) {
         try {
             Log.i(TAG, "asking ${device.address} to pair over Low Energy")
@@ -412,6 +438,14 @@ class BleSink(
                     Log.i(TAG, "bonded to ${d.address}")
                     if (host?.address == d.address) subscribed = true
                     onState("")
+                }
+                BluetoothDevice.BOND_BONDING -> {
+                    // The host got there first, which is how a pad is meant to be paired. Stand
+                    // down so two requests do not cross on the link.
+                    if (host?.address == d.address) {
+                        Log.i(TAG, "${d.address} is pairing with us; leaving it to do so")
+                        cancelBondRequest()
+                    }
                 }
                 BluetoothDevice.BOND_NONE -> Log.i(TAG, "pairing with ${d.address} did not complete")
             }
@@ -464,16 +498,15 @@ class BleSink(
                     onState("")
                 } else {
                     // Either never met, or bonded over Classic only and never subscribed here.
-                    // Asking for a Low Energy bond covers both; one that already exists is
-                    // refused harmlessly.
-                    createBondWith(device)
+                    // Let the host ask first either way; see askForBondLater.
+                    askForBondLater(device)
                 }
                 startHeartbeat()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "${device.address} went away")
                 if (host?.address == device.address) {
                     host = null; connected = false; subscribed = false
-                    stopHeartbeat()
+                    stopHeartbeat(); cancelBondRequest()
                     // Findable again, now that being findable means something.
                     resumeAdvertising()
                     onState("Not connected")
@@ -664,6 +697,8 @@ class BleSink(
 
     private companion object {
         const val TAG = "SidePadBle"
+        /** How long a host gets to start pairing before the pad suggests it. */
+        const val COURTESY_MS = 6_000L
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
