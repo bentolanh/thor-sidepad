@@ -117,6 +117,8 @@ class BleSink(
     private var heartbeat: ScheduledFuture<*>? = null
     private var changedChar: BluetoothGattCharacteristic? = null
     private var goodbye: java.util.concurrent.CountDownLatch? = null
+    private val sendLock = Any()
+    @Volatile private var inFlight = false
     private var sleeper: ScheduledFuture<*>? = null
     /** Set only by the directed-connection experiment; keeps the pad off the air while it runs. */
     @Volatile private var experimenting = false
@@ -731,6 +733,10 @@ class BleSink(
             if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
         }
 
+        override fun onNotificationSent(device: BluetoothDevice?, status: Int) {
+            synchronized(sendLock) { inFlight = false; (sendLock as Object).notifyAll() }
+        }
+
         override fun onMtuChanged(device: BluetoothDevice?, mtu: Int) {
             Log.i(TAG, "the host asked for $mtu bytes a packet")
         }
@@ -847,12 +853,38 @@ class BleSink(
             val taken = try {
                 @Suppress("DEPRECATION")
                 c.value = frame
+                inFlight = true
                 @Suppress("DEPRECATION")
                 srv.notifyCharacteristicChanged(d, c, false)
-            } catch (e: Exception) { Log.w(TAG, "notify failed", e); return }
-            if (taken) return
+            } catch (e: Exception) { inFlight = false; Log.w(TAG, "notify failed", e); return }
+            if (taken) { awaitSent(); return }
+            inFlight = false
             tries++
             try { Thread.sleep(2) } catch (_: InterruptedException) { return }
+        }
+    }
+
+    /**
+     * Waits for the radio to admit it has sent the last report before offering another.
+     *
+     * The pad produces a hundred reports a second; a link to a machine carries perhaps sixty.
+     * Android accepts every one of them regardless and queues the surplus inside its own stack,
+     * where it is invisible from here — notifyCharacteristicChanged answers true, our queue drains
+     * happily, and the packets go out later and later. Measured on 2026-09-20: a stick kept moving
+     * for about a second after it was released, because that second of reports was still waiting
+     * in a buffer we could not see.
+     *
+     * None of this showed while a bug meant nothing was subscribed and the reports went nowhere.
+     * The moment they were really delivered, the link became the limit.
+     */
+    private fun awaitSent() {
+        val until = System.nanoTime() + SEND_WAIT_MS * 1_000_000
+        synchronized(sendLock) {
+            while (inFlight) {
+                val left = (until - System.nanoTime()) / 1_000_000
+                if (left <= 0) { inFlight = false; return }
+                try { (sendLock as Object).wait(left) } catch (_: InterruptedException) { return }
+            }
         }
     }
 
@@ -919,6 +951,8 @@ class BleSink(
         const val QUIET_AFTER_MS = 2500L
         /** How long the pad keeps offering itself to nobody before going quiet. */
         const val SLEEP_AFTER_MS = 10 * 60 * 1000L
+        /** Longest we wait for the radio to report a frame gone before giving up on it. */
+        const val SEND_WAIT_MS = 60L
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
