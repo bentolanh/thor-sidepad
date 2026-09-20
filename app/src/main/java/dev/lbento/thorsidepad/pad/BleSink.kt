@@ -48,6 +48,8 @@ class BleSink(
     private val ctx: Context,
     private val identity: Identity = Identity.OWN,
     private val onState: (String) -> Unit = {},
+    /** Whether to tell a host there are motors here. See Prefs.rumble for what it costs. */
+    private val rumble: Boolean = true,
 ) : PadTransport {
 
     /**
@@ -95,7 +97,7 @@ class BleSink(
      * then read as two sticks jammed into a corner.
      */
     private val shape: ReportShape =
-        if (identity == Identity.XBOX) XboxShape() else StandardShape()
+        if (identity == Identity.XBOX) XboxShape(rumble) else StandardShape()
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.

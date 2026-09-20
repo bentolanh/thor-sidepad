@@ -124,7 +124,7 @@ class StandardShape : ReportShape {
  *    12     hat              four bits, 1 is north through 8 north-west, 0 is centred
  *    13‥14  ten buttons      then six bits of nothing
  */
-class XboxShape : ReportShape {
+class XboxShape(private val rumble: Boolean = true) : ReportShape {
     private val report = ByteArray(16)
     /** Report two: one bit, the button in the middle, exactly as the real controller sends it. */
     private val system = ByteArray(1)
@@ -136,7 +136,7 @@ class XboxShape : ReportShape {
         putShort(0, CENTRE); putShort(2, CENTRE); putShort(4, CENTRE); putShort(6, CENTRE)
     }
 
-    override val descriptor = DESCRIPTOR
+    override val descriptor = if (rumble) DESCRIPTOR else NO_RUMBLE
     override val discreteBytes = intArrayOf(12, 13, 14, 15)
 
     override fun handles(code: Int): Boolean = BUTTONS.containsKey(code)
@@ -224,6 +224,9 @@ class XboxShape : ReportShape {
      * which is nearer the intent than averaging them into something limp.
      */
     override fun rumbleFrom(bytes: ByteArray): Int? {
+        // Nothing asked for one: without the force-feedback collection a host has no report to
+        // write here, so anything arriving is not a rumble instruction and must not be read as one.
+        if (!rumble) return null
         if (bytes.size < 5) return null
         val enabled = bytes[0].toInt() and 0x0F
         if (enabled == 0) return 0
@@ -237,6 +240,25 @@ class XboxShape : ReportShape {
 
     private companion object {
         const val CENTRE = 0x8000
+
+        /**
+         * Where the force-feedback collection sits inside the descriptor, and what is left
+         * without it.
+         *
+         * The real controller ends its report map with a Physical Interface Device collection —
+         * report three, enable-actuators, four magnitudes, duration, delay, loop count — and that
+         * collection is the whole of how a host learns there is a motor to drive. It is also not
+         * free. Measured on 2026-09-20: with it, macOS starts _GCHapticServerManager's run loop
+         * and that loop ticks for as long as the pad is connected, costing 1.02 seconds of
+         * processor per minute with nothing rumbling, nothing running and no traffic on the
+         * radio. An 8BitDo attached to the same machine cost nothing, because it drives its
+         * motors through its own protocol and declares no such collection.
+         *
+         * So the collection can be left out, at the price of the motors. Everything before it is
+         * untouched and the application collection still has to be closed, which is the last byte.
+         */
+        const val PID_AT = 225
+        const val PID_END = 316
 
         /**
          * Ten buttons, in the order the name implies. The Thor's M1 and M2 have nowhere to go:
@@ -268,6 +290,10 @@ class XboxShape : ReportShape {
         )
 
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */
+        private val NO_RUMBLE: ByteArray by lazy {
+            DESCRIPTOR.copyOfRange(0, PID_AT) + DESCRIPTOR.copyOfRange(PID_END, DESCRIPTOR.size)
+        }
+
         val DESCRIPTOR = byteArrayOf(
             0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x05.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x85.toByte(), 0x01.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(),
             0x09.toByte(), 0x30.toByte(), 0x09.toByte(), 0x31.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(),

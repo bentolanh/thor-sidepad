@@ -118,6 +118,22 @@ class MainActivity : AppCompatActivity() {
             OverlayService.send(this, OverlayService.ACTION_START)
         }
 
+        val rumble = findViewById<Switch>(R.id.rumbleSwitch)
+        rumble.isChecked = prefs.rumble
+        rumble.setOnCheckedChangeListener { _, on ->
+            prefs.rumble = on
+            // The claim lives in the report map, which a host reads once when it discovers the
+            // pad and then remembers. Rebuilding the pad is what gets the new map on the air; a
+            // machine already holding the old one keeps it until it reconnects, so say so.
+            OverlayService.send(this, OverlayService.ACTION_START)
+            android.widget.Toast.makeText(
+                this,
+                if (on) "Rumble offered. Reconnect the machine for it to notice."
+                else "Rumble withdrawn. Reconnect the machine for it to notice.",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+
         fillDisplays()
         displaySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>, v: View?, pos: Int, id: Long) { prefs.displayId = displayIds.getOrNull(pos) ?: -1 }

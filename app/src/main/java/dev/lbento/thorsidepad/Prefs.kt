@@ -108,6 +108,22 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("keepAwake", false)
         set(v) = sp.edit().putBoolean("keepAwake", v).apply()
 
+    /**
+     * Whether the pad tells a host it has motors in it.
+     *
+     * Saying so is what makes rumble work, and it is not free. The claim is a force-feedback
+     * collection at the end of the report map, and macOS answers it by starting a haptics run
+     * loop that ticks for as long as the pad is connected whether or not anything is buzzing —
+     * measured on 2026-09-20 at 1.02 seconds of processor a minute with the pad untouched, next
+     * to nothing at all for an 8BitDo on the same machine.
+     *
+     * Changing this changes the shape of what a host was promised, so a host that already knows
+     * the pad has to be told to look again before it takes effect.
+     */
+    var rumble: Boolean
+        get() = sp.getBoolean("rumble", true)
+        set(v) = sp.edit().putBoolean("rumble", v).apply()
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()
