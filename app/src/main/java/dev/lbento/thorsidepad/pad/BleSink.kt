@@ -255,44 +255,23 @@ class BleSink(
     // ---- the services --------------------------------------------------------------------------
 
     private fun addServices(srv: BluetoothGattServer) {
-        // Generic Access, carrying the one number that says "gamepad".
-        //
-        // macOS decides which Bluetooth HID devices deserve fast connection parameters by reading
-        // the GAP appearance: its own log shows isLowLatencyBLEHID checking appearanceValue, and
-        // an 8BitDo answering 0x03C4 gets a fifteen-millisecond interval where we answer 0x0 and
-        // do not. That is the stick delay.
-        //
-        // This service belongs to the Bluetooth stack rather than to an app, and Android offers
-        // no way to set the appearance it publishes. Adding our own may well be refused — the
-        // callback says so when a service is rejected — but the cost of asking is one log line
-        // and the prize is the difference between a pad that lags and one that does not.
-        val gap = BluetoothGattService(uuid(GENERIC_ACCESS), BluetoothGattService.SERVICE_TYPE_PRIMARY)
-        gap.addCharacteristic(BluetoothGattCharacteristic(uuid(APPEARANCE),
-            BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ))
-        srv.addService(gap)
-        awaitService()
+        // Generic Access is not ours to publish. Claiming the gamepad appearance there would
+        // have earned the fast connection parameters macOS reserves for real pads — its log
+        // checks appearanceValue and gives an 8BitDo answering 0x03C4 a fifteen-millisecond
+        // interval where we answer 0x0 and wait longer. But the stack owns that service and
+        // never answers the callback for it: measured on 2026-09-20, every addService after it
+        // ran two seconds late waiting on a reply that does not come, the server took eight
+        // seconds to stand up, and a machine that connected in the meantime found no gamepad at
+        // all. The appearance stays out of reach.
 
-        // How a peripheral tells a host that already knows it to look again.
-        //
-        // A bonded host does not re-read the attribute table on every connection; it keeps the
-        // one it found the first time. That is a sensible saving until the table changes, and
-        // ours changes whenever the app is reinstalled or the pad is made to appear as something
-        // else. On 2026-09-20 a reinstall left a Mac asking for a handle that no longer existed:
-        // nothing answered, its ATT transaction timed out thirty seconds later, it hung up, and
-        // it came straight back with the same stale table. Every death left another dead gamepad
-        // in its device list. The only cure was forgetting the pad and pairing it again.
-        //
-        // Indicating on this characteristic is how that is meant to be avoided, so it goes first,
-        // where the handle range it reports begins.
-        val gatt = BluetoothGattService(uuid(GATT_SERVICE), BluetoothGattService.SERVICE_TYPE_PRIMARY)
-        val changed = BluetoothGattCharacteristic(uuid(SERVICE_CHANGED),
-            BluetoothGattCharacteristic.PROPERTY_INDICATE, 0)
-        changed.addDescriptor(BluetoothGattDescriptor(uuid(CCCD),
-            BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE))
-        gatt.addCharacteristic(changed)
-        changedChar = changed
-        srv.addService(gatt)
-        awaitService()
+        // Generic Attribute is not ours to publish either, and nor was Generic Access before
+        // it. Both are reserved to the Bluetooth stack, which never answers the callback for
+        // them: measured on 2026-09-20, each cost the full two-second wait and delayed every
+        // service behind it, so the gamepad itself did not exist until eight seconds in and a
+        // machine connecting before that found nothing to subscribe to. Service Changed would
+        // have been the polite way to tell a bonded host its cached copy of us had moved — every
+        // host we met logged "not listening for service changes", which is what a service that
+        // was never really registered looks like from the outside.
 
         // Device information, holding the identity. Readable without encryption on purpose: a host
         // that cannot see who we are before bonding has no reason to want to bond.
