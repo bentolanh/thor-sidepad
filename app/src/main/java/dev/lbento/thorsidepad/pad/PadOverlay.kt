@@ -172,7 +172,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * and this is the way back. It is deliberately small and half-transparent — it sits on top of
      * whatever is playing, so it has to be findable without being in the way.
      */
-    fun showBubble(x: Int, y: Int, onMoved: (Int, Int) -> Unit, onTap: () -> Unit) {
+    fun showBubble(x: Int, y: Int, onMoved: (Int, Int) -> Unit, onLongPress: () -> Unit, onTap: () -> Unit) {
         if (bubble != null) return
         val d = themed.resources.displayMetrics.density
         val size = (52 * d).toInt()
@@ -191,21 +191,34 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         // A drag has to be told from a tap, or the button fires every time it is moved.
         val slop = android.view.ViewConfiguration.get(themed).scaledTouchSlop
         var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var dragged = false
+        var held = false
+        // Holding it opens the panel. On a single-screen handheld the panel's own pull-down is
+        // Android's notification shade, so this is the only way to reach it.
+        val hold = Runnable {
+            if (!dragged) {
+                held = true
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                onLongPress()
+            }
+        }
         v.setOnTouchListener { _, e ->
             when (e.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
-                    downX = e.rawX; downY = e.rawY; startX = lp.x; startY = lp.y; dragged = false
+                    downX = e.rawX; downY = e.rawY; startX = lp.x; startY = lp.y
+                    dragged = false; held = false
+                    v.postDelayed(hold, android.view.ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX; val dy = e.rawY - downY
-                    if (!dragged && kotlin.math.hypot(dx, dy) > slop) dragged = true
+                    if (!dragged && kotlin.math.hypot(dx, dy) > slop) { dragged = true; v.removeCallbacks(hold) }
                     if (dragged) {
                         lp.x = startX + dx.toInt(); lp.y = startY + dy.toInt()
                         try { wm.updateViewLayout(v, lp) } catch (_: Exception) {}
                     }
                 }
-                android.view.MotionEvent.ACTION_UP -> {
-                    if (dragged) onMoved(lp.x, lp.y) else onTap()
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    v.removeCallbacks(hold)
+                    if (dragged) onMoved(lp.x, lp.y) else if (!held) onTap()
                 }
             }
             true

@@ -88,6 +88,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnTogglePad).setOnClickListener {
             OverlayService.send(this, OverlayService.ACTION_TOGGLE)
         }
+        findViewById<Button>(R.id.btnPanel).setOnClickListener {
+            OverlayService.send(this, OverlayService.ACTION_PANEL)
+        }
         findViewById<Button>(R.id.btnExport).setOnClickListener { exportPresets.launch("thor-sidepad-presets.json") }
         findViewById<Button>(R.id.btnImport).setOnClickListener { importPresets.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*")) }
         findViewById<Button>(R.id.btnGuide).setOnClickListener {

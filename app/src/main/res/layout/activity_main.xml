@@ -42,6 +42,7 @@
             <TextView style="@style/StepHelp" android:text="The first start opens a short guide on the second screen. Everything else lives there: pull down from its top edge for the SidePad panel, pull up from its bottom edge to show or hide the pad." />
             <Button android:id="@+id/btnStart" style="@style/Row" android:text="Start SidePad" />
             <Button android:id="@+id/btnTogglePad" style="@style/Row" android:text="Show or hide the pad" />
+            <Button android:id="@+id/btnPanel" style="@style/Row" android:text="Open the SidePad panel" />
             <Button android:id="@+id/btnGuide" style="@style/Row" android:text="Show the guide again" />
         </LinearLayout>
 
@@ -52,7 +53,7 @@
             android:text="Start in the background at boot" />
         <Switch android:id="@+id/bubbleSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Floating button to show and hide the pad" />
-        <TextView style="@style/StepHelp" android:text="For a handheld with one screen, where every edge swipe belongs to Android and there is no spare gesture to reach the pad with. Drag the button anywhere; tap it to show or hide the pad." />
+        <TextView style="@style/StepHelp" android:text="For a handheld with one screen, where every edge swipe belongs to Android and there is no spare gesture to reach the pad with. Drag the button anywhere; tap it to show or hide the pad, hold it to open the panel." />
         <TextView style="@style/StatusLine" android:text="App icon" />
         <!-- Two tappable icons; the chosen one is ringed. No names needed. -->
         <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp">

@@ -769,6 +769,7 @@ class OverlayService : Service() {
         if (!prefs.bubble) { ov.removeBubble(); return }
         ov.showBubble(prefs.bubbleX, prefs.bubbleY,
             onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
+            onLongPress = { showPanel() },
             onTap = { toggle() })
     }
 
