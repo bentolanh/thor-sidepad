@@ -367,6 +367,10 @@ class BleSink(
         // through the whole session. A machine sees that and reattaches the instant the link
         // drops — so pressing Disconnect on a Mac undid itself inside a second, every time.
         if (host != null && secondsFindable() == 0) {
+            // Wanting to advertise and being able to are different things: the intent has to be
+            // recorded even when this turn is declined, or resumeAdvertising will decide the pad
+            // never wanted to be on air and it goes silent for good once the machine lets go.
+            wantAdvertising = true
             Log.i(TAG, "a machine already has us; staying quiet")
             return true
         }
@@ -798,8 +802,15 @@ class BleSink(
         val EVERYTHING_CHANGED = byteArrayOf(0x01, 0x00, 0xFF.toByte(), 0xFF.toByte())
         val INDICATE_ON = byteArrayOf(0x02, 0x00)
         /** How long the pad stays off the air after a machine lets go of it. */
-        /** The machine chose to end it, rather than the link failing. */
-        const val REMOTE_HUNG_UP = 0x13
+        /**
+         * The machine chose to end it, rather than the link failing.
+         *
+         * Not the 0x13 the specification names for it: Android reports a clean teardown to a GATT
+         * server as plain success, and 0x13 never arrived. Measured on 2026-09-20 by pressing
+         * Disconnect on a Mac and reading the status — it was nought. A link that fails carries a
+         * real error instead, which is the distinction actually wanted here.
+         */
+        const val REMOTE_HUNG_UP = 0
         const val QUIET_AFTER_MS = 2500L
         const val BEAT_MS = 10L
         const val RETRIES = 8
