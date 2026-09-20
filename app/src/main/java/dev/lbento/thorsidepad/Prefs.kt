@@ -34,17 +34,19 @@ class Prefs(ctx: Context) {
     /**
      * Which radio carries presses to a machine, when the destination is one.
      *
-     * Classic is the default and stays that way: it is what Windows and Android expect, and it is
-     * what every host has already paired with. Low Energy exists because over Classic the vendor
-     * and product numbers a host reads belong to the handheld's Bluetooth chip and cannot be
-     * changed, while over Low Energy they are ours, which is what lets one mapping serve every
-     * handheld this runs on instead of one per radio.
+     * Low Energy is the only one offered now. Classic works and the code for it is kept, but it
+     * has nothing to offer that this does not: over Classic the vendor and product numbers a host
+     * reads belong to the handheld's Bluetooth chip and cannot be changed, and those numbers are
+     * the whole of how a host decides what a pad is. Over Low Energy they are ours, which is what
+     * makes one mapping serve every handheld this runs on rather than one per radio, and what got
+     * a native game to accept the pad at all.
      *
-     * A host that has paired one of them may refuse to see the other, so switching is a re-pair
-     * rather than a toggle, and only one is ever open at a time.
+     * Kept as a setting rather than deleted because one thing is genuinely untested: a Windows
+     * machine reached through CrossOver was working over Classic and has never been tried over
+     * Low Energy. If that turns out to need Classic, this is how it comes back.
      */
     var btTransport: String
-        get() = sp.getString("btTransport", TRANSPORT_CLASSIC) ?: TRANSPORT_CLASSIC
+        get() = sp.getString("btTransport", TRANSPORT_LE) ?: TRANSPORT_LE
         set(v) = sp.edit().putString("btTransport", v).apply()
 
     /** What a host is told the pad is, when it is carried over Low Energy. See BleSink.Identity. */

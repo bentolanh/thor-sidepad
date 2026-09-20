@@ -477,7 +477,9 @@ class OverlayService : Service() {
                         main.post { refreshLinkBadge() }
                         if (msg.isNotEmpty()) Log.i(TAG, "link: $msg")
                     }
-                    val bt = btSink ?: if (prefs.btTransport == Prefs.TRANSPORT_LE) {
+                    // Low Energy unless something has deliberately asked for Classic, which
+                    // nothing in the panel does any more.
+                    val bt = btSink ?: if (prefs.btTransport != Prefs.TRANSPORT_CLASSIC) {
                         // A Low Energy pad does not dial a host; it makes itself findable and the
                         // host comes to it. So there is no address to open with.
                         BleSink(this, bleIdentity(), note).also { s ->

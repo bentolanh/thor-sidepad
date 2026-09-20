@@ -845,6 +845,23 @@ the app.
   carries it in the second report, and the database expects it in the first. One bit is a cheap
   price for not having to guess which reader matters.
 
+  **Only Low Energy is offered now.** Decided 2026-09-20, once the Low Energy path had carried a
+  native game, two emulators and Steam without a configuration file between them. Classic works
+  and its code is kept, but it has nothing to offer that the other does not: over Classic the
+  vendor and product numbers a host reads belong to the handheld's Bluetooth chip and cannot be
+  changed, and those numbers are the whole of how a host decides what a pad is. Over Low Energy
+  they are the pad's own, which is what makes one mapping serve every handheld this runs on
+  instead of one per radio.
+
+  So the panel no longer asks which radio, only what the pad should call itself, and a destination
+  is a machine rather than a named one — over Low Energy there is nothing to pick, because the
+  computer comes to the pad and whichever one does is the answer.
+
+  One thing is genuinely untested and is why the setting was kept rather than deleted: a Windows
+  machine reached through CrossOver was working over Classic and has never been tried over Low
+  Energy. If it turns out to want Classic, `btTransport` is how it comes back, and nothing in
+  `BluetoothSink` has been removed.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and

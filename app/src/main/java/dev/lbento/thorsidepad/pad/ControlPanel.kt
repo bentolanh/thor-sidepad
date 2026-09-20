@@ -187,8 +187,7 @@ object ControlPanel {
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
                 choicesGroup.addView(pickerRow("Send to", whereTo) { page = Page.DESTINATION; render() })
                 choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-                val remoteAs = (if (state.transport == "le") "Low Energy" else "Classic") +
-                    (if (state.transport == "le" && state.identity == "XBOX") ", as an Xbox pad" else "")
+                val remoteAs = if (state.identity == "XBOX") "An Xbox-compatible pad" else "SidePad"
                 choicesGroup.addView(pickerRow("Appears as", if (state.remote) remoteAs else target) {
                     page = if (state.remote) Page.APPEARANCE else Page.CONTROLLER; render()
                 })
@@ -225,16 +224,10 @@ object ControlPanel {
                 // become findable is ours to worry about and nobody else's: an earlier version
                 // made the mode live on another page and told the user why Low Energy was
                 // different, which is a plumbing detail dressed up as a choice.
-                val le = state.transport == "le"
-                card.addView(label("Mode", 14f, grey))
-                card.addView(btn((if (!le) "\u25CF  " else "") + "Classic Bluetooth", le) { actions.setTransport("classic") })
-                card.addView(btn((if (le) "\u25CF  " else "") + "Bluetooth Low Energy", !le) { actions.setTransport("le") })
-                if (le) {
-                    card.addView(label("Appears as", 14f, grey).apply { setPadding(0, 16, 0, 4) })
-                    val xbox = state.identity == "XBOX"
-                    card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
-                    card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
-                }
+                card.addView(label("Appears as", 14f, grey))
+                val xbox = state.identity == "XBOX"
+                card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
+                card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
                 card.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
                     .apply { topMargin = 18; bottomMargin = 14 })
                 if (state.visibleFor > 0) {
@@ -257,20 +250,13 @@ object ControlPanel {
                     for (h in state.adoptable) card.addView(btn("Use ${h.label}") { actions.adoptMachine(h.address) })
                 }
                 card.addView(label(
-                    "Changing the mode or what it appears as makes this a different device to the " +
-                    "computer, so it has to be paired again \u2014 and if it will not connect, forget it " +
-                    "on the computer and on the Thor both, since clearing one side leaves keys behind.",
+                    "Changing what it appears as makes this a different device to the computer, so " +
+                    "it has to be paired again \u2014 and if it will not connect, forget it on the " +
+                    "computer and on the Thor both, since clearing one side leaves keys behind.",
                     12f, grey).apply { setPadding(0, 18, 0, 0) })
             } else if (page == Page.APPEARANCE) {
-                card.addView(label("Carried over", 14f, grey))
-                val le = state.transport == "le"
-                card.addView(btn((if (!le) "\u25CF  " else "") + "Classic Bluetooth", le) { actions.setTransport("classic") })
-                card.addView(btn((if (le) "\u25CF  " else "") + "Bluetooth Low Energy", !le) { actions.setTransport("le") })
-                card.addView(label(
-                    "Classic is what Windows and most machines expect. Low Energy lets the pad choose what it calls itself, which is what makes one setup work on every handheld \u2014 but a machine that has paired one of these has to be paired again to use the other.",
-                    12f, grey).apply { setPadding(0, 10, 0, 0) })
-                if (le) {
-                    card.addView(label("Known to the machine as", 14f, grey).apply { setPadding(0, 18, 0, 4) })
+                run {
+                    card.addView(label("Known to the machine as", 14f, grey))
                     val xbox = state.identity == "XBOX"
                     card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
                     card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
@@ -299,16 +285,15 @@ object ControlPanel {
                 // comes to the pad, and whoever bonds is the answer. Which is why this cannot live
                 // behind a chosen machine the way it first did — there is nothing to choose until
                 // after the pairing, and the pairing needs this set first.
-                val onLe = state.remote && state.transport == "le"
                 card.addView(label("Or wait to be found", 14f, grey).apply { setPadding(0, 22, 0, 4) })
-                card.addView(btn((if (onLe) "\u25CF  " else "") +
-                    "A machine, over Bluetooth Low Energy", !onLe) { actions.useLowEnergy() })
+                card.addView(btn((if (state.remote) "\u25CF  " else "") + "A machine", !state.remote) {
+                    actions.useLowEnergy()
+                })
                 card.addView(label(
-                    "No machine to pick here: the computer finds the pad and connects to it. This is " +
-                    "the one where the pad chooses what it calls itself, so a machine can know the " +
-                    "layout without being told.",
+                    "No machine to pick: the computer finds the pad and connects to it, and whichever " +
+                    "one does is the answer.",
                     12f, grey).apply { setPadding(0, 6, 0, 0) })
-                if (onLe) card.addView(btn("What the machine sees\u2026") { page = Page.APPEARANCE; render() })
+                if (state.remote) card.addView(btn("What the machine sees\u2026") { page = Page.APPEARANCE; render() })
             } else {
                 card.addView(label("Presses go to", 14f, grey))
                 for (t in state.targets) {
