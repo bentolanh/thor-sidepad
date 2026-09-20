@@ -347,6 +347,11 @@ class OverlayService : Service() {
                          catch (e: Exception) { Log.w(TAG, "probe failed", e) } }.start()
             }
             ACTION_GUIDE -> showGuide()
+            // Debug only; see BleSink.tryDirectedConnect.
+            ACTION_TRY_CONNECT -> (btSink as? BleSink)?.tryDirectedConnect(
+                intent.getStringExtra("address").orEmpty(),
+                intent.getStringExtra("auto") != "false")
+            ACTION_TRY_RESET -> (btSink as? BleSink)?.endExperiment()
             // START and anything unrecognised: come back as the pad was left. The watchdog uses
             // START, so a pad that was on screen when the app was taken is on screen again.
             else -> {
@@ -1225,6 +1230,8 @@ class OverlayService : Service() {
         const val ACTION_PANEL = "dev.lbento.thorsidepad.PANEL"
         const val ACTION_FOCUS_TOP = "dev.lbento.thorsidepad.FOCUS_TOP"
         const val ACTION_GUIDE = "dev.lbento.thorsidepad.GUIDE"
+        const val ACTION_TRY_CONNECT = "dev.lbento.thorsidepad.TRY_CONNECT"
+        const val ACTION_TRY_RESET = "dev.lbento.thorsidepad.TRY_RESET"
         const val ACTION_START = "dev.lbento.thorsidepad.START"
         /**
          * How often the service says it is still there, and how long silence is allowed. A beat is a
@@ -1242,8 +1249,10 @@ class OverlayService : Service() {
         @Volatile var running = false
         @Volatile var visible = false
 
-        fun send(ctx: Context, action: String) {
+        fun send(ctx: Context, action: String, address: String? = null, auto: String? = null) {
             val i = Intent(ctx, OverlayService::class.java).setAction(action)
+            if (address != null) i.putExtra("address", address)
+            if (auto != null) i.putExtra("auto", auto)
             try {
                 // Android only lets a background app start a foreground service in narrow cases,
                 // and a broadcast from Tasker is not one of them. Once the service is up, a plain

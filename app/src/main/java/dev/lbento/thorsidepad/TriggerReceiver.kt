@@ -18,6 +18,8 @@ import dev.lbento.thorsidepad.pad.OverlayService
 class TriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
-        if (action.startsWith("dev.lbento.thorsidepad.")) OverlayService.send(context, action)
+        if (action.startsWith("dev.lbento.thorsidepad."))
+            OverlayService.send(context, action, intent.getStringExtra("address"),
+                intent.getStringExtra("auto"))
     }
 }

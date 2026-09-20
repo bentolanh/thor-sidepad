@@ -118,6 +118,8 @@ class BleSink(
     private var changedChar: BluetoothGattCharacteristic? = null
     private var goodbye: java.util.concurrent.CountDownLatch? = null
     private var sleeper: ScheduledFuture<*>? = null
+    /** Set only by the directed-connection experiment; keeps the pad off the air while it runs. */
+    @Volatile private var experimenting = false
 
     // ---- opening and closing -------------------------------------------------------------------
 
@@ -440,6 +442,42 @@ class BleSink(
         }, SLEEP_AFTER_MS, TimeUnit.MILLISECONDS)
     }
 
+    /**
+     * Asks the stack for one specific machine, with nothing on the air for anyone else to find.
+     *
+     * The question this answers: can a peripheral choose which of several paired machines gets it?
+     * Advertising cannot — every bonded machine resolves the same identity and the quickest one
+     * wins. BluetoothGattServer.connect names a peer instead, but it is overwhelmingly used from
+     * the central side and vendor stacks differ on whether a peripheral may use it at all.
+     *
+     * Not wired to anything a user can press. Driven over adb while the answer is unknown.
+     */
+    fun tryDirectedConnect(address: String, auto: Boolean = true) {
+        val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return
+        val target = try { adapter.getRemoteDevice(address) } catch (e: Exception) {
+            Log.w(TAG, "no such machine: $address", e); return
+        }
+        experimenting = true
+        sleeper?.cancel(false)
+        host?.let { d ->
+            Log.i(TAG, "experiment: letting go of ${d.address}")
+            try { server?.cancelConnection(d) } catch (_: Exception) {}
+        }
+        stopAdvertising()
+        Log.i(TAG, "experiment: off the air, asking the stack for $address")
+        try {
+            val ok = server?.connect(target, auto)
+            Log.i(TAG, "experiment: connect($address, auto=$auto) returned $ok; waiting to see who arrives")
+        } catch (e: Exception) { Log.w(TAG, "experiment: connect refused", e) }
+    }
+
+    /** Ends the experiment and puts the pad back on the air. */
+    fun endExperiment() {
+        experimenting = false
+        Log.i(TAG, "experiment: over, calling out again")
+        reconnect()
+    }
+
     /** Back on air after sleeping, because somebody reached for the pad again. */
     fun wake() {
         if (host != null) return
@@ -447,6 +485,7 @@ class BleSink(
     }
 
     private fun resumeAdvertising() {
+        if (experimenting) { Log.i(TAG, "staying off the air: a directed connection is being tried"); return }
         if (!wantAdvertising || advertiser != null || host != null) return
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return
         startAdvertising(adapter)
