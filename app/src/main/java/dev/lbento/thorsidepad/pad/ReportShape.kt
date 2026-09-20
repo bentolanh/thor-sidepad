@@ -115,7 +115,6 @@ class StandardShape : ReportShape {
  */
 class XboxShape : ReportShape {
     private val report = ByteArray(15)
-    private val system = ByteArray(1)
     private var hatX = 0
     private var hatY = 0
 
@@ -131,15 +130,13 @@ class XboxShape : ReportShape {
         // The button in the middle travels in its own report, the way it does on the hardware
         // this imitates: an Xbox pad's guide is a system-menu bit under report two, not one of
         // the buttons in the pad's own report.
-        // The middle button goes in both places, because its two readers disagree about where it
-        // lives. The hardware this imitates carries it as a system-menu bit in a second report,
-        // and a host reading that hardware's shape looks there. But the mapping SDL already holds
-        // for these very numbers says `guide:b10`, so anything leaning on that looks in the pad's
-        // own report instead. Sending it twice costs one bit and satisfies both; the alternative
-        // is picking one and being wrong for half the things that matter.
-        if (code == dev.lbento.thorsidepad.inject.Btn.MODE) {
-            synchronized(report) { system[0] = if (down) 0x01 else 0x00 }
-        }
+        // The middle button lives at bit ten and nowhere else. It was briefly also sent as a
+        // system-menu bit in a second report, the way the hardware this imitates carries it, as
+        // insurance against the two readers disagreeing. The insurance cost more than the risk:
+        // System Control is a second top-level usage, and a host answers that by publishing a
+        // second, inert copy of the whole pad beside the real one. Two pads from one radio is what
+        // wedges a Mac's controller daemon. The mapping already held for these numbers says
+        // `guide:b10`, so bit ten is where it goes.
         val bit = BUTTONS[code] ?: return
         val i = 13 + bit / 8
         val mask = 1 shl (bit % 8)
@@ -195,8 +192,6 @@ class XboxShape : ReportShape {
     }
 
     override fun snapshot(): ByteArray = synchronized(report) { report.copyOf() }
-
-    override fun systemSnapshot(): ByteArray = synchronized(report) { system.copyOf() }
 
     /**
      * Reads a rumble instruction the way the pad this imitates describes one.
@@ -285,14 +280,6 @@ class XboxShape : ReportShape {
             0x05, 0x09, 0x19, 0x01, 0x29, 0x0D, 0x15, 0x00, 0x25, 0x01,
             0x75, 0x01, 0x95.toByte(), 0x0D, 0x81.toByte(), 0x02,
             0x15, 0x00, 0x25, 0x00, 0x75, 0x03, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
-            0xC0.toByte(),
-            // Report two: the button in the middle, as a system main menu bit. Copied in shape
-            // from the pad this was read off, which carries it exactly here and not among the
-            // buttons — a host that knows the name looks for it in this report.
-            0x05, 0x01, 0x09, 0x80.toByte(), 0x85.toByte(), 0x02, 0xA1.toByte(), 0x00,
-            0x09, 0x85.toByte(), 0x15, 0x00, 0x25, 0x01,
-            0x95.toByte(), 0x01, 0x75, 0x01, 0x81.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x07, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
             0xC0.toByte(),
             // Report three, the one the host writes to us: which motors, how hard, for how long.
             // Copied in shape from the pad this was read off. Four magnitudes because that pad has
