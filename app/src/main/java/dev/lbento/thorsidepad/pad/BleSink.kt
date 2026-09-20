@@ -471,6 +471,43 @@ class BleSink(
         } catch (e: Exception) { Log.w(TAG, "experiment: connect refused", e) }
     }
 
+    /**
+     * Drops a machine's keys, so the pad stops belonging to it.
+     *
+     * The point of being able to do this from here rather than from Android's settings: a pad
+     * bonded to one machine only cannot be taken by another, which is the one reliable way to
+     * decide where it goes. Choosing between several bonded machines is not possible — they all
+     * resolve the same identity and the quickest awake one wins.
+     *
+     * Only this side forgets. Whether the machine notices and offers to pair again, or sits there
+     * failing with keys that no longer match, is the machine's business and differs between them.
+     */
+    fun forgetMachine(address: String): Boolean {
+        val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return false
+        val device = try { adapter.getRemoteDevice(address) } catch (e: Exception) {
+            Log.w(TAG, "no such machine: $address", e); return false
+        }
+        if (host?.address == address) {
+            Log.i(TAG, "letting go of $address before forgetting it")
+            try { server?.cancelConnection(device) } catch (_: Exception) {}
+            host = null; connected = false; subscribed = false
+            stopHeartbeat()
+        }
+        subscriptions.edit().remove(address).remove("sc:$address").remove("fp:$address").apply()
+        // removeBond is not in the public API, so it is asked for by name.
+        return try {
+            val m = BluetoothDevice::class.java.getMethod("removeBond")
+            val ok = m.invoke(device) as? Boolean ?: false
+            Log.i(TAG, "forgetting $address: $ok")
+            onState("Not connected")
+            // Clearing host above means the disconnection callback skips its own block, and the
+            // line that puts the advertisement back up lives there — so it has to happen here or
+            // the pad goes silent the moment it is unpaired, with no way back but a hide and show.
+            ticker.schedule({ resumeAdvertising() }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
+            ok
+        } catch (e: Exception) { Log.w(TAG, "could not forget $address", e); false }
+    }
+
     /** Ends the experiment and puts the pad back on the air. */
     fun endExperiment() {
         experimenting = false

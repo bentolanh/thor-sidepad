@@ -87,6 +87,7 @@
                 <action android:name="dev.lbento.thorsidepad.GUIDE" />
                 <action android:name="dev.lbento.thorsidepad.TRY_CONNECT" />
                 <action android:name="dev.lbento.thorsidepad.TRY_RESET" />
+                <action android:name="dev.lbento.thorsidepad.FORGET" />
             </intent-filter>
         </receiver>
 
