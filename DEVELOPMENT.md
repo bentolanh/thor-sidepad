@@ -824,6 +824,27 @@ the app.
   discoverable, and the Low Energy path had nothing to wait for and so never started it. Same
   tick, now started by both.
 
+  **Claiming an Elite for the sake of the extra pair is not worth it.** Looked at on 2026-09-20,
+  because an Elite Series 2 carries four paddles and this handheld has two buttons a standard pad
+  has no name for. Its Bluetooth identity is `045E:0B05`, and the mapping SDL already holds for it
+  reads `back:b31 … guide:b53 … leftshoulder:b6 … lefttrigger:a6`. Buttons thirty-one and
+  fifty-three: a far larger and quite different report from the one copied here, and there is no
+  Elite on the bench to read it off, which is the only method that has worked. And the entry maps
+  no paddles at all, so the identity would not even deliver the thing it was wanted for.
+
+  **Where the middle button and the extra pair actually go.** The identity this pad now claims is
+  in that database by name: `030000005e040000e002000003090000` is an Xbox One Controller, mapped
+  through button ten with `guide:b10`. Which settles two things. The middle button belongs at ten,
+  and an earlier attempt that put the extra pair there would have made M1 fire as the guide. And
+  the pair goes after it, at eleven and twelve, outside what the built-in mapping covers — visible
+  to anything reading raw buttons, a layout editor or an emulator's binding screen, and invisible
+  to anything leaning on that mapping. That is the honest ceiling without inventing hardware.
+
+  The middle button is sent twice, in the pad's own report at bit ten and as a system-menu bit in
+  a second report. Its two readers disagree about where it lives: the hardware this imitates
+  carries it in the second report, and the database expects it in the first. One bit is a cheap
+  price for not having to guess which reader matters.
+
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is
   therefore roughly 0. This is normal for a controller the host does not recognise by name and

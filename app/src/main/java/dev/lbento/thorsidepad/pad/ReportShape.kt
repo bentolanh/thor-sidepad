@@ -124,9 +124,14 @@ class XboxShape : ReportShape {
         // The button in the middle travels in its own report, the way it does on the hardware
         // this imitates: an Xbox pad's guide is a system-menu bit under report two, not one of
         // the buttons in the pad's own report.
+        // The middle button goes in both places, because its two readers disagree about where it
+        // lives. The hardware this imitates carries it as a system-menu bit in a second report,
+        // and a host reading that hardware's shape looks there. But the mapping SDL already holds
+        // for these very numbers says `guide:b10`, so anything leaning on that looks in the pad's
+        // own report instead. Sending it twice costs one bit and satisfies both; the alternative
+        // is picking one and being wrong for half the things that matter.
         if (code == dev.lbento.thorsidepad.inject.Btn.MODE) {
             synchronized(report) { system[0] = if (down) 0x01 else 0x00 }
-            return
         }
         val bit = BUTTONS[code] ?: return
         val i = 13 + bit / 8
@@ -205,13 +210,17 @@ class XboxShape : ReportShape {
             dev.lbento.thorsidepad.inject.Btn.START to 7,
             dev.lbento.thorsidepad.inject.Btn.THUMBL to 8,
             dev.lbento.thorsidepad.inject.Btn.THUMBR to 9,
-            // The Thor's own extra pair. A standard Xbox pad declares ten buttons and has nowhere
-            // for these; an Elite carries four paddles and does. Declaring twelve is the cheap
-            // half of that question — whether a host that knows the name tolerates two more than
-            // the name implies, or quietly ignores them. Costs a re-pair to find out, and the
-            // report is the same fifteen bytes either way since the padding absorbs it.
-            dev.lbento.thorsidepad.inject.Btn.C to 10,
-            dev.lbento.thorsidepad.inject.Btn.Z to 11,
+            // Ten is where the mapping SDL holds for these numbers expects the middle button, so
+            // that is where it goes and the extra pair starts after it.
+            dev.lbento.thorsidepad.inject.Btn.MODE to 10,
+            // The Thor's own pair, which a standard pad has no name for. They are sent all the
+            // same: anything reading raw buttons — a layout editor, an emulator's binding screen —
+            // can see and bind them, even though the built-in mapping stops at ten and will not.
+            // The alternative was claiming an Elite, which carries paddles legitimately; its own
+            // entry in that database maps none of them and its report runs to button fifty-three,
+            // so it would be a great deal of guessing for something that may not even work.
+            dev.lbento.thorsidepad.inject.Btn.C to 11,
+            dev.lbento.thorsidepad.inject.Btn.Z to 12,
         )
 
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */
@@ -244,10 +253,10 @@ class XboxShape : ReportShape {
             0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x42,
             0x75, 0x04, 0x95.toByte(), 0x01, 0x15, 0x00, 0x25, 0x00,
             0x35, 0x00, 0x45, 0x00, 0x65, 0x00, 0x81.toByte(), 0x03,
-            // twelve buttons, then four bits of nothing
-            0x05, 0x09, 0x19, 0x01, 0x29, 0x0C, 0x15, 0x00, 0x25, 0x01,
-            0x75, 0x01, 0x95.toByte(), 0x0C, 0x81.toByte(), 0x02,
-            0x15, 0x00, 0x25, 0x00, 0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
+            // thirteen buttons, then three bits of nothing
+            0x05, 0x09, 0x19, 0x01, 0x29, 0x0D, 0x15, 0x00, 0x25, 0x01,
+            0x75, 0x01, 0x95.toByte(), 0x0D, 0x81.toByte(), 0x02,
+            0x15, 0x00, 0x25, 0x00, 0x75, 0x03, 0x95.toByte(), 0x01, 0x81.toByte(), 0x03,
             0xC0.toByte(),
             // Report two: the button in the middle, as a system main menu bit. Copied in shape
             // from the pad this was read off, which carries it exactly here and not among the
