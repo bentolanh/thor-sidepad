@@ -808,116 +808,21 @@ the app.
   still churns, then toggle the Mac's Bluetooth and look once more. That separates something
   living in the Mac's state from something this pad is still doing.
 
-  ### Four rough edges, found 2026-09-19, not yet fixed
+  ### Rough edges, found 2026-09-19
 
-  A button the current shape has no room for is swallowed rather than left alone. The controller
-  is taken exclusively with `EVIOCGRAB`, so every press belongs to this app whether or not it has
-  anywhere to send it — and in Xbox mode, which carries ten buttons, that leaves Home, Back, M1
-  and M2 doing nothing at all: not reaching the machine, and no longer working on the handheld
-  either. Dead for no reason a user could guess at.
+  **Fixed 2026-09-20.** Three of these were one fault: the panel is drawn when the app changes
+  something and never when the world changes underneath it. So a machine unpaired in Android's own
+  settings went on being offered as a destination, a machine that had just paired did not appear
+  until the destination was switched away and back, and a countdown put on screen once showed the
+  number it had at that moment and then sat there.
 
-  Not grabbing is not the answer, since then every mapped press fires twice. The shape knows which
-  codes it has no slot for, so those can be put back where they came from: injected into the
-  handheld through the virtual device the injector already has. The pad keeps what it uses and
-  hands back what it does not.
-
-  A device unpaired from Android's own settings still shows as paired in the panel. Nothing tells
-  the app the bond has gone, so the list it keeps goes stale. It wants a `BOND_STATE_CHANGED`
-  receiver that drops the address from `pairedHostList`, the way pairing adds it.
-
-  A machine that has just paired does not appear in the panel until the destination is switched
-  away to this device and back. The pairing finishes on the Bluetooth side and nothing asks the
-  panel to look again, so it goes on showing the list it drew before. All three of these are the
-  same fault wearing different hats: the panel is redrawn when something in the app changes it,
-  and never when the Bluetooth stack changes something underneath it. One `BOND_STATE_CHANGED`
-  receiver that refreshes the panel would cover the stale list, the missing new machine, and half
-  of the countdown.
-
-  The countdown on the pairing page sticks at 119 seconds. The panel is only asked to redraw twice
-  after the button is pressed, so it shows a number from a second ago and then never again; the
-  Classic path had the same shape but its dialog redrew for other reasons. It wants a repeating
-  tick while that page is open, stopping when the count reaches zero.
-
-  **Advertising while already connected put the pad in a machine's list twice, and that wedged
-  the machine.** Found 2026-09-19. The findability timer fires a second or two after a host
-  connects, and it restarted the advertisement without checking whether anyone was on the other
-  end; the same Mac connected again and there were two of this pad from then on. The log reads
-  `connected` and then `quietly reachable` one hundred and seventy milliseconds later, which is
-  the whole of it.
-
-  What that costs is out of all proportion to the mistake. Two pads from one radio is enough to
-  wedge `gamecontrollerd`, and once that daemon is stuck every application that enumerates game
-  controllers hangs at launch and cannot be killed — a game, a cloud client, a mouse driver, all
-  parked in uninterruptible wait. Stopping the pad removed both entries at once, which is how it
-  was pinned on us. Worse still, the documented cure for a wedged daemon is `sudo killall
-  gamecontrollerd`, and that makes the daemon tell every client to drop its controllers, which
-  `loginwindow` handles by failing an assertion and aborting — so the fix logs the user out. One
-  missing check produced a chain ending in somebody's session being thrown away.
-
-  So: never advertise while a host is attached, and turn away a second machine rather than serving
-  it alongside the first. A pad is a thing one person holds.
-
-  **Apple's framework cannot tell this pad from a real one, and a native game still ignores it.**
-  Compared side by side on 2026-09-19 with an 8BitDo that works in the same game: controller class,
-  product category, player index, profile class, element count, current-controller flag, battery
-  and haptics are identical on both, down to `GCXboxGamepad` and thirty-four elements. Input
-  arrives correctly too — A reads as `A Button`, the left stick as −1.00. So every theory of the
-  form "a game filters on something and we fail it" is dead; there is nothing visible to fail.
-
-  Removing the `Usage(Pointer)` wrapper did what it was meant to — one device in the list instead
-  of two, usage pairs down to a lone gamepad — and changed nothing about the game, so the shadow
-  was innocent. RPCS3 and RetroArch continue to take the pad with no configuration.
-
-  **And a native game does take it: Cuphead plays with no Steam Input at all.** Which settles the
-  headline question — claiming the Xbox identity and sending an Xbox-shaped report does buy native
-  game support on macOS, the thing the whole exercise was for. Eastward is an outlier rather than
-  the rule, and one game refusing a pad that another accepts is a much smaller problem than a pad
-  no game accepts.
-
-  It also weakens the theory below. The only structural difference left is that this descriptor is
-  a subset: the pad it was copied from declares four reports — the gamepad, a system-control bit,
-  a rumble **output** report, and battery — where this declares the gamepad alone. A game reaching
-  for rumble and finding nothing to write to could give up, and Unity's input layer does reach for
-  it. But Cuphead manages without them, so their absence is not a general blocker; at most it is
-  something Eastward in particular wants. Worth adding for completeness either way, and worth
-  retrying Eastward afterwards, but it is no longer the explanation of anything.
-
-  **Why one native game refused the pad: two bytes of version.** Eastward keeps its own log at
-  `~/Library/Application Support/Pixpil/Eastward/steam_*/game.log`, and it says so outright:
-
-```
-joystick added   <MOAIJoystickInstanceSDL>
-no joystick mapping found:  030000005e040000e002000000010000  Xbox One S Controller
-joystick added   <MOAIJoystickInstanceSDL>
-joystick mapped  Xbox Wireless Controller
-```
-
-  The game runs on MOAI with SDL and its `JoystickManagerSDL.lua` holds a mapping table of its
-  own, keyed by the whole SDL identifier. Two pads were present; one was in the table and one was
-  not. Decoding the one that was not:
-
-| | |
-| --- | --- |
-| `0300` | bus |
-| `0000` | name hash, zeroed |
-| `5e04 0000` | vendor 045e |
-| `e002 0000` | product 02e0 |
-| `0001` | **version 0x0100 — ours, hardcoded in the PnP ID** |
-
-  Every pad here that a host accepts as Xbox-compatible reports firmware version 9.0.3, which is
-  `0x0903`, so its identifier ends `…e002000003090000` and the game's table has it. Ours ends
-  `…e002000000010000` and it does not. Vendor and product were never the whole of the identity;
-  the version is part of it, and a table keyed by the lot will miss by two bytes as readily as by
-  twenty.
-
-  This also explains the shape of the evidence. Emulators take the pad because SDL's own database
-  and their config files match on vendor and product. Steam takes it because Steam Input hands the
-  game a controller of its own. Cuphead takes it because it reads Apple's framework, which matches
-  on vendor and product too. Only a program carrying its own list keyed by the full identifier
-  notices, and Eastward is one.
-
-  The fix is one line — report `0x0903` as the product version in `BleSink.pnpId()` — and it
-  changes the identity, so every host that has paired will need pairing again. Not done yet.
+  The bond watch used to exist only during a pairing window and only noticed bonding, never
+  unbonding. It now runs for the life of the service and handles both, with the window kept for
+  the judgement it was really making — a bond formed while the user is pairing from this app is
+  one they meant to add, and the handheld's own list is mostly headphones. The countdown had a
+  tick already; the Classic path started it, having polled the adapter until the device went
+  discoverable, and the Low Energy path had nothing to wait for and so never started it. Same
+  tick, now started by both.
 
   **A trigger rests at −1, not 0.** The Gamepad API stretches every axis across −1 to +1, so an
   untouched trigger reads as the far negative end and a fully pulled one as +1. Half travel is

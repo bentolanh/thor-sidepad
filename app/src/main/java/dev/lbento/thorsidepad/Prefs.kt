@@ -25,6 +25,12 @@ class Prefs(ctx: Context) {
         if (all.add(address)) pairedHostList = all.joinToString(",")
     }
 
+    /** A machine unpaired anywhere is no longer somewhere to send presses, wherever that happened. */
+    fun forgetPairedHost(address: String) {
+        val all = pairedHostList.split(',').filter { it.isNotBlank() }.toMutableSet()
+        if (all.remove(address)) pairedHostList = all.joinToString(",")
+    }
+
     /**
      * Which radio carries presses to a machine, when the destination is one.
      *

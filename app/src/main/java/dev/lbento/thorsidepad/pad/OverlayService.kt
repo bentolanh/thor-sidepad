@@ -241,17 +241,47 @@ class OverlayService : Service() {
      */
     private var bondWatch: android.content.BroadcastReceiver? = null
 
+    /**
+     * Opens a window during which a machine that pairs is taken to be one the user meant to add.
+     *
+     * Only bonds formed here are offered as destinations, because the handheld's pairing list is
+     * mostly headphones and other controllers and none of those are somewhere to send presses.
+     * The window is what makes that judgement, not the listening — the listening never stops now,
+     * so that a bond disappearing is noticed whenever it happens.
+     */
     private fun watchForNewPairing(secs: Int) {
+        adoptUntil = SystemClock.elapsedRealtime() + secs * 1000L + 5_000
+    }
+
+    /**
+     * Keeps the panel honest about what is paired.
+     *
+     * The panel is drawn when the app changes something, and pairing is not something the app
+     * changes — it happens in Android's settings or in a dialog, underneath. So a machine unpaired
+     * elsewhere went on being offered as a destination, and one just paired did not appear until
+     * the destination was switched away and back. Both were the panel showing a list nobody had
+     * told it to look at again.
+     */
+    private fun watchBonds() {
         if (bondWatch != null) return
         val r = object : android.content.BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
                 if (i?.action != android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED) return
-                if (i.getIntExtra(android.bluetooth.BluetoothDevice.EXTRA_BOND_STATE, -1)
-                    != android.bluetooth.BluetoothDevice.BOND_BONDED) return
                 val d = i.getParcelableExtra<android.bluetooth.BluetoothDevice>(
                     android.bluetooth.BluetoothDevice.EXTRA_DEVICE) ?: return
-                prefs.rememberPairedHost(d.address)
-                Log.i(TAG, "paired from SidePad: ${d.address}")
+                when (i.getIntExtra(android.bluetooth.BluetoothDevice.EXTRA_BOND_STATE, -1)) {
+                    android.bluetooth.BluetoothDevice.BOND_BONDED -> {
+                        if (SystemClock.elapsedRealtime() < adoptUntil) {
+                            prefs.rememberPairedHost(d.address)
+                            Log.i(TAG, "paired from SidePad: ${d.address}")
+                        }
+                    }
+                    android.bluetooth.BluetoothDevice.BOND_NONE -> {
+                        prefs.forgetPairedHost(d.address)
+                        Log.i(TAG, "no longer paired: ${d.address}")
+                    }
+                    else -> return
+                }
                 overlay?.let { ov -> main.post { ov.updatePanel(panelState(ov)) } }
             }
         }
@@ -259,9 +289,10 @@ class OverlayService : Service() {
             registerReceiver(r, android.content.IntentFilter(
                 android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED))
             bondWatch = r
-            main.postDelayed({ stopWatchingForPairing() }, secs * 1000L + 5_000)
         } catch (e: Exception) { Log.w(TAG, "bond watch", e) }
     }
+
+    @Volatile private var adoptUntil = 0L
 
     private fun stopWatchingForPairing() {
         bondWatch?.let { try { unregisterReceiver(it) } catch (_: Exception) {} }
@@ -312,6 +343,7 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
+        watchBonds()
         prefs.guideSnapshot?.let { snap ->
             // A guide was interrupted (service killed, reboot): undo its temporary look now. The
             // guide turns the shield on for its own sake, so that goes back with the rest.
@@ -928,6 +960,7 @@ class OverlayService : Service() {
 
     /** Called whenever the panel goes away, so a guide waiting on it can continue. */
     private fun panelClosed() {
+        main.removeCallbacks(visibleTick)
         if (guideStep == 2) main.postDelayed({ if (guideStep == 2) showGuideStep(2) }, 1000)
     }
 
@@ -1021,11 +1054,12 @@ class OverlayService : Service() {
                 // device discoverable, with its consent dialog. Low Energy has nothing to ask:
                 // the pad simply starts saying its name for a while and then stops.
                 val ble = btSink as? BleSink
-                if (ble != null) {
-                    ble.makeFindable(120)
-                    ov.updatePanel(panelState(ov))
-                    main.postDelayed({ ov.updatePanel(panelState(ov)) }, 1000)
-                } else makeThorVisible(ov)
+                // The countdown is only honest if something redraws it. The Classic path got that
+                // for free — it polls the adapter until it sees the device go discoverable, and
+                // starts the tick when it does. Low Energy has nothing to wait for, so it was
+                // never started, and the number sat at 119 for two minutes.
+                if (ble != null) ble.makeFindable(120) else makeThorVisible(ov)
+                main.removeCallbacks(visibleTick); main.post(visibleTick)
             }
 
             override fun adoptMachine(address: String) {
