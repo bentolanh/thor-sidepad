@@ -641,6 +641,16 @@ class OverlayService : Service() {
      */
     @Volatile private var passThrough: Set<Int> = emptySet()
 
+    /** Just for the log, so it says Home rather than 102. */
+    private fun name(code: Int) = when (code) {
+        Key.HOME -> "Home"
+        Key.BACK -> "Back"
+        114 -> "Volume down"
+        115 -> "Volume up"
+        580 -> "Recents"
+        else -> "code $code"
+    }
+
     private fun openPassThrough(svc: IInjector, bt: PadTransport, caps: String) {
         try {
             val declared = JSONObject(caps).optJSONArray("keys") ?: return
@@ -649,13 +659,12 @@ class OverlayService : Service() {
                 val code = declared.getInt(i)
                 if (bt.handles(code)) continue
                 if (code in 0x130..0x13F || code in 0x220..0x223) continue
-                // Home is left out on purpose. Handed back it arrives from this device rather than
-                // from the controller, so Android treats it as a plain home key and opens the home
-                // app — stepping over Mjolnir, which is what handles that button on the Thor and
-                // cannot see it while the controller is held. Nothing we can do from here behaves
-                // the way the button does when SidePad is not running, so it does nothing at all
-                // rather than something wrong.
-                if (code == Key.HOME) continue
+                // Home goes back too. It cannot behave exactly as it does when SidePad is not
+                // running — handed back it arrives from this device rather than from the
+                // controller, so whatever the Thor's own button handler keys off is not
+                // reproduced and Android simply does the ordinary thing with a home key. Plain
+                // Home is still worth more than a button that does nothing at all, which is what
+                // leaving it out gave.
                 spare.add(code)
             }
             passThrough = spare.toSet()
@@ -663,7 +672,7 @@ class OverlayService : Service() {
             val err = svc.openVirtual("SidePad keys", spare.toIntArray(),
                 IntArray(0), IntArray(0), IntArray(0))
             if (err.isNotEmpty()) { Log.w(TAG, "pass-through device: $err"); return }
-            Log.i(TAG, "handing ${spare.size} unmapped buttons back to Android")
+            Log.i(TAG, "handing these back to Android: " + spare.joinToString { name(it) })
         } catch (e: Exception) { Log.w(TAG, "pass-through device", e) }
     }
 
