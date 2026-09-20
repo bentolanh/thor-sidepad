@@ -255,6 +255,23 @@ class BleSink(
     // ---- the services --------------------------------------------------------------------------
 
     private fun addServices(srv: BluetoothGattServer) {
+        // Generic Access, carrying the one number that says "gamepad".
+        //
+        // macOS decides which Bluetooth HID devices deserve fast connection parameters by reading
+        // the GAP appearance: its own log shows isLowLatencyBLEHID checking appearanceValue, and
+        // an 8BitDo answering 0x03C4 gets a fifteen-millisecond interval where we answer 0x0 and
+        // do not. That is the stick delay.
+        //
+        // This service belongs to the Bluetooth stack rather than to an app, and Android offers
+        // no way to set the appearance it publishes. Adding our own may well be refused — the
+        // callback says so when a service is rejected — but the cost of asking is one log line
+        // and the prize is the difference between a pad that lags and one that does not.
+        val gap = BluetoothGattService(uuid(GENERIC_ACCESS), BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        gap.addCharacteristic(BluetoothGattCharacteristic(uuid(APPEARANCE),
+            BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ))
+        srv.addService(gap)
+        awaitService()
+
         // How a peripheral tells a host that already knows it to look again.
         //
         // A bonded host does not re-read the attribute table on every connection; it keeps the
@@ -677,6 +694,7 @@ class BleSink(
                 uuid(REPORT) -> if (ch === systemChar) (shape.systemSnapshot() ?: ByteArray(1))
                                 else shape.snapshot()
                 uuid(PROTOCOL_MODE) -> byteArrayOf(REPORT_PROTOCOL)
+                uuid(APPEARANCE) -> GAMEPAD_APPEARANCE
                 uuid(BATTERY_LEVEL) -> byteArrayOf(100)
                 else -> ByteArray(0)
             }
@@ -956,6 +974,10 @@ class BleSink(
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
+        const val GENERIC_ACCESS = "1800"
+        const val APPEARANCE = "2a01"
+        /** Gamepad, as the assigned-numbers list has it. */
+        val GAMEPAD_APPEARANCE = byteArrayOf(0xC4.toByte(), 0x03)
         const val GATT_SERVICE = "1801"
         const val SERVICE_CHANGED = "2a05"
         const val DEVICE_INFO = "180a"
