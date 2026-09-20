@@ -393,11 +393,18 @@ class BleSink(
             .setConnectable(true)
             .setTimeout(0)
             .build()
-        // Named while findable, anonymous otherwise. The name and the gamepad service are what
-        // put an entry in a stranger's list; a host that already knows us finds us by address.
+        // Named while findable, nameless otherwise — but always carrying the gamepad service.
+        //
+        // The service uuid used to come off with the name, on the reasoning that a machine which
+        // already knows us finds us by address. It does not. macOS reconnects by scanning for
+        // 0x1812 and nothing else: measured on 2026-09-20, it matched this pad ninety-six times
+        // and every one of them fell inside a findable window. For the nineteen quiet minutes
+        // between, it scanned every twenty seconds and never saw a gamepad at all — so pressing
+        // Connect fell through to the only transport still answering, Classic, which files the
+        // handheld as a phone and hands back no controller.
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(open)
-            .also { if (open) it.addServiceUuid(ParcelUuid(uuid(HID_SERVICE))) }
+            .addServiceUuid(ParcelUuid(uuid(HID_SERVICE)))
             .build()
         val cb = object : AdvertiseCallback() {
             override fun onStartSuccess(s: AdvertiseSettings?) {
@@ -979,8 +986,18 @@ class BleSink(
         const val SLEEP_AFTER_MS = 10 * 60 * 1000L
         /** Longest we wait for the radio to report a frame gone before giving up on it. */
         const val SEND_WAIT_MS = 60L
-        /** Repeats after a change: enough to survive a lost packet, few enough to fall silent. */
-        const val REPEATS = 3
+        /**
+         * How many times to repeat a report after something changes.
+         *
+         * Nought means once and no more, which is what a real controller does. Held there
+         * deliberately: the repeats were added alongside a retry to cure presses going missing,
+         * the symptom went away, and nobody ever learned which of the two did it or why the
+         * presses were lost at all. With the radio now paced properly and the drops counted,
+         * this is the way to find out — if presses start going missing again, the repeats were
+         * carrying real weight and the reason is worth finding; if they do not, this was
+         * covering for an overrun we were causing ourselves.
+         */
+        const val REPEATS = 0
         const val BEAT_MS = 10L
         const val RETRIES = 8
 
