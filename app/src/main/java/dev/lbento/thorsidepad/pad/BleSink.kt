@@ -117,6 +117,7 @@ class BleSink(
     private var heartbeat: ScheduledFuture<*>? = null
     private var changedChar: BluetoothGattCharacteristic? = null
     private var goodbye: java.util.concurrent.CountDownLatch? = null
+    private var sleeper: ScheduledFuture<*>? = null
 
     // ---- opening and closing -------------------------------------------------------------------
 
@@ -374,15 +375,23 @@ class BleSink(
             Log.i(TAG, "a machine already has us; staying quiet")
             return true
         }
+        val open = secondsFindable() > 0
+        // Loud only while somebody is looking. Low latency at full power is a packet every
+        // hundred milliseconds, and the pad used to do that around the clock — airtime taken from
+        // the Wi-Fi and every other Bluetooth device in the room, and the handheld's battery with
+        // it. A machine that already knows us finds us perfectly well at the quiet setting.
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+            .setAdvertiseMode(
+                if (open) AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY
+                else AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
+            .setTxPowerLevel(
+                if (open) AdvertiseSettings.ADVERTISE_TX_POWER_HIGH
+                else AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
             .setConnectable(true)
             .setTimeout(0)
             .build()
-        // Loud while findable, anonymous otherwise. The name and the gamepad service are what put
-        // an entry in a stranger's list; a host that already knows us finds us by address.
-        val open = secondsFindable() > 0
+        // Named while findable, anonymous otherwise. The name and the gamepad service are what
+        // put an entry in a stranger's list; a host that already knows us finds us by address.
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(open)
             .also { if (open) it.addServiceUuid(ParcelUuid(uuid(HID_SERVICE))) }
@@ -397,6 +406,7 @@ class BleSink(
         advertiser = cb
         wantAdvertising = true
         le.startAdvertising(settings, data, cb)
+        armSleep()
         return true
     }
 
@@ -408,6 +418,32 @@ class BleSink(
             Log.i(TAG, "stopped calling out")
         } catch (e: Exception) { Log.w(TAG, "stopAdvertising", e) }
         advertiser = null
+    }
+
+    /**
+     * Stops calling out after a long enough spell with nobody listening.
+     *
+     * A controller left on a shelf goes to sleep; this one used to advertise until its battery
+     * gave out. Sleeping is also what finally makes a machine's Disconnect mean something — a Mac
+     * reattaches to any bonded pad it sees advertising, so while the pad never stops, the request
+     * is undone within seconds. Trying instead to guess from the disconnection status which
+     * departures were deliberate does not work, and left the pad unreachable.
+     */
+    private fun armSleep() {
+        sleeper?.cancel(false)
+        sleeper = ticker.schedule({
+            if (host == null && advertiser != null) {
+                Log.i(TAG, "nobody has picked the pad up; going quiet until it is wanted")
+                stopAdvertising()
+                onState("Not connected")
+            }
+        }, SLEEP_AFTER_MS, TimeUnit.MILLISECONDS)
+    }
+
+    /** Back on air after sleeping, because somebody reached for the pad again. */
+    fun wake() {
+        if (host != null) return
+        resumeAdvertising()
     }
 
     private fun resumeAdvertising() {
@@ -498,6 +534,7 @@ class BleSink(
                     return
                 }
                 host = device; connected = true
+                sleeper?.cancel(false)
                 Log.i(TAG, "${device.address} connected")
                 // Outside a pairing window a controller stops calling out the moment a machine
                 // takes it, and so should this: the machine that has us cannot use it, every
@@ -534,19 +571,17 @@ class BleSink(
                 if (host?.address == device.address) {
                     host = null; connected = false; subscribed = false
                     stopHeartbeat()
-                    if (status == REMOTE_HUNG_UP) {
-                        // Somebody pressed Disconnect. A controller does not climb back into a
-                        // machine that has just put it down — it waits to be picked up, and the
-                        // pad's own "tap to try again" is how that is done here. Calling out
-                        // again would simply undo the request: a Mac reattaches to a bonded pad
-                        // the moment it sees one advertise, which it did inside a second.
-                        Log.i(TAG, "it let go on purpose; waiting to be asked rather than calling out")
-                    } else {
-                        // A drop rather than a decision: a pocket, a door, a flat battery. Go back
-                        // on air, but not instantly — a machine needs a moment to put the old
-                        // device away, and 358ms was not enough for one measured on 2026-09-20.
-                        ticker.schedule({ resumeAdvertising() }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
-                    }
+                    // Always go back on air, whatever the reason. Telling a deliberate
+                    // Disconnect from a link that simply failed was tried on 2026-09-20 by
+                    // reading the status, and it cannot be done: Android reports both as plain
+                    // success. Staying quiet on that guess left the pad unreachable for twenty
+                    // minutes after an ordinary drop, which is far worse than a Disconnect that
+                    // does not stick. What makes a Disconnect mean something is sleeping below,
+                    // not guessing here.
+                    //
+                    // Not instantly, though: a machine needs a moment to put the old device away,
+                    // and the 358ms it used to take was not enough.
+                    ticker.schedule({ resumeAdvertising() }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
                     onState("Not connected")
                 }
             }
@@ -802,16 +837,9 @@ class BleSink(
         val EVERYTHING_CHANGED = byteArrayOf(0x01, 0x00, 0xFF.toByte(), 0xFF.toByte())
         val INDICATE_ON = byteArrayOf(0x02, 0x00)
         /** How long the pad stays off the air after a machine lets go of it. */
-        /**
-         * The machine chose to end it, rather than the link failing.
-         *
-         * Not the 0x13 the specification names for it: Android reports a clean teardown to a GATT
-         * server as plain success, and 0x13 never arrived. Measured on 2026-09-20 by pressing
-         * Disconnect on a Mac and reading the status — it was nought. A link that fails carries a
-         * real error instead, which is the distinction actually wanted here.
-         */
-        const val REMOTE_HUNG_UP = 0
         const val QUIET_AFTER_MS = 2500L
+        /** How long the pad keeps offering itself to nobody before going quiet. */
+        const val SLEEP_AFTER_MS = 10 * 60 * 1000L
         const val BEAT_MS = 10L
         const val RETRIES = 8
 

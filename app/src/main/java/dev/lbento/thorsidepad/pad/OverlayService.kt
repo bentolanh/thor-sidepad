@@ -446,6 +446,8 @@ class OverlayService : Service() {
                     val note = linkNote()
                     // Low Energy unless something has deliberately asked for Classic, which
                     // nothing in the panel does any more.
+                    // A pad that went quiet waiting for somebody is being reached for now.
+                    (btSink as? BleSink)?.wake()
                     val bt = btSink ?: if (prefs.btTransport != Prefs.TRANSPORT_CLASSIC) {
                         // A Low Energy pad does not dial a host; it makes itself findable and the
                         // host comes to it. So there is no address to open with.
