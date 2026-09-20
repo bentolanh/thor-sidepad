@@ -275,7 +275,7 @@ class OverlayService : Service() {
         remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
         hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
         padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts(),
-        transport = prefs.btTransport, identity = prefs.btIdentity)
+        transport = prefs.btTransport, identity = prefs.btIdentity, keepAwake = prefs.keepAwake)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {
@@ -551,7 +551,8 @@ class OverlayService : Service() {
 
     private fun refreshLinkBadge() {
         val bt0 = btSink
-        holdAwake(prefs.targetMode == Prefs.MODE_BT && visible && bt0?.connected == true)
+        holdAwake(prefs.keepAwake && prefs.targetMode == Prefs.MODE_BT &&
+            visible && bt0?.connected == true)
         val ov = overlay ?: return
         val bt = btSink
         val remote = prefs.targetMode == Prefs.MODE_BT
@@ -1038,6 +1039,14 @@ class OverlayService : Service() {
                 }
             }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
+            override fun setKeepAwake(on: Boolean) {
+                prefs.keepAwake = on
+                // Takes effect now rather than at the next connection, so the switch does what it
+                // looks like it does.
+                refreshLinkBadge()
+                ov.updatePanel(panelState(ov))
+            }
+
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }

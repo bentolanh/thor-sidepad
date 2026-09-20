@@ -78,6 +78,17 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putFloat("opacity", v).apply()
 
     /** Shield: one full-screen window, nothing behind it is touchable. Off = one window per button. Off at every start. */
+    /**
+     * Whether the handheld stays awake while a machine is holding the pad.
+     *
+     * Off, the Thor sleeps as it normally would and stops reading its own controller, so presses
+     * stop arriving while the link still looks fine. On, it plays with both screens dark and
+     * spends the battery to do it. Neither is obviously right, so it is asked rather than chosen.
+     */
+    var keepAwake: Boolean
+        get() = sp.getBoolean("keepAwake", false)
+        set(v) = sp.edit().putBoolean("keepAwake", v).apply()
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()

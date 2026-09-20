@@ -47,6 +47,7 @@ data class PanelState(
     /** Pairing: the name a computer will see, and how long the Thor is still visible for. */
     val padName: String = "",
     val visibleFor: Int = 0,
+    val keepAwake: Boolean = false,
     /** Computers already paired with this Thor that SidePad does not yet know about. */
     val adoptable: List<HostChoice> = emptyList(),
     /** Which radio carries presses to a machine, and what that machine is told the pad is. */
@@ -59,6 +60,7 @@ interface PanelActions {
     fun pickProfile()
     fun editLayout()
     fun setShield(on: Boolean)
+    fun setKeepAwake(on: Boolean)
     fun setOpacity(value: Float)
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
@@ -200,6 +202,12 @@ object ControlPanel {
                     setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                 })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
+                card.addView(sw("Keep playing with the screens off", state.keepAwake) { actions.setKeepAwake(it) })
+                card.addView(label(
+                    "Off, the Thor sleeps as usual and stops reading its own controller, so presses " +
+                    "stop reaching the machine even though the pad still looks connected. On, it " +
+                    "keeps working with both screens dark and uses more battery.",
+                    11f, grey).apply { setPadding(0, 0, 0, 8) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))
                 card.addView(row(*choices.map { (key, name) -> btn(name, key != state.backdrop) { actions.setBackdrop(key) } }.toTypedArray()))
