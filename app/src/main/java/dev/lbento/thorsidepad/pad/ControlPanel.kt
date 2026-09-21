@@ -234,8 +234,12 @@ object ControlPanel {
                 // different, which is a plumbing detail dressed up as a choice.
                 card.addView(label("Appears as", 14f, grey))
                 val xbox = state.identity == "XBOX"
-                card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
-                card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
+                val neutral = state.identity == "NEUTRAL"
+                val own = !xbox && !neutral
+                card.addView(btn((if (!own) "\u25CF  " else "") + "SidePad", own) { actions.setIdentity("OWN") })
+                card.addView(btn((if (!xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
+                card.addView(btn((if (!neutral) "\u25CF  " else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
+                card.addView(label("The last one sends exactly what the Xbox setting sends \u2014 same buttons, same sticks \u2014 but under our own vendor number instead of Microsoft's. Some machines treat those two very differently.", 12f, grey).apply { setPadding(0, 6, 0, 6) })
                 card.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
                     .apply { topMargin = 18; bottomMargin = 14 })
                 if (state.visibleFor > 0) {

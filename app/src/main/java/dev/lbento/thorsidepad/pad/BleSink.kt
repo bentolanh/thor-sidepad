@@ -75,6 +75,31 @@ class BleSink(
         // every pad here that it does accept reports 9.0.3 and ends in `0309`. Same vendor, same
         // product, different answer.
         XBOX(0x045E, 0x02E0, 0x0903, "Xbox-compatible"),
+
+        /**
+         * The same pad, the same report, our own numbers.
+         *
+         * macOS routes a gamepad by who it claims to be, and the two routes are not equal.
+         * Measured 2026-09-21 from the registry, with both attached over Low Energy:
+         *
+         *     045e:02e0  (this pad)   IOHIDUserDevice -> IOHIDInterface -> IOHIDEventDummyService
+         *     2dc8:6012  (an 8BitDo)  IOHIDUserDevice -> IOHIDInterface -> AppleGCHIDEventDummyService
+         *
+         * The 8BitDo is handed to Apple's GameController HID service. This pad is handed to the
+         * generic one. A real Xbox Series controller is also handed to the generic one, and gets
+         * a second device of its own at 045e:0b12 backed by AppleUserHIDDevice — a driver that
+         * expects a genuine Xbox controller, not plain HID.
+         *
+         * So claiming Microsoft's numbers looks like the safe choice and may be the opposite of
+         * it: too Xbox for the generic treatment, not Xbox enough for the Xbox driver, landing
+         * between the two with nothing claiming the device. The 8BitDo, which claims nobody
+         * else's numbers, is the one pad that has worked natively in everything tried.
+         *
+         * This exists to test that, and changes exactly one thing. The report, the descriptor
+         * and the button order are identical to [XBOX]; only the vendor and product differ.
+         * 0x1209 is the pid.codes pool for open projects and is borrowed from nobody.
+         */
+        NEUTRAL(0x1209, 0x5350, 0x0100, "SidePad, standard layout"),
     }
 
     @Volatile override var connected = false; private set
@@ -101,7 +126,9 @@ class BleSink(
      * then read as two sticks jammed into a corner.
      */
     private val shape: ReportShape =
-        if (identity == Identity.XBOX) XboxShape(rumble, plainButtons, consumer) else StandardShape()
+        // NEUTRAL is the Xbox shape under different numbers, so it takes the same report.
+        if (identity == Identity.XBOX || identity == Identity.NEUTRAL)
+            XboxShape(rumble, plainButtons, consumer) else StandardShape()
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.
