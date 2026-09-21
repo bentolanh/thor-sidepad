@@ -131,6 +131,11 @@ so it sits in the list like any other controller.
 **Windows 11** hides it the same way. Settings → Bluetooth & devices → Devices → **Bluetooth
 devices discovery**, and change **Default** to **Advanced**. Microsoft describes the switch in
 its own words: Default connects common accessories, Advanced shows all types of device.
+Once paired it arrives as a "HID-compliant game controller" with the standard mapping and a
+working vibration motor, which is how Windows treats any Low Energy pad: it does not go through
+the Xbox driver, because that one binds over USB and Bluetooth Classic rather than Low Energy.
+Anything reading controllers through SDL or Steam Input sees it. Whether a game that insists on
+XInput does has not been tried.
 
 Both hide it for the same reason, and it is not something this app can fix. A Low Energy device
 says what kind of thing it is through a GAP value called Appearance, and Android gives an app no
