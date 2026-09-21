@@ -150,10 +150,13 @@ object ControlPanel {
             val xbox = state.identity == "XBOX"
             val neutral = state.identity == "NEUTRAL"
             val own = !xbox && !neutral
+            // The dot marks the one in use and that button is the disabled one, which is the
+            // convention every other choice on this panel follows. Getting it backwards made
+            // picking the third option look like it had jumped to the first.
             val dot = "\u25CF  "
-            into.addView(btn((if (!own) dot else "") + "SidePad", own) { actions.setIdentity("OWN") })
-            into.addView(btn((if (!xbox) dot else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
-            into.addView(btn((if (!neutral) dot else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
+            into.addView(btn((if (own) dot else "") + "SidePad", !own) { actions.setIdentity("OWN") })
+            into.addView(btn((if (xbox) dot else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
+            into.addView(btn((if (neutral) dot else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
             into.addView(label(
                 "SidePad is honest about what it is, and a machine needs telling once which button is " +
                 "which. An Xbox pad is what nearly every third-party controller claims to be, so most " +
