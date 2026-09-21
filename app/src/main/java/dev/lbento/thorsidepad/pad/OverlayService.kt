@@ -572,10 +572,20 @@ class OverlayService : Service() {
         } catch (e: Exception) { Log.w(TAG, "wake lock", e) }
     }
 
-    private fun refreshLinkBadge() {
-        val bt0 = btSink
+    /**
+     * Applies the wake lock the keep-awake switch asks for.
+     *
+     * Split out of [refreshLinkBadge], which did this and raised the "not connected" badge in one
+     * call. Flicking the switch therefore announced the state of the link, which is not what the
+     * switch is about and startled anyone who touched it while playing.
+     */
+    private fun applyAwakeHold() {
         holdAwake(prefs.keepAwake && prefs.targetMode == Prefs.MODE_BT &&
-            visible && bt0?.connected == true)
+            visible && btSink?.connected == true)
+    }
+
+    private fun refreshLinkBadge() {
+        applyAwakeHold()
         val ov = overlay ?: return
         val bt = btSink
         val remote = prefs.targetMode == Prefs.MODE_BT
@@ -1203,8 +1213,9 @@ class OverlayService : Service() {
             override fun setKeepAwake(on: Boolean) {
                 prefs.keepAwake = on
                 // Takes effect now rather than at the next connection, so the switch does what it
-                // looks like it does.
-                refreshLinkBadge()
+                // looks like it does — and only that: refreshing the whole badge from here put a
+                // "not connected" notice on screen every time the switch was touched.
+                applyAwakeHold()
                 ov.updatePanel(panelState(ov))
             }
 
