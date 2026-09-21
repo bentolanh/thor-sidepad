@@ -144,6 +144,18 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("plainButtons", false)
         set(v) = sp.edit().putBoolean("plainButtons", v).apply()
 
+    /**
+     * What the player taught us about this handheld's own controls, as JSON. See PadCalibration.
+     *
+     * Empty means take every device at its word, which is right on the Thor and on most
+     * hardware. It is wrong where a control sits on an unexpected code, or on a different input
+     * device than the rest — the Odin 2 Mini puts Start and Select on a node of their own, and
+     * a pad that reads one device loses them without any sign that it has.
+     */
+    var calibration: String
+        get() = sp.getString("calibration", "") ?: ""
+        set(v) = sp.edit().putString("calibration", v).apply()
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()

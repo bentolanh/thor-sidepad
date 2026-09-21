@@ -28,6 +28,11 @@
             android:exported="true"
             android:launchMode="singleTask" />
 
+        <activity
+            android:name=".CalibrateActivity"
+            android:exported="false"
+            android:label="Calibrate controls" />
+
         <!-- Two launcher icons for the same screen; the app enables one at a time. Famicom is the default. -->
         <activity-alias
             android:name=".LauncherFamicom"

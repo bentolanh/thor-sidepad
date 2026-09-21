@@ -70,4 +70,13 @@ interface IInjector {
     // in the same shape as targetCaps, or an "error: " string.
     String forwardStart(String path, boolean grab, IPadEvents cb) = 28;
     void forwardStop() = 29;
+
+    // The same, across several nodes at once, because a handheld does not have to put all of its
+    // controls on one. Events arrive through onEventAt carrying the index of the path they came
+    // from. Returns one JSON object: {"nodes":[{"path","keys":[..],"abs":{..}},..]}, or "error: ".
+    String forwardStartMulti(in String[] paths, boolean grab, IPadEvents cb) = 30;
+
+    // Every input device that looks like it carries controller controls, as JSON:
+    // [{"path","name","keys":[..],"abs":[..]}]. Used to decide what to listen to while calibrating.
+    String controllerNodes() = 31;
 }

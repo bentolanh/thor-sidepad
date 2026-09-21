@@ -372,6 +372,17 @@ class InjectorService() : IInjector.Stub() {
 
     // ---- forwarding a real controller ----------------------------------------------------------
     @Volatile private var fwdFd = -1
+    /**
+     * Every descriptor a multi-node forward is reading, and the generation it belongs to.
+     *
+     * The single-node path keeps [fwdFd] because it is simple and still used. A multi-node
+     * forward cannot: it has one reader thread per device, and they all have to stop together.
+     * A generation number does that without a lock in the read loop — bump it and every thread
+     * notices on its next timeout.
+     */
+    @Volatile private var fwdGen = 0
+    private val fwdFds = java.util.concurrent.CopyOnWriteArrayList<Int>()
+    private var fwdThreads = mutableListOf<Thread>()
     private var fwdThread: Thread? = null
     private var fwdDeath: android.os.IBinder.DeathRecipient? = null
     private var fwdClient: android.os.IBinder? = null
@@ -417,9 +428,95 @@ class InjectorService() : IInjector.Stub() {
         return JSONObject().put("keys", JSONArray(keys)).put("abs", absJson).put("virtual", false).toString()
     }
 
+    override fun controllerNodes(): String {
+        // Deliberately generous. A node that carries only Start and Select does not look like a
+        // controller by any tidy definition, and on the Odin 2 Mini that is exactly what one of
+        // them is. Anything with keys or axes is offered, with a hint about which look like pads,
+        // and the caller decides what to listen to.
+        val out = JSONArray()
+        val nodes = File("/dev/input").listFiles { f -> f.name.startsWith("event") }
+            ?.sortedBy { it.name.removePrefix("event").toIntOrNull() ?: 0 } ?: emptyList()
+        for (node in nodes) {
+            val dfd = Native.openDevice(node.absolutePath, false)
+            if (dfd < 0) continue
+            try {
+                val k = Native.deviceCodes(dfd, Ev.KEY) ?: IntArray(0)
+                val a = Native.deviceCodes(dfd, Ev.ABS) ?: IntArray(0)
+                if (k.isEmpty() && a.isEmpty()) continue
+                out.put(JSONObject()
+                    .put("path", node.absolutePath)
+                    .put("name", Native.deviceName(dfd) ?: node.name)
+                    .put("gamepad", k.any { it in Btn.A..Btn.THUMBR } || a.isNotEmpty())
+                    .put("keys", JSONArray(k.toList()))
+                    .put("abs", JSONArray(a.toList())))
+            } finally { Native.closeDevice(dfd) }
+        }
+        return out.toString()
+    }
+
+    override fun forwardStartMulti(paths: Array<String>?, grab: Boolean, cb: IPadEvents?): String {
+        forwardStop()
+        if (paths.isNullOrEmpty() || cb == null) return "error: no devices"
+        val gen = ++fwdGen
+        val nodes = JSONArray()
+        val opened = mutableListOf<Pair<Int, Int>>()   // index within paths, fd
+
+        paths.forEachIndexed { i, path ->
+            val f = Native.openDevice(path, false)
+            if (f < 0) {
+                // One unreadable node must not sink the rest: a handheld may well offer a device
+                // this process cannot open, and the others still carry most of the controls.
+                Log.w(TAG, "forward: cannot open $path: ${Native.strerror(f)}")
+                nodes.put(JSONObject().put("path", path).put("error", Native.strerror(f)))
+                return@forEachIndexed
+            }
+            if (grab) {
+                val g = Native.grabDevice(f, true)
+                if (g < 0) Log.w(TAG, "grab refused on $path: ${Native.strerror(g)}")
+            }
+            val keys = (Native.deviceCodes(f, Ev.KEY) ?: IntArray(0)).toList()
+            val absJson = JSONObject()
+            (Native.deviceCodes(f, Ev.ABS) ?: IntArray(0)).forEach { c ->
+                Native.absInfo(f, c)?.let { absJson.put(c.toString(), JSONArray(listOf(it[0], it[1]))) }
+            }
+            nodes.put(JSONObject().put("path", path).put("index", i)
+                .put("keys", JSONArray(keys)).put("abs", absJson))
+            fwdFds.add(f); opened.add(i to f)
+        }
+        if (opened.isEmpty()) return "error: none of those could be opened"
+
+        val death = android.os.IBinder.DeathRecipient {
+            Log.w(TAG, "the app went away; releasing ${opened.size} controller node(s)")
+            forwardStop()
+        }
+        try { cb.asBinder().linkToDeath(death, 0); fwdDeath = death; fwdClient = cb.asBinder() }
+        catch (e: Exception) { Log.w(TAG, "linkToDeath", e) }
+
+        for ((idx, f) in opened) {
+            val t = Thread({
+                while (fwdGen == gen) {
+                    val e = try { Native.readEvent(f, 250) } catch (ex: Exception) { null } ?: continue
+                    if (e[0] < 0) { Log.w(TAG, "forward read ended on node $idx: ${Native.strerror(e[1])}"); break }
+                    try { cb.onEventAt(idx, e[0], e[1], e[2]) } catch (ex: Exception) { break }
+                }
+                try { Native.grabDevice(f, false) } catch (_: Exception) {}
+                Native.closeDevice(f)
+                fwdFds.remove(f)
+            }, "sidepad-forward-$idx")
+            t.isDaemon = true; fwdThreads.add(t); t.start()
+        }
+        Log.i(TAG, "forwarding ${opened.size} node(s) grab=$grab")
+        return JSONObject().put("nodes", nodes).toString()
+    }
+
     override fun forwardStop() {
         fwdDeath?.let { d -> try { fwdClient?.unlinkToDeath(d, 0) } catch (_: Exception) {} }
         fwdDeath = null; fwdClient = null
+        // Bumping the generation is what tells every multi-node reader to stop. They close their
+        // own descriptors on the way out, so nothing here has to reach into them.
+        fwdGen++
+        val multi = fwdThreads.toList(); fwdThreads.clear()
+        for (m in multi) try { m.join(600) } catch (_: InterruptedException) {}
         val t = fwdThread
         fwdFd = -1
         fwdThread = null

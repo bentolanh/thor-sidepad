@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView style="@style/SectionHeader" android:text="Teach the pad your controls" />
+        <TextView style="@style/StepHelp" android:text="Press each control as it is asked for. This learns which button is which and which of the handheld's input devices it comes from — some handhelds put Start and Select on a device of their own, and without this they are simply lost." />
+
+        <TextView
+            android:id="@+id/calState"
+            style="@style/StatusLine"
+            android:layout_marginTop="8dp"
+            android:text="Connecting to Shizuku…" />
+
+        <TextView
+            android:id="@+id/calPrompt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:text="Not started" />
+
+        <TextView
+            android:id="@+id/calProgress"
+            style="@style/StatusLine"
+            android:layout_marginTop="4dp"
+            android:text="" />
+
+        <TextView
+            android:id="@+id/calHint"
+            style="@style/StepHelp"
+            android:layout_marginTop="4dp"
+            android:text="" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
+            <Button android:id="@+id/calBegin" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Begin" />
+            <Button android:id="@+id/calSkip" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Skip" android:layout_marginStart="8dp" />
+            <Button android:id="@+id/calBack" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Back" android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+            <Button android:id="@+id/calSave" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Save" />
+            <Button android:id="@+id/calClear" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Clear saved" android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:layout_marginTop="20dp" android:text="Learned so far" />
+        <TextView
+            android:id="@+id/calTable"
+            style="@style/StatusLine"
+            android:fontFamily="monospace"
+            android:text="nothing yet" />
+
+    </LinearLayout>
+</ScrollView>

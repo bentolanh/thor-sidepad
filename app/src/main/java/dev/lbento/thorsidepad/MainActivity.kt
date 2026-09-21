@@ -118,6 +118,10 @@ class MainActivity : AppCompatActivity() {
             OverlayService.send(this, OverlayService.ACTION_START)
         }
 
+        findViewById<android.widget.Button>(R.id.btnCalibrate).setOnClickListener {
+            startActivity(android.content.Intent(this, CalibrateActivity::class.java))
+        }
+
         val plainButtons = findViewById<Switch>(R.id.plainButtonsSwitch)
         plainButtons.isChecked = prefs.plainButtons
         plainButtons.setOnCheckedChangeListener { _, on ->

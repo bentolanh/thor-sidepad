@@ -22,6 +22,7 @@ import dev.lbento.thorsidepad.inject.Catalog
 import dev.lbento.thorsidepad.inject.IInjector
 import dev.lbento.thorsidepad.inject.Injector
 import dev.lbento.thorsidepad.inject.Key
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -591,9 +592,10 @@ class OverlayService : Service() {
             var held = false
             try {
                 refreshTargets(svc)
+                val calib = PadCalibration.parse(prefs.calibration)
                 val path = prefs.physicalPath.ifEmpty { targets.firstOrNull()?.path.orEmpty() }
-                if (path.isEmpty()) { Log.w(TAG, "no controller to forward"); return@Thread }
-                val f = ControllerForwarder(bt) { code, down ->
+                if (path.isEmpty() && calib.isEmpty) { Log.w(TAG, "no controller to forward"); return@Thread }
+                val f = ControllerForwarder(bt, calibration = calib, passThrough = { code, down ->
                     when {
                         code !in passThrough -> Unit
                         // Home is not handed back as a key. Injected from our own device it
@@ -614,18 +616,28 @@ class OverlayService : Service() {
                         else -> try { svc.key(code, down) }
                             catch (e: Exception) { Log.w(TAG, "pass through", e) }
                     }
+                })
+                // A calibration names every device it needs; without one there is a single node
+                // and the old call still does. The helper may also predate the multi-node call
+                // entirely, in which case it throws and the single-node path is still correct
+                // for the device the player picked.
+                val caps: String? = if (!calib.isEmpty) {
+                    val multi = try { svc.forwardStartMulti(calib.nodePaths.toTypedArray(), true, f) }
+                                catch (e: Exception) { Log.w(TAG, "the helper is too old for multi-device reading; restart SidePad", e); null }
+                    if (multi != null && !multi.startsWith("error")) { f.configureMulti(multi, calib); multi }
+                    else multi
+                } else {
+                    svc.forwardStart(path, true, f)?.also { if (!it.startsWith("error")) f.configure(it) }
                 }
-                // A helper left over from before this call existed answers null rather than failing.
-                val caps = svc.forwardStart(path, true, f)
                 if (caps.isNullOrEmpty() || caps.startsWith("error")) {
                     Log.w(TAG, "forward refused: ${caps ?: "the helper is too old; restart SidePad"}")
                     return@Thread
                 }
-                f.configure(caps)
                 openPassThrough(svc, bt, caps)
                 forwarder = f
                 held = true
-                Log.i(TAG, "forwarding the Thor's controller from $path")
+                Log.i(TAG, if (calib.isEmpty) "forwarding the controller from $path"
+                           else "forwarding ${calib.nodePaths.size} calibrated device(s): ${calib.describe()}")
             } catch (e: Exception) { Log.w(TAG, "forward failed", e) }
             finally {
                 if (!held) {
@@ -670,7 +682,20 @@ class OverlayService : Service() {
 
     private fun openPassThrough(svc: IInjector, bt: PadTransport, caps: String) {
         try {
-            val declared = JSONObject(caps).optJSONArray("keys") ?: return
+            // Two shapes arrive here. One device gives {"keys":[..]}; several give
+            // {"nodes":[{"keys":[..]},..]}, and every one of those devices has been grabbed, so
+            // every one of their spare buttons needs somewhere to go. Reading only the first
+            // shape would leave the others' Home and volume keys destroyed, which is the exact
+            // fault this function exists to prevent.
+            val root = JSONObject(caps)
+            val declared = root.optJSONArray("keys") ?: JSONArray().also { merged ->
+                val nodes = root.optJSONArray("nodes") ?: return
+                val seen = HashSet<Int>()
+                for (i in 0 until nodes.length()) {
+                    val k = nodes.getJSONObject(i).optJSONArray("keys") ?: continue
+                    for (j in 0 until k.length()) if (seen.add(k.getInt(j))) merged.put(k.getInt(j))
+                }
+            }
             val spare = ArrayList<Int>()
             var home = false
             for (i in 0 until declared.length()) {
