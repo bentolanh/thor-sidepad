@@ -411,17 +411,28 @@ class BleSink(
             .setConnectable(true)
             .setTimeout(0)
             .build()
-        // Named while findable, nameless otherwise — but always carrying the gamepad service.
+        // Always named, and always carrying the gamepad service.
         //
-        // The service uuid used to come off with the name, on the reasoning that a machine which
-        // already knows us finds us by address. It does not. macOS reconnects by scanning for
-        // 0x1812 and nothing else: measured on 2026-09-20, it matched this pad ninety-six times
-        // and every one of them fell inside a findable window. For the nineteen quiet minutes
-        // between, it scanned every twenty seconds and never saw a gamepad at all — so pressing
-        // Connect fell through to the only transport still answering, Classic, which files the
-        // handheld as a phone and hands back no controller.
-        val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(open)
+        // Both halves were once left out when the pad was not in a findable window, on the
+        // reasoning that a machine which already knows us finds us by address. That reasoning has
+        // been wrong twice.
+        //
+        // Dropping the service uuid made the pad invisible: macOS reconnects by scanning for
+        // 0x1812 and nothing else, and across nineteen quiet minutes on 2026-09-20 it scanned
+        // every twenty seconds and never saw a gamepad, so pressing Connect fell through to
+        // Classic and handed back a phone.
+        //
+        // Dropping the name made it anonymous instead, which is its own mess. Android hands out
+        // a fresh random address every quarter of an hour, so once the pad became visible again
+        // every rotation arrived at the host as a brand new nameless device. The Mac filled up
+        // with unnamed "Bluetooth Device" rows nobody can clear — one per rotation, all of them
+        // this pad.
+        //
+        // A name costs two bytes plus its length in an advertisement with thirty-one to spend,
+        // and flags and one 16-bit uuid take seven of them. It fits. Where it does not, the
+        // host is told at least that a gamepad is here, which is the half that cannot be spared.
+        fun advertData(withName: Boolean) = AdvertiseData.Builder()
+            .setIncludeDeviceName(withName)
             .addServiceUuid(ParcelUuid(uuid(HID_SERVICE)))
             .build()
         val cb = object : AdvertiseCallback() {
@@ -429,11 +440,20 @@ class BleSink(
                 Log.i(TAG, (if (open) "findable as " else "quietly reachable as ") +
                     "${identity.label} (${hex(identity.vendor)}:${hex(identity.product)})")
             }
-            override fun onStartFailure(code: Int) { Log.w(TAG, "advertising refused, code $code") }
+            override fun onStartFailure(code: Int) {
+                // A long device name is the one thing here that can overflow the packet. Rather
+                // than go silent, drop the name and keep the gamepad service, which is what a
+                // host actually needs to find us.
+                if (code == ADVERTISE_FAILED_DATA_TOO_LARGE) {
+                    Log.w(TAG, "advertisement too large with the name in it; going without")
+                    try { le.startAdvertising(settings, advertData(false), this) }
+                    catch (e: Exception) { Log.w(TAG, "nameless retry refused", e) }
+                } else Log.w(TAG, "advertising refused, code $code")
+            }
         }
         advertiser = cb
         wantAdvertising = true
-        le.startAdvertising(settings, data, cb)
+        le.startAdvertising(settings, advertData(true), cb)
         armSleep()
         return true
     }
