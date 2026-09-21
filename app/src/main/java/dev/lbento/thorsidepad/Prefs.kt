@@ -156,6 +156,54 @@ class Prefs(ctx: Context) {
         get() = sp.getString("calibration", "") ?: ""
         set(v) = sp.edit().putString("calibration", v).apply()
 
+    /**
+     * Which platform the pad is talking to, because they do not agree about what a gamepad is.
+     *
+     * The report map has to be decided before any host connects — it is what the host reads to
+     * learn what we are — so this cannot be detected and applied on the fly. Changing it rebuilds
+     * the attribute table, which means the machine has to be paired again.
+     *
+     * [PLATFORM_AUTO] guesses from the last machine that took the pad: its Bluetooth name and
+     * class are all a peripheral gets, which is enough to recognise an Apple device and not much
+     * else. When it cannot tell, it chooses the Apple shape, because that one is a strict subset
+     * and no host is known to need the parts it leaves out.
+     *
+     * Mac and iPad and iPhone are one choice on purpose: they share the GameController framework
+     * and will agree with each other far more than with anything else.
+     */
+    var hostPlatform: String
+        get() = sp.getString("hostPlatform", PLATFORM_AUTO) ?: PLATFORM_AUTO
+        set(v) = sp.edit().putString("hostPlatform", v).apply()
+
+    /** The Bluetooth name of the last machine that took the pad, for [PLATFORM_AUTO] to read. */
+    var lastHostName: String
+        get() = sp.getString("lastHostName", "") ?: ""
+        set(v) = sp.edit().putString("lastHostName", v).apply()
+
+    /**
+     * What [hostPlatform] comes to once AUTO has been resolved.
+     *
+     * The guess is deliberately timid. A name is the only real signal and the owner can change
+     * it, so anything unrecognised falls to the Apple shape rather than to a shape that is only
+     * known to be different, not known to be better.
+     */
+    fun platformNow(): String {
+        val chosen = hostPlatform
+        if (chosen != PLATFORM_AUTO) return chosen
+        val n = lastHostName.lowercase()
+        val apple = listOf("mac", "ipad", "iphone", "apple", "ipod")
+        return if (apple.any { n.contains(it) }) PLATFORM_APPLE else PLATFORM_APPLE
+    }
+
+    /**
+     * Whether to offer the Consumer collections the real controller carries.
+     *
+     * Measured false for Apple: View never arrived, Guide has never worked anywhere, and those
+     * collections are the leading suspect for the WindowServer livelock. True elsewhere is a
+     * guess — no other platform has been measured — kept because Guide might work there.
+     */
+    fun wantsConsumerControls(): Boolean = platformNow() != PLATFORM_APPLE
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()
@@ -202,6 +250,19 @@ class Prefs(ctx: Context) {
         /** Presses go to another machine over Bluetooth rather than into this device. */
         const val MODE_BT = "bt"
         const val TRANSPORT_CLASSIC = "classic"
+        const val PLATFORM_AUTO = "auto"
+        /** Mac, iPad and iPhone together: one GameController framework, one set of quirks. */
+        const val PLATFORM_APPLE = "apple"
+        const val PLATFORM_WINDOWS = "windows"
+        const val PLATFORM_ANDROID = "android"
+        const val PLATFORM_LINUX = "linux"
+        val PLATFORM_LABELS = listOf(
+            PLATFORM_AUTO to "Work it out automatically",
+            PLATFORM_APPLE to "Mac, iPad or iPhone",
+            PLATFORM_WINDOWS to "Windows",
+            PLATFORM_ANDROID to "Android",
+            PLATFORM_LINUX to "Linux or Steam Deck",
+        )
         const val TRANSPORT_LE = "le"
     }
 }

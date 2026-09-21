@@ -52,6 +52,8 @@ class BleSink(
     private val rumble: Boolean = true,
     /** Send buttons counted straight through, for a host that does not know the identity. */
     private val plainButtons: Boolean = false,
+    /** Offer the Consumer collections the real controller carries. See Prefs.hostPlatform. */
+    private val consumer: Boolean = false,
 ) : PadTransport {
 
     /**
@@ -99,7 +101,7 @@ class BleSink(
      * then read as two sticks jammed into a corner.
      */
     private val shape: ReportShape =
-        if (identity == Identity.XBOX) XboxShape(rumble, plainButtons) else StandardShape()
+        if (identity == Identity.XBOX) XboxShape(rumble, plainButtons, consumer) else StandardShape()
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.
@@ -622,6 +624,12 @@ class BleSink(
                     return
                 }
                 host = device; connected = true
+                // The name is nearly all a peripheral learns about a machine, and the automatic
+                // platform choice has nothing else to go on. Recorded whether or not it is used.
+                try {
+                    val n = device.name
+                    if (!n.isNullOrBlank()) dev.lbento.thorsidepad.Prefs(ctx).lastHostName = n
+                } catch (_: SecurityException) {}
                 sleeper?.cancel(false)
                 Log.i(TAG, "${device.address} connected")
                 // Outside a pairing window a controller stops calling out the moment a machine

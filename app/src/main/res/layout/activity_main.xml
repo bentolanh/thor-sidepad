@@ -54,6 +54,9 @@
         <Switch android:id="@+id/bubbleSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Floating button to show and hide the pad" />
         <TextView style="@style/StepHelp" android:text="For a handheld with one screen, where every edge swipe belongs to Android and there is no spare gesture to reach the pad with. Drag the button anywhere; tap it to show or hide the pad, hold it to open the panel." />
+        <TextView style="@style/StatusLine" android:text="What the pad is talking to" />
+        <Spinner android:id="@+id/platformSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <TextView style="@style/StepHelp" android:text="Platforms disagree about what a gamepad is, and the pad has to decide what to say before a machine connects — so this cannot be worked out on the fly. Only the Apple setting is measured: it leaves out two things a Mac never understood. The others are a guess and may give you a working Guide button. Changing this means pairing the machine again." />
         <Button android:id="@+id/btnCalibrate" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Teach the pad your controls" />
         <TextView style="@style/StepHelp" android:text="Only needed if a button does nothing when the pad is forwarding to another machine. Some handhelds put Start and Select on a separate input device, which the pad cannot find on its own." />

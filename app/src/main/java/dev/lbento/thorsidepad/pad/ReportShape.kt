@@ -128,6 +128,11 @@ class XboxShape(
     private val rumble: Boolean = true,
     /** Which of the two button orders below to send. See [BUTTONS] and [BUTTONS_PLAIN]. */
     private val plainButtons: Boolean = false,
+    /**
+     * Whether to offer the Consumer collections the real controller carries. See [WITH_CONSUMER].
+     * False — the default — is what Apple hosts need and what every host is known to cope with.
+     */
+    private val consumer: Boolean = false,
 ) : ReportShape {
     private val report = ByteArray(16)
     private var hatX = 0
@@ -138,7 +143,11 @@ class XboxShape(
         putShort(0, CENTRE); putShort(2, CENTRE); putShort(4, CENTRE); putShort(6, CENTRE)
     }
 
-    override val descriptor = if (rumble) DESCRIPTOR else NO_RUMBLE
+    override val descriptor = when {
+        consumer -> WITH_CONSUMER
+        rumble -> DESCRIPTOR
+        else -> NO_RUMBLE
+    }
     override val discreteBytes = intArrayOf(12, 13, 14, 15)
 
     override fun handles(code: Int): Boolean =
@@ -160,6 +169,12 @@ class XboxShape(
         // two, and it has never once worked — not in a gamepad tester, not in Steam, not in a
         // game. It is no longer sent at all, so it reaches Android as an ordinary Home press.
         // See the descriptor below for why that collection had to go regardless.
+        // Guide has a home only in the faithful descriptor. Without it the press is not sent,
+        // so it falls through to Android as an ordinary Home instead of being swallowed.
+        if (consumer && !plainButtons && code == dev.lbento.thorsidepad.inject.Btn.MODE) {
+            synchronized(system) { system[0] = if (down) 1 else 0 }
+            return
+        }
         val bit = (if (plainButtons) BUTTONS_PLAIN else BUTTONS)[code] ?: return
         val i = 13 + bit / 8
         val mask = 1 shl (bit % 8)
@@ -216,8 +231,9 @@ class XboxShape(
 
     override fun snapshot(): ByteArray = synchronized(report) { report.copyOf() }
 
-    // No second report any more. Returning null is what stops one being offered at all.
-    override fun systemSnapshot(): ByteArray? = null
+    /** Report two exists only in the faithful descriptor; null is what stops one being offered. */
+    private val system = ByteArray(1)
+    override fun systemSnapshot(): ByteArray? = if (consumer) synchronized(system) { system.copyOf() } else null
 
     /**
      * Reads a rumble instruction the way the pad this imitates describes one.
@@ -357,6 +373,53 @@ class XboxShape(
         )
 
         /** Transcribed from a pad that works. The gamepad's own report; the extras are omitted. */
+        /**
+         * The faithful descriptor, Consumer collections and all, for hosts that may want them.
+         *
+         * This is what the real model 1708 sends: the gamepad, a Consumer AC Back inside report
+         * one for View, and a nested Consumer application collection for Guide in report two.
+         *
+         * macOS wants none of it. Measured 2026-09-21: AC Back is never translated into a
+         * gamepad button, so View simply did not exist there, and Guide has never registered in
+         * any tester, in Steam, or in a game. The Consumer collections are also the leading
+         * suspect for the WindowServer livelock. So Apple hosts get [DESCRIPTOR], which carries
+         * no Consumer page at all.
+         *
+         * Every other platform is UNMEASURED. Windows, Linux and Android may well handle these
+         * usages properly and hand back a working Guide button, which is the only reason this is
+         * kept rather than deleted. Nobody has checked. Do not assume it is better anywhere —
+         * find out, the way macOS was found out, by reading what actually arrives.
+         */
+        val WITH_CONSUMER: ByteArray = byteArrayOf(
+            0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x05.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x85.toByte(), 0x01.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(),
+            0x09.toByte(), 0x30.toByte(), 0x09.toByte(), 0x31.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(),
+            0x02.toByte(), 0x75.toByte(), 0x10.toByte(), 0x81.toByte(), 0x02.toByte(), 0xC0.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(), 0x09.toByte(), 0x32.toByte(),
+            0x09.toByte(), 0x35.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(), 0x02.toByte(), 0x75.toByte(),
+            0x10.toByte(), 0x81.toByte(), 0x02.toByte(), 0xC0.toByte(), 0x05.toByte(), 0x02.toByte(), 0x09.toByte(), 0xC5.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(),
+            0x03.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x0A.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(),
+            0x06.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x02.toByte(), 0x09.toByte(), 0xC4.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(),
+            0xFF.toByte(), 0x03.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x0A.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(),
+            0x75.toByte(), 0x06.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x39.toByte(), 0x15.toByte(), 0x01.toByte(),
+            0x25.toByte(), 0x08.toByte(), 0x35.toByte(), 0x00.toByte(), 0x46.toByte(), 0x3B.toByte(), 0x01.toByte(), 0x66.toByte(), 0x14.toByte(), 0x00.toByte(), 0x75.toByte(), 0x04.toByte(),
+            0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x42.toByte(), 0x75.toByte(), 0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(),
+            0x35.toByte(), 0x00.toByte(), 0x45.toByte(), 0x00.toByte(), 0x65.toByte(), 0x00.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x09.toByte(), 0x19.toByte(), 0x01.toByte(),
+            0x29.toByte(), 0x0F.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x95.toByte(), 0x0F.toByte(), 0x81.toByte(), 0x02.toByte(),
+            0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x0C.toByte(),
+            0x0A.toByte(), 0x24.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x81.toByte(),
+            0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x07.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(),
+            0x0C.toByte(), 0x09.toByte(), 0x01.toByte(), 0x85.toByte(), 0x02.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x05.toByte(), 0x0C.toByte(), 0x0A.toByte(), 0x23.toByte(), 0x02.toByte(),
+            0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(),
+            0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x07.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0xC0.toByte(), 0x05.toByte(), 0x0F.toByte(), 0x09.toByte(),
+            0x21.toByte(), 0x85.toByte(), 0x03.toByte(), 0xA1.toByte(), 0x02.toByte(), 0x09.toByte(), 0x97.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x75.toByte(),
+            0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x04.toByte(), 0x95.toByte(),
+            0x01.toByte(), 0x91.toByte(), 0x03.toByte(), 0x09.toByte(), 0x70.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x64.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(),
+            0x04.toByte(), 0x91.toByte(), 0x02.toByte(), 0x09.toByte(), 0x50.toByte(), 0x66.toByte(), 0x01.toByte(), 0x10.toByte(), 0x55.toByte(), 0x0E.toByte(), 0x15.toByte(), 0x00.toByte(),
+            0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x09.toByte(), 0xA7.toByte(), 0x15.toByte(),
+            0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x65.toByte(), 0x00.toByte(),
+            0x55.toByte(), 0x00.toByte(), 0x09.toByte(), 0x7C.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(),
+            0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0xC0.toByte(), 0xC0.toByte()
+        )
+
         private val NO_RUMBLE: ByteArray by lazy {
             DESCRIPTOR.copyOfRange(0, PID_AT) + DESCRIPTOR.copyOfRange(PID_END, DESCRIPTOR.size)
         }
