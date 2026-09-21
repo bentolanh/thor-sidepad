@@ -164,6 +164,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     }
 
     private var bubble: View? = null
+    private var bubbleParams: WindowManager.LayoutParams? = null
 
     /**
      * A floating button that shows and hides the pad.
@@ -223,12 +224,28 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             true
         }
-        try { wm.addView(v, lp); bubble = v } catch (e: Exception) { Log.w(TAG, "bubble", e) }
+        try { wm.addView(v, lp); bubble = v; bubbleParams = lp } catch (e: Exception) { Log.w(TAG, "bubble", e) }
     }
 
     fun removeBubble() {
         bubble?.let { v -> try { wm.removeView(v) } catch (_: Exception) {} }
-        bubble = null
+        bubble = null; bubbleParams = null
+    }
+
+    /**
+     * Put the bubble back on top of whatever was just built.
+     *
+     * Windows of one type stack in the order they were added, and showing the pad adds a
+     * full-screen shield, so a bubble created earlier ends up underneath it — reachable only by
+     * the gesture the shield exists to swallow. On a single-screen handheld the bubble is the one
+     * way back to the panel, so it is the last thing that can afford to be covered. Re-adding it
+     * makes it the newest window again, which is the only ordering the window manager offers.
+     */
+    private fun raiseBubble() {
+        val v = bubble ?: return
+        val lp = bubbleParams ?: return
+        try { wm.removeView(v) } catch (_: Exception) {}
+        try { wm.addView(v, lp) } catch (e: Exception) { Log.w(TAG, "raise bubble", e); bubble = null; bubbleParams = null }
     }
 
     private fun add(v: View, lp: WindowManager.LayoutParams) {
@@ -447,6 +464,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             add(v, lp)
             shieldView = v; shieldParams = lp
             retireAfterDraw(v, old)
+            raiseBubble()
             return
         }
         val short = min(width, height)
@@ -495,6 +513,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             add(v, lp)
         }
         views.lastOrNull()?.let { retireAfterDraw(it, old) } ?: old.forEach { w -> try { wm.removeViewImmediate(w) } catch (_: Exception) {} }
+        raiseBubble()
     }
 
     /**
