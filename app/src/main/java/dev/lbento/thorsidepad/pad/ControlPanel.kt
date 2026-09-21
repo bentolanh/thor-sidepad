@@ -75,7 +75,8 @@ interface PanelActions {
     fun setPadTo(machine: Boolean)
     /** Sends to a machine over Low Energy, which needs no machine chosen first: one comes to us. */
     /** Start sending to a machine and open the pairing screen. */
-    fun pairNewMachine()
+    /** Start sending [forPad]'s controls to another device, and open the pairing screen. */
+    fun pairNewMachine(forPad: Boolean)
     fun setTransport(value: String)
     fun setIdentity(value: String)
     fun pairMachine()
@@ -188,7 +189,7 @@ object ControlPanel {
                 Page.MAIN -> "SidePad"
                 Page.DESTINATION -> "Physical control"
                 Page.APPEARANCE -> "Appears as"
-                Page.PAIRING -> "Pair a new machine"
+                Page.PAIRING -> "Pair a new device"
                 Page.CONTROLLER -> "On-screen control"
                 else -> "Appears as"
             }, 20f),
@@ -237,7 +238,7 @@ object ControlPanel {
                 // belong to it. They were one list while everything went to the same place; they
                 // are not one thing, and forwarding the built-in controller while the on-screen
                 // pad still works this handheld is exactly the case that needed saying separately.
-                val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
+                val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "another device"
                 val machineWhere = hostLabel + (if (state.hostConnected) "" else " — not connected")
                 val localPad = if (state.virtual) "This device, as a separate controller"
                                else "This device, as " + (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
@@ -335,9 +336,9 @@ object ControlPanel {
                     12f, grey).apply { setPadding(0, 18, 0, 0) })
             } else if (page == Page.APPEARANCE) {
                 run {
-                    card.addView(label("Known to the machine as", 14f, grey))
+                    card.addView(label("Known to the other device as", 14f, grey))
                     identityButtons(card)
-                    card.addView(btn("Pair a machine\u2026") { page = Page.PAIRING; render() }.apply {
+                    card.addView(btn("Pair a device\u2026") { page = Page.PAIRING; render() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                     })
                 }
@@ -355,14 +356,15 @@ object ControlPanel {
                         actions.setDestination(current.address)
                     })
                 }
-                // Pairing is the only way to a machine now, so it is also the way into remote
-                // mode: this sets the destination as well as opening the page. The old "A machine"
-                // button did the setting, and removing it without this would have left no route.
-                card.addView(btn("Pair a new machine\u2026") { actions.pairNewMachine() })
+                // Pairing is the only way to another device, so it is also the way into sending
+                // there: this sets the destination as well as opening the page. It sets only the
+                // controls whose page it was pressed from — taking the other set along was what
+                // made the on-screen buttons follow the built-in controller uninvited.
+                card.addView(btn("Pair a new device\u2026") { actions.pairNewMachine(forPad = false) })
                 card.addView(label(
                     if (current == null)
-                        "Nothing paired yet. Pair a computer and this device becomes a controller for it, over Bluetooth."
-                    else "Pairing a new machine replaces the one above. Sending to a machine needs no " +
+                        "Nothing paired yet. Pair a computer and this handheld becomes a controller for it, over Bluetooth."
+                    else "Pairing a new device replaces the one above. Sending to another device needs no " +
                          "Shizuku: this device presents itself as an ordinary Bluetooth gamepad.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
             } else {
@@ -383,9 +385,10 @@ object ControlPanel {
                 }
                 val sep = !state.padRemote && state.virtual
                 card.addView(btn((if (sep) "●  " else "") + "This device, as a separate controller", !sep) { actions.setTarget(null) })
+                if (machine == null) card.addView(btn("Pair a new device\u2026") { actions.pairNewMachine(forPad = true) })
                 card.addView(label(
                     if (state.physicalRemote)
-                        "The built-in controller is being sent to a machine, so there is nothing here to write into \u2014 the on-screen buttons become this device\u2019s controller instead."
+                        "The built-in controller is being sent to another device, so there is nothing here to write into \u2014 the on-screen buttons become this handheld\u2019s controller instead."
                     else "Writing into a real controller keeps games seeing one pad. The other way makes a device of its own, so a game sees two controllers \u2014 this one and yours.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
             }

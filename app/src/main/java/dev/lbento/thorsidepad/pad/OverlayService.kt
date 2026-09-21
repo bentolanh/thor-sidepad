@@ -1391,8 +1391,11 @@ class OverlayService : Service() {
              * first, the way Classic does, made this unreachable for anyone who had not already
              * paired one — and pairing one needs this set.
              */
-            override fun pairNewMachine() {
-                prefs.physicalTo = Prefs.TO_MACHINE; prefs.padTo = Prefs.TO_MACHINE
+            override fun pairNewMachine(forPad: Boolean) {
+                // Only the set of controls this was asked for. Sending both was what made the
+                // on-screen buttons follow the built-in controller to a machine uninvited, which
+                // is the one combination the split exists to keep apart.
+                if (forPad) prefs.padTo = Prefs.TO_MACHINE else prefs.physicalTo = Prefs.TO_MACHINE
                 // The radio follows what we are appearing as, rather than being fixed here. Both
                 // identities are Low Energy today, so nothing changes yet — but a PlayStation or
                 // Nintendo profile would be Classic, and that belongs to the profile rather than
