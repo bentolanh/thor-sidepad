@@ -554,6 +554,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             val frosted = backdrop == "frosted" && blurSupported
             val color = backdropColor(backdrop)
             val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider, video = video, edges = !singleScreen)
+            v.pointer = pointer
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {

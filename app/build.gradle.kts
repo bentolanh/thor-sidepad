@@ -15,8 +15,13 @@ android {
         applicationId = "dev.lbento.thorsidepad"
         minSdk = 30
         targetSdk = 33
-        versionCode = 6
-        versionName = "0.9.5"
+        // Bump this whenever IInjector.aidl changes, not only for releases. The helper is a
+        // Shizuku daemon that outlives the app, and Shizuku only replaces it when this number
+        // moves — so without a bump a new APK talks to an old helper, and every method added
+        // since simply is not there. That cost an afternoon on 2026-09-21: two features were
+        // written, installed and "tested" against a helper five hours older than either of them.
+        versionCode = 7
+        versionName = "0.9.6"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 

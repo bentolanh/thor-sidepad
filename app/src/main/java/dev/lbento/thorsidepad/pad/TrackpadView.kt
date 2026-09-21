@@ -56,17 +56,10 @@ class TrackpadView(
     /** A finger's worth of scroll before one wheel click is sent. */
     private val wheelStepPx = 28f * ctx.resources.displayMetrics.density
 
-    override fun onDraw(c: Canvas) {
-        val r = 18f
-        face.color = if (lit) 0x33FFFFFF else 0x1FFFFFFF
-        c.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), r, r, face)
-        edge.color = if (enabled) 0x66FFFFFF else 0x33FFFFFF
-        edge.strokeWidth = 2f
-        c.drawRoundRect(1f, 1f, width - 1f, height - 1f, r, r, edge)
-        mark.color = if (enabled) 0x99FFFFFF.toInt() else 0x4DFFFFFF
-        mark.textSize = minOf(width, height) * 0.16f
-        c.drawText("TRACKPAD", width / 2f, height / 2f + mark.textSize * 0.36f, mark)
-    }
+    private val painter = ButtonPainter()
+
+    override fun onDraw(c: Canvas) =
+        painter.drawTrackpad(c, 1f, 1f, width - 1f, height - 1f, lit)
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (!enabled) return false
@@ -148,8 +141,7 @@ class TrackpadView(
     }
 
     companion object {
-        /** Half-extents in button radii, so islands and shield agree on the same rectangle. */
-        const val HALF_W = 2.2f
-        const val HALF_H = 1.6f
+        const val HALF_W = ButtonPainter.PAD_HALF_W
+        const val HALF_H = ButtonPainter.PAD_HALF_H
     }
 }

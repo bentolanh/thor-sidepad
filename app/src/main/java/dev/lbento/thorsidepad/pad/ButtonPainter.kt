@@ -79,6 +79,28 @@ class ButtonPainter {
         if (tag != null) { small.textSize = r * 0.26f; c.drawText(tag, cx, bottom + r * 0.7f, small) }
     }
 
+    /**
+     * The trackpad: a plain rounded field, lighter while a finger is on it.
+     *
+     * Deliberately unlike every other control here. Round means "press me"; this one is a surface
+     * to be dragged across, and drawing it as a button was enough on its own to make it unusable —
+     * the editor showed a circle, so there was no way to see or size the area a finger would have.
+     */
+    fun drawTrackpad(c: Canvas, left: Float, top: Float, right: Float, bottom: Float,
+                     active: Boolean, selected: Boolean = false) {
+        val r = (bottom - top) * 0.12f
+        fill.color = if (active) 0x40FFFFFF else 0x1FFFFFFF
+        c.drawRoundRect(left, top, right, bottom, r, r, fill)
+        ring.pathEffect = null
+        ring.strokeWidth = (bottom - top) * (if (selected) 0.05f else 0.03f)
+        ring.color = if (selected) 0xFFFFC107.toInt() else 0x99FFFFFF.toInt()
+        c.drawRoundRect(left, top, right, bottom, r, r, ring)
+        text.textSize = (bottom - top) * 0.17f
+        text.color = 0x99FFFFFF.toInt()
+        c.drawText("TRACKPAD", (left + right) / 2f, (top + bottom) / 2f + text.textSize * 0.36f, text)
+        text.color = Color.WHITE
+    }
+
     /** A stick: outer ring, knob offset by (kx, ky) in -1..1 of the ring radius. */
     fun drawStick(c: Canvas, cx: Float, cy: Float, r: Float, label: String, enabled: Boolean, kx: Float, ky: Float, selected: Boolean = false) {
         ring.strokeWidth = r * (if (selected) 0.10f else 0.05f)
@@ -493,6 +515,9 @@ class ButtonPainter {
             return l to 1f - l
         }
 
+        /** The trackpad's half-extents in button radii; islands, shield and editor share them. */
+        const val PAD_HALF_W = 2.2f
+        const val PAD_HALF_H = 1.6f
         const val MEDIA_HALF_W = 2.3f
         /** How much of the unit's width the three transport zones take; the rest is the volume track. */
         const val MEDIA_BUTTONS_FRAC = 0.58f

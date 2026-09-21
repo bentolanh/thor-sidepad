@@ -9,6 +9,9 @@ display, injected as real gamepad events through a Shizuku user service. See REA
   `app/build/outputs/apk/release/app-release.apk` with `adb install -r`. The device must be
   plugged in or on adb wifi. Installing needs no permission asked each time — it is the normal
   way work gets checked here. Never `adb uninstall`: it deletes the user's presets.
+- Changing `IInjector.aidl` means bumping `versionCode` in `app/build.gradle.kts`. The helper is
+  a Shizuku daemon that outlives the app and is only replaced when that number changes; without a
+  bump the new APK talks to the old helper and every added method is missing at runtime.
 - The injector runs as shell UID via Shizuku. Anything touching `/dev/input` or `/dev/uinput`
   belongs in `inject/InjectorService.kt` + `jni/sidepad_native.c`, never in the app process.
 - All overlay windows must stay `FLAG_NOT_FOCUSABLE`: focus on the second display would steal

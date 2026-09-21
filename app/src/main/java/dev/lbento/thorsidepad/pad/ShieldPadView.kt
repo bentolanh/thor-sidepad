@@ -12,6 +12,7 @@ import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isMediaUnit
 import dev.lbento.thorsidepad.inject.isVideoUnit
+import dev.lbento.thorsidepad.inject.isTrackpadUnit
 import dev.lbento.thorsidepad.inject.mediaCodeAt
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
@@ -77,6 +78,17 @@ class ShieldPadView(
     private val videoDownX = HashMap<Int, Float>()    // pointerId -> where the drag began
     private val videoMoved = HashSet<Int>()           // pointers that have moved far enough to count
     private val dpadBy = HashMap<Int, Int>()         // pointerId -> D-pad index it is steering
+
+    // ---- trackpad ----
+    /** What a trackpad here drives; null while the pad has none or the helper cannot make one. */
+    var pointer: PointerSink? = null
+    private val padBy = HashMap<Int, Int>()          // pointerId -> trackpad index under it
+    private val padX = HashMap<Int, Float>()
+    private val padY = HashMap<Int, Float>()
+    private val padDownAt = HashMap<Int, Long>()
+    private val padTravel = HashMap<Int, Float>()
+    private var padScroll = 0f
+    private val wheelStep get() = 28f * resources.displayMetrics.density
     private val dpadMask = HashMap<Int, Int>()       // D-pad index -> directions held
 
     private class Swipe(val edge: EdgeGesture, val x0: Float, val y0: Float, val t0: Long)
@@ -113,6 +125,9 @@ class ShieldPadView(
             } else if (isVideoUnit(b.code)) {
                 val cx = b.cx * width; val cy = b.cy * height
                 if (abs(x - cx) <= r * ButtonPainter.VIDEO_HALF_W && abs(y - cy) <= r * ButtonPainter.VIDEO_HALF_H) return i
+            } else if (isTrackpadUnit(b.code)) {
+                val cx = b.cx * width; val cy = b.cy * height
+                if (abs(x - cx) <= r * ButtonPainter.PAD_HALF_W && abs(y - cy) <= r * ButtonPainter.PAD_HALF_H) return i
             } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1
@@ -125,7 +140,12 @@ class ShieldPadView(
         layout.buttons.forEachIndexed { i, b ->
             val r = b.size * short() / 2f
             val label = Glyphs.label(b.code, layout.style)
-            if (isDpadCode(b.code)) {
+            if (isTrackpadUnit(b.code)) {
+                val tx = b.cx * width; val ty = b.cy * height
+                painter.drawTrackpad(c, tx - r * ButtonPainter.PAD_HALF_W, ty - r * ButtonPainter.PAD_HALF_H,
+                    tx + r * ButtonPainter.PAD_HALF_W, ty + r * ButtonPainter.PAD_HALF_H,
+                    padBy.containsValue(i))
+            } else if (isDpadCode(b.code)) {
                 painter.drawDpad(c, b.cx * width, b.cy * height, r, engine.enabled(b.code), dpadMask[i] ?: 0)
             } else if (isStickCode(b.code)) {
                 val k = knob[i]
@@ -327,6 +347,12 @@ class ShieldPadView(
         }
     }
 
+    /** Matches [TrackpadView.gain]: flat for placing the cursor, faster for crossing the screen. */
+    private fun padGain(step: Float): Float {
+        val d = resources.displayMetrics.density
+        return 1f + (step / (6f * d)).coerceIn(0f, 1f) * 2f
+    }
+
     private fun edgeAt(x: Float, y: Float): EdgeGesture? {
         if (!edges) return null
         val zone = short() * EDGE_ZONE
@@ -352,6 +378,13 @@ class ShieldPadView(
                 else if (i >= 0 && isStickCode(layout.buttons[i].code)) { stickBy[pid] = i; steer(i, x, y) }
                 else if (i >= 0 && isDpadCode(layout.buttons[i].code)) { dpadBy[pid] = i; steerDpad(i, x, y) }
                 else if (i >= 0 && isSliderCode(layout.buttons[i].code)) { sliderBy[pid] = i; slide(i, y) }
+                else if (i >= 0 && isTrackpadUnit(layout.buttons[i].code)) {
+                    padBy[pid] = i; padX[pid] = x; padY[pid] = y
+                    padDownAt[pid] = e.eventTime; padTravel[pid] = 0f
+                    // A second finger on the same pad turns the gesture into a scroll.
+                    if (padBy.count { it.value == i } >= 2) padScroll = 0f
+                    invalidate()
+                }
                 else {
                     tracked.add(pid)
                     if (i >= 0) {
@@ -402,6 +435,26 @@ class ShieldPadView(
                     stickBy[pid]?.let { si -> steer(si, e.getX(idx), e.getY(idx)); invalidate() }
                     dpadBy[pid]?.let { di -> steerDpad(di, e.getX(idx), e.getY(idx)); invalidate() }
                     sliderBy[pid]?.let { si -> slide(si, e.getY(idx)); invalidate() }
+                    padBy[pid]?.let { pi ->
+                        val nx = e.getX(idx); val ny = e.getY(idx)
+                        val dx = nx - (padX[pid] ?: nx); val dy = ny - (padY[pid] ?: ny)
+                        padX[pid] = nx; padY[pid] = ny
+                        padTravel[pid] = (padTravel[pid] ?: 0f) + hypot(dx, dy)
+                        if (padBy.count { it.value == pi } >= 2) {
+                            // Two fingers on one pad: scroll, and only from the first of them so
+                            // the page does not move twice as fast as the hand.
+                            if (padBy.keys.minOrNull() == pid) {
+                                padScroll += dy
+                                while (abs(padScroll) >= wheelStep) {
+                                    pointer?.wheel(if (padScroll > 0) 1 else -1)
+                                    padScroll -= (if (padScroll > 0) 1f else -1f) * wheelStep
+                                }
+                            }
+                        } else {
+                            val g = padGain(hypot(dx, dy))
+                            pointer?.move((dx * g).toInt(), (dy * g).toInt())
+                        }
+                    }
                     mediaDrag[pid]?.let { mi -> mediaSlide(mi, e.getX(idx), false); invalidate() }
                     videoDrag[pid]?.let { vi ->
                         // Both tracks answer a drag and ignore a tap, so a stray touch changes nothing.
@@ -427,6 +480,19 @@ class ShieldPadView(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val idx = e.actionIndex
                 val pid = e.getPointerId(idx)
+                padBy.remove(pid)?.let { pi ->
+                    val quick = e.eventTime - (padDownAt.remove(pid) ?: 0L) <= 300L
+                    val still = (padTravel.remove(pid) ?: 0f) <= touchSlop
+                    // Two fingers down makes it the right button, which is the only way to reach
+                    // one without spending a button on it.
+                    val two = padBy.any { it.value == pi }
+                    if (quick && still) {
+                        val b = if (two) 0x111 else 0x110
+                        pointer?.button(b, true)
+                        postDelayed({ pointer?.button(b, false) }, 40)
+                    }
+                    padX.remove(pid); padY.remove(pid); invalidate()
+                }
                 release(pid, fireAction = pressedBy[pid]?.let { it == hit(e.getX(idx), e.getY(idx)) } == true)
                 releaseStick(pid)
                 releaseDpad(pid)

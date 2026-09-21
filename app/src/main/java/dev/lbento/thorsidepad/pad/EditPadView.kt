@@ -11,6 +11,7 @@ import dev.lbento.thorsidepad.inject.Action
 import dev.lbento.thorsidepad.inject.isActionCode
 import dev.lbento.thorsidepad.inject.isMediaUnit
 import dev.lbento.thorsidepad.inject.isVideoUnit
+import dev.lbento.thorsidepad.inject.isTrackpadUnit
 import dev.lbento.thorsidepad.inject.isSliderCode
 import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isStickCode
@@ -68,6 +69,11 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
                 painter.drawMedia(c, mx - r * ButtonPainter.MEDIA_HALF_W, my - r * ButtonPainter.MEDIA_HALF_H,
                     mx + r * ButtonPainter.MEDIA_HALF_W, my + r * ButtonPainter.MEDIA_HALF_H, -1, i == selected)
             }
+            else if (isTrackpadUnit(b.code)) {
+                val r = b.size * short() / 2f; val tx = b.cx * width; val ty = b.cy * height
+                painter.drawTrackpad(c, tx - r * ButtonPainter.PAD_HALF_W, ty - r * ButtonPainter.PAD_HALF_H,
+                    tx + r * ButtonPainter.PAD_HALF_W, ty + r * ButtonPainter.PAD_HALF_H, false, i == selected)
+            }
             else if (isDpadCode(b.code)) painter.drawDpad(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, 0, i == selected)
             else if (isStickCode(b.code)) painter.drawStick(c, b.cx * width, b.cy * height, b.size * short() / 2f, label, true, 0f, 0f, i == selected)
             else if (b.code == Action.SHIELD) painter.drawShieldToggle(c, b.cx * width, b.cy * height, b.size * short() / 2f, true, i == selected)
@@ -86,6 +92,8 @@ class EditPadView(ctx: Context, val layout: PadLayout) : View(ctx) {
                 if (abs(x - b.cx * width) <= r * ButtonPainter.VIDEO_HALF_W && abs(y - b.cy * height) <= r * ButtonPainter.VIDEO_HALF_H) return i
             } else if (isMediaUnit(b.code)) {
                 if (abs(x - b.cx * width) <= r * ButtonPainter.MEDIA_HALF_W && abs(y - b.cy * height) <= r * ButtonPainter.MEDIA_HALF_H) return i
+            } else if (isTrackpadUnit(b.code)) {
+                if (abs(x - b.cx * width) <= r * ButtonPainter.PAD_HALF_W && abs(y - b.cy * height) <= r * ButtonPainter.PAD_HALF_H) return i
             } else if (hypot(x - b.cx * width, y - b.cy * height) <= r) return i
         }
         return -1
