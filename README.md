@@ -222,6 +222,12 @@ touch screen, expect the following:
   as disabled on the pad.
 - The frosted backdrop needs a device that can blur behind windows; otherwise it falls back
   to a heavy dim.
+- The trackpad needs somewhere for the cursor to go. On a handheld with two screens the pointer
+  lands on the main one while the pad sits on the second, so it works whichever mode the pad is
+  in. On a handheld with one screen it works in islands mode, where the gaps between buttons
+  belong to whatever is underneath — but not with the shield on, because the shield is one window
+  covering the whole screen and every click, mouse included, is its own. The pad says "shield is
+  on" in place of the trackpad rather than pretending.
 - Keeping the handheld awake while you play works anywhere Shizuku does. It reports each press
   to Android as the activity it is, through a call the shell user is allowed to make on any
   Android build — nothing about it is particular to these handhelds.

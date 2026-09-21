@@ -144,7 +144,7 @@ class ShieldPadView(
                 val tx = b.cx * width; val ty = b.cy * height
                 painter.drawTrackpad(c, tx - r * ButtonPainter.PAD_HALF_W, ty - r * ButtonPainter.PAD_HALF_H,
                     tx + r * ButtonPainter.PAD_HALF_W, ty + r * ButtonPainter.PAD_HALF_H,
-                    padBy.containsValue(i))
+                    padBy.containsValue(i), enabled = pointer != null)
             } else if (isDpadCode(b.code)) {
                 painter.drawDpad(c, b.cx * width, b.cy * height, r, engine.enabled(b.code), dpadMask[i] ?: 0)
             } else if (isStickCode(b.code)) {

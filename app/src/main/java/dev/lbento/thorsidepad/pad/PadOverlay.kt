@@ -554,7 +554,12 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             val frosted = backdrop == "frosted" && blurSupported
             val color = backdropColor(backdrop)
             val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider, video = video, edges = !singleScreen)
-            v.pointer = pointer
+            // Only where a click can land somewhere. The shield is a full-screen touchable
+            // window, so every pointer event on its display goes to it — mouse included, decided
+            // at window level before any view sees it. On a handheld with a second screen the
+            // cursor is over there and this is fine; on one screen the cursor is under the shield
+            // and would only ever click the shield, so the trackpad says so instead of pretending.
+            v.pointer = if (singleScreen) null else pointer
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {

@@ -87,17 +87,19 @@ class ButtonPainter {
      * the editor showed a circle, so there was no way to see or size the area a finger would have.
      */
     fun drawTrackpad(c: Canvas, left: Float, top: Float, right: Float, bottom: Float,
-                     active: Boolean, selected: Boolean = false) {
+                     active: Boolean, selected: Boolean = false, enabled: Boolean = true) {
         val r = (bottom - top) * 0.12f
-        fill.color = if (active) 0x40FFFFFF else 0x1FFFFFFF
+        fill.color = if (!enabled) 0x14FFFFFF else if (active) 0x40FFFFFF else 0x1FFFFFFF
         c.drawRoundRect(left, top, right, bottom, r, r, fill)
-        ring.pathEffect = null
+        ring.pathEffect = if (enabled) null else DashPathEffect(floatArrayOf(10f, 8f), 0f)
         ring.strokeWidth = (bottom - top) * (if (selected) 0.05f else 0.03f)
-        ring.color = if (selected) 0xFFFFC107.toInt() else 0x99FFFFFF.toInt()
+        ring.color = if (selected) 0xFFFFC107.toInt() else if (enabled) 0x99FFFFFF.toInt() else 0x4DFFFFFF
         c.drawRoundRect(left, top, right, bottom, r, r, ring)
         text.textSize = (bottom - top) * 0.17f
-        text.color = 0x99FFFFFF.toInt()
-        c.drawText("TRACKPAD", (left + right) / 2f, (top + bottom) / 2f + text.textSize * 0.36f, text)
+        text.color = if (enabled) 0x99FFFFFF.toInt() else 0x4DFFFFFF
+        c.drawText(if (enabled) "TRACKPAD" else "SHIELD IS ON",
+            (left + right) / 2f, (top + bottom) / 2f + text.textSize * 0.36f, text)
+        ring.pathEffect = null
         text.color = Color.WHITE
     }
 
