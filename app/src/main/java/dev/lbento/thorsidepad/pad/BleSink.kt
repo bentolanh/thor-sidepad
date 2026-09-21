@@ -661,8 +661,28 @@ class BleSink(
                 // sixteen seconds later, again and again. Nothing here noticed, because from
                 // this side a link that is up and a link that is listening look identical.
                 //
-                // So wait to be asked, every time. A machine that wants the pad subscribes when
-                // it connects, and that write is the only honest signal there is.
+                // So: wait to be asked — unless nothing has moved since this host last asked.
+                //
+                // The specification puts remembering on the peripheral, not the host, and macOS
+                // follows it: a bonded machine reconnects and expects reports to resume without
+                // subscribing again. This pad did not remember, so the machine waited for
+                // reports and the pad waited to be asked, and every reconnection since has
+                // needed the pairing thrown away and rebuilt. That is the cost of the caution
+                // above, and it has been paid on every test for two days.
+                //
+                // The caution is still right where the attribute table has changed, because then
+                // the machine's cached handles are wrong and reports go nowhere. But that is
+                // exactly what the fingerprint below already detects — same identity, same
+                // descriptor, same build. When it matches, the machine's session is as valid as
+                // it was when it subscribed, and resuming is what the specification asks for.
+                // When it does not, nothing is assumed and the old behaviour stands.
+                val known = subscriptions.getBoolean(device.address, false)
+                val sameLayout = subscriptions.getInt("fp:${device.address}", 0) == layoutFingerprint()
+                if (known && sameLayout) {
+                    subscribed = true
+                    Log.i(TAG, "${device.address} subscribed last time and nothing has moved; resuming")
+                    onState("")
+                }
                 if (!isBonded(device)) {
                     // Never met, or bonded over Classic only. Asking for a Low Energy bond
                     // covers both; one that already exists is refused harmlessly.
@@ -745,7 +765,15 @@ class BleSink(
             if (d?.uuid == uuid(CCCD) && d.characteristic?.uuid == uuid(REPORT)) {
                 subscribed = value != null && value.isNotEmpty() && value[0].toInt() and 0x01 != 0
                 Log.i(TAG, if (subscribed) "the host is taking reports" else "the host stopped taking reports")
-                device?.let { subscriptions.edit().putBoolean(it.address, subscribed).apply() }
+                // Record which layout it subscribed to, so the next connection can tell whether
+                // resuming is safe. Without this a first-time subscriber has nothing to compare
+                // against and would be made to subscribe again on every visit.
+                device?.let {
+                    subscriptions.edit()
+                        .putBoolean(it.address, subscribed)
+                        .putInt("fp:${it.address}", layoutFingerprint())
+                        .apply()
+                }
                 if (subscribed) onState("")
             }
             if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
@@ -932,17 +960,25 @@ class BleSink(
      * of the attribute table — the identity we claim and the report descriptor that goes with it
      * — which is exactly what a reinstall or a change of "appears as" disturbs.
      */
-    private fun announceLayoutIfChanged(device: BluetoothDevice) {
-        // What the host has to re-read if it changed. The identity and the report descriptor are
-        // the obvious parts, but the server itself counts: reinstalling the app builds a new one,
-        // and a host holding the old session will sit on a link that works while publishing no
-        // gamepad at all. Measured on 2026-09-20 — no churn, no timeouts, simply no controller.
-        // The install time is what says "this is not the server you met".
+    /**
+     * What a host would have to re-read if it changed.
+     *
+     * The identity and the report descriptor are the obvious parts, but the server itself
+     * counts: reinstalling the app builds a new one, and a host holding the old session will sit
+     * on a link that works while publishing no gamepad at all. Measured on 2026-09-20 — no
+     * churn, no timeouts, simply no controller. The install time is what says "this is not the
+     * server you met".
+     */
+    private fun layoutFingerprint(): Int {
         val built = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).lastUpdateTime
         } catch (e: Exception) { 0L }
-        var fingerprint = identity.name.hashCode() * 31 + shape.descriptor.contentHashCode()
-        fingerprint = fingerprint * 31 + built.hashCode()
+        var fp = identity.name.hashCode() * 31 + shape.descriptor.contentHashCode()
+        return fp * 31 + built.hashCode()
+    }
+
+    private fun announceLayoutIfChanged(device: BluetoothDevice) {
+        val fingerprint = layoutFingerprint()
         val key = "fp:${device.address}"
         if (subscriptions.getInt(key, 0) == fingerprint) return
         ticker.schedule({

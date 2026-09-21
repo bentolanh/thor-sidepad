@@ -180,6 +180,46 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putString("calibration", v).apply()
 
 
+    /**
+     * Which platform the pad is talking to. DORMANT: nothing reads this yet.
+     *
+     * Kept because it will be wanted the moment a second platform disagrees with macOS about
+     * what a gamepad is, and the awkward part is not the setting but the timing: a host reads
+     * the report map to learn what we are, and it reads it before we know anything about it. So
+     * the choice has to be made before a machine connects, which is why it cannot be detected
+     * and applied on the fly, and why changing it costs a pairing.
+     *
+     * It was wired up on 2026-09-21 to choose whether to send the Consumer collections, on the
+     * theory that those caused the WindowServer livelock. That theory died the same morning —
+     * the daemon was caught wedged with all four threads idle, so the flood is WindowServer
+     * retrying a daemon that has forgotten its controllers, not an attack on it. With one report
+     * map left there is nothing for this to choose, so it chooses nothing rather than pretending.
+     *
+     * [platformNow] is the part worth keeping: a peripheral learns a Bluetooth name and a device
+     * class and nothing else, which is enough to recognise an Apple device and not much more.
+     */
+    var hostPlatform: String
+        get() = sp.getString("hostPlatform", PLATFORM_AUTO) ?: PLATFORM_AUTO
+        set(v) = sp.edit().putString("hostPlatform", v).apply()
+
+    /** The Bluetooth name of the last machine that took the pad, for [platformNow] to read. */
+    var lastHostName: String
+        get() = sp.getString("lastHostName", "") ?: ""
+        set(v) = sp.edit().putString("lastHostName", v).apply()
+
+    /**
+     * What [hostPlatform] comes to once AUTO has been resolved. Timid on purpose: a name is the
+     * only real signal and its owner can change it, so anything unrecognised falls to Apple,
+     * whose shape has so far been a strict subset of what other hosts accept.
+     */
+    fun platformNow(): String {
+        val chosen = hostPlatform
+        if (chosen != PLATFORM_AUTO) return chosen
+        val n = lastHostName.lowercase()
+        return if (listOf("mac", "ipad", "iphone", "apple", "ipod").any { n.contains(it) })
+            PLATFORM_APPLE else PLATFORM_APPLE
+    }
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()
@@ -226,6 +266,19 @@ class Prefs(ctx: Context) {
         /** Presses go to another machine over Bluetooth rather than into this device. */
         const val MODE_BT = "bt"
         const val TRANSPORT_CLASSIC = "classic"
+        const val PLATFORM_AUTO = "auto"
+        /** Mac, iPad and iPhone together: one GameController framework, one set of quirks. */
+        const val PLATFORM_APPLE = "apple"
+        const val PLATFORM_WINDOWS = "windows"
+        const val PLATFORM_ANDROID = "android"
+        const val PLATFORM_LINUX = "linux"
+        val PLATFORM_LABELS = listOf(
+            PLATFORM_AUTO to "Work it out automatically",
+            PLATFORM_APPLE to "Mac, iPad or iPhone",
+            PLATFORM_WINDOWS to "Windows",
+            PLATFORM_ANDROID to "Android",
+            PLATFORM_LINUX to "Linux or Steam Deck",
+        )
         const val TRANSPORT_LE = "le"
     }
 }
