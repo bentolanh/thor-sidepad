@@ -181,12 +181,15 @@ class BleSink(
             stopHeartbeat()
             onState("Not connected")
         }
-        restartAdvertising()
+        // Only if there is nothing on the air. Restarting an advertisement that is already
+        // running changes the address for no reason, and the settings no longer differ.
+        if (advertiser == null) restartAdvertising() else Log.i(TAG, "already on the air; keeping this address")
         ticker.schedule({
-            if (secondsFindable() == 0) {
-                Log.i(TAG, "no longer findable; quiet again")
-                restartAdvertising()
-            }
+            // Nothing to restart when the window closes any more. The advertisement outside a
+            // findable window is now identical to the one inside it, so switching back would
+            // only cost another address. What the window still decides is whether the pad lets
+            // go of a machine that has it, which happens above, not here.
+            if (secondsFindable() == 0) Log.i(TAG, "no longer findable; still reachable")
         }, seconds.toLong() + 1, TimeUnit.SECONDS)
     }
 
@@ -397,17 +400,21 @@ class BleSink(
             return true
         }
         val open = secondsFindable() > 0
-        // Loud only while somebody is looking. Low latency at full power is a packet every
-        // hundred milliseconds, and the pad used to do that around the clock — airtime taken from
-        // the Wi-Fi and every other Bluetooth device in the room, and the handheld's battery with
-        // it. A machine that already knows us finds us perfectly well at the quiet setting.
+        // One setting, always, because changing it costs an identity.
+        //
+        // These used to be loud while findable and quiet otherwise. Since the advertisement
+        // carries the same name and the same gamepad service either way, that switch changed
+        // nothing a host can see — but it meant tearing the advertisement down and putting it
+        // back up, and Android hands out a fresh random address every time advertising starts.
+        // Measured on 2026-09-21: six different addresses in half an hour, where a rotation
+        // alone would give two. Each one arrives at a host as another device, which is where the
+        // unnamed rows in a Mac's list come from.
+        //
+        // Balanced sits between the two it replaces: found promptly enough to pair by hand, and
+        // not a packet every hundred milliseconds around the clock.
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(
-                if (open) AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY
-                else AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
-            .setTxPowerLevel(
-                if (open) AdvertiseSettings.ADVERTISE_TX_POWER_HIGH
-                else AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
             .setConnectable(true)
             .setTimeout(0)
             .build()
