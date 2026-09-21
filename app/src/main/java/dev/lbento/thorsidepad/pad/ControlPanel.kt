@@ -24,11 +24,11 @@ data class HostChoice(val address: String, val label: String)
 
 /**
  * The Thor's built-in controller reports one of two names depending on the Control Center's
- * "Handle Style". Both mean the same physical pad, so both are shown as "Thor controller".
+ * "Handle Style". Both mean the same physical pad, so both are shown as "Built-in controller".
  */
 fun thorLabel(name: String): String? = when (name) {
-    "Xbox Wireless Controller" -> "Thor controller (Xbox style)"
-    "Odin Controller" -> "Thor controller (Standard style)"
+    "Xbox Wireless Controller" -> "Built-in controller (Xbox style)"
+    "Odin Controller" -> "Built-in controller (Standard style)"
     else -> null
 }
 fun isThorName(name: String) = thorLabel(name) != null
@@ -180,8 +180,8 @@ object ControlPanel {
             // Every page that is not the main one needs a way back; the scrim only closes the panel.
             if (page != Page.MAIN) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
             bar.addView(label(when (page) {
-                Page.MAIN -> "Thor SidePad"
-                Page.DESTINATION -> "Send to"
+                Page.MAIN -> "SidePad"
+                Page.DESTINATION -> "Send button presses to"
                 Page.APPEARANCE -> "Appears as"
                 Page.PAIRING -> "Pair a new machine"
                 else -> "Appears as"
@@ -214,7 +214,7 @@ object ControlPanel {
                 val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
                 val whereTo = if (!state.remote) "This device"
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
-                choicesGroup.addView(pickerRow("Send to", whereTo) { page = Page.DESTINATION; render() })
+                choicesGroup.addView(pickerRow("Send button presses to", whereTo) { page = Page.DESTINATION; render() })
                 choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
                 val remoteAs = if (state.identity == "XBOX_SERIES") "An Xbox-compatible pad" else "SidePad"
                 choicesGroup.addView(pickerRow("Appears as", if (state.remote) remoteAs else target) {
@@ -228,13 +228,13 @@ object ControlPanel {
                 card.addView(btn("Edit layout") { actions.editLayout() }.apply {
                     setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                 })
-                card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(sw("Keep playing with the screens off", state.keepAwake) { actions.setKeepAwake(it) })
                 card.addView(label(
-                    "Off, the Thor sleeps as usual and stops reading its own controller, so presses " +
+                    "Off, this device sleeps as usual and stops reading its own controller, so presses " +
                     "stop reaching the machine even though the pad still looks connected. On, it " +
-                    "keeps working with both screens dark and uses more battery.",
+                    "keeps working with the screens dark and uses more battery.",
                     11f, grey).apply { setPadding(0, 0, 0, 8) })
+                card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))
                 card.addView(row(*choices.map { (key, name) -> btn(name, key != state.backdrop) { actions.setBackdrop(key) } }.toTypedArray()))
@@ -252,12 +252,6 @@ object ControlPanel {
                 }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     marginStart = 140; marginEnd = 140
                 })
-                card.addView(label(
-                    if (state.edges)
-                        "Scroll past the bottom of this list to close, the way the notification shade does. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad."
-                    else
-                        "Scroll past the bottom of this list to close, the way the notification shade does. The top and bottom edges belong to Android on this device, so the floating button is the way back to the pad.",
-                    12f, grey).apply { setPadding(0, 10, 0, 0) })
             } else if (page == Page.PAIRING) {
                 // One screen, one story, whichever radio is underneath. Pick the mode, press the
                 // button, go to the machine and connect. What the two radios do differently to
@@ -280,7 +274,7 @@ object ControlPanel {
                     card.addView(btn("Start the two minutes again") { actions.makeVisible() }
                         .apply { setPadding(0, 12, 0, 0) })
                 } else {
-                    card.addView(btn("Make the Thor visible") { actions.makeVisible() }.apply {
+                    card.addView(btn("Make this device visible") { actions.makeVisible() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                     })
                     card.addView(label(
@@ -288,14 +282,14 @@ object ControlPanel {
                         13f, grey).apply { setPadding(0, 8, 0, 0) })
                 }
                 if (state.adoptable.isNotEmpty()) {
-                    card.addView(label("Already paired with this Thor", 14f, grey)
+                    card.addView(label("Already paired with this device", 14f, grey)
                         .apply { setPadding(0, 18, 0, 4) })
                     for (h in state.adoptable) card.addView(btn("Use ${h.label}") { actions.adoptMachine(h.address) })
                 }
                 card.addView(label(
                     "Changing what it appears as makes this a different device to the computer, so " +
                     "it has to be paired again \u2014 and if it will not connect, forget it on the " +
-                    "computer and on the Thor both, since clearing one side leaves keys behind.",
+                    "computer and on this device both, since clearing one side leaves keys behind.",
                     12f, grey).apply { setPadding(0, 18, 0, 0) })
             } else if (page == Page.APPEARANCE) {
                 run {
@@ -315,8 +309,8 @@ object ControlPanel {
                 card.addView(btn("Pair a new machine\u2026") { page = Page.PAIRING; render() })
                 card.addView(label(
                     if (state.hosts.isEmpty())
-                        "Nothing paired yet. Pair a computer and the Thor becomes a controller for it, over Bluetooth."
-                    else "Sending to a machine needs no Shizuku: the Thor presents itself as an ordinary Bluetooth gamepad.",
+                        "Nothing paired yet. Pair a computer and this device becomes a controller for it, over Bluetooth."
+                    else "Sending to a machine needs no Shizuku: this device presents itself as an ordinary Bluetooth gamepad.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
                 // Low Energy has no machine to pick. Over Classic the Thor dials a computer it has
                 // paired with, so the list above is the question; over Low Energy the computer

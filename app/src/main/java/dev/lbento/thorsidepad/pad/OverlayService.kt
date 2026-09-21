@@ -421,7 +421,7 @@ class OverlayService : Service() {
     private fun withInjector(block: (IInjector) -> Unit) {
         Injector.connect(this) { svc ->
             if (svc == null) {
-                toast("Shizuku is not running or not authorised. Open Thor SidePad to fix.")
+                toast("Shizuku is not running or not authorised. Open SidePad to fix.")
             } else block(svc)
         }
     }
@@ -857,7 +857,7 @@ class OverlayService : Service() {
             if (svc != null) {
                 Thread { try { svc.shell("am start --display $displayId -n $packageName/.MainActivity") } catch (e: Exception) { Log.w(TAG, "open app failed", e) } }.start()
             } else {
-                toast("Android blocked the launch and Shizuku is not running. Tap the Thor SidePad notification to open the app.")
+                toast("Android blocked the launch and Shizuku is not running. Tap the SidePad notification to open the app.")
             }
         }, 1200)
     }
@@ -1354,11 +1354,11 @@ class OverlayService : Service() {
 
     private fun buildNotification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Thor SidePad", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, "SidePad", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_pad)
-            .setContentTitle("Thor SidePad")
+            .setContentTitle("SidePad")
             .setContentText(if (visible) "Pad is on the second screen. Pull up from the bottom edge to hide it." else "Pad hidden. Pull up from the bottom edge to show it, pull down for the panel.")
             .setContentIntent(open)
             .setOngoing(true)

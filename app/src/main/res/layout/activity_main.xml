@@ -75,6 +75,6 @@
         <TextView style="@style/StepHelp" android:text="Your presets and the current layout live inside the app and are lost when it is uninstalled. Export writes them to a file you choose (Downloads, a cloud folder); Import reads such a file back, replacing presets of the same name." />
         <Button android:id="@+id/btnExport" style="@style/Row" android:text="Export presets to a file" />
         <Button android:id="@+id/btnImport" style="@style/Row" android:text="Import presets from a file" />
-        <TextView style="@style/StepHelp" android:text="Shizuku itself stops when the Thor reboots. In the Shizuku app, turn on “Start on boot (wireless debugging)” so both come back on their own; otherwise start Shizuku again from its app or from a computer with adb." />
+        <TextView style="@style/StepHelp" android:text="Shizuku itself stops when this device reboots. In the Shizuku app, turn on “Start on boot (wireless debugging)” so both come back on their own; otherwise start Shizuku again from its app or from a computer with adb." />
     </LinearLayout>
 </ScrollView>

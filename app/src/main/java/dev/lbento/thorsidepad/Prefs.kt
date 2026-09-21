@@ -5,7 +5,7 @@ import android.content.Context
 class Prefs(ctx: Context) {
     private val sp = ctx.applicationContext.getSharedPreferences("sidepad", Context.MODE_PRIVATE)
 
-    /** "physical" writes into the Thor's own controller node; "virtual" creates a separate uinput pad. */
+    /** "physical" writes into the handheld's own controller node; "virtual" creates a separate uinput pad. */
     var targetMode: String
         get() = sp.getString("targetMode", MODE_PHYSICAL) ?: MODE_PHYSICAL
         set(v) = sp.edit().putString("targetMode", v).apply()

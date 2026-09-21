@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.step2Button).setOnClickListener {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             // Some firmware (the Thor's included) opens the full app list instead of SidePad's own page.
-            Toast.makeText(this, "Find Thor SidePad in the list and turn it on. SidePad comes back by itself.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Find SidePad in the list and turn it on. SidePad comes back by itself.", Toast.LENGTH_LONG).show()
             startOverlayWatch()
         }
         findViewById<Button>(R.id.step3Button).setOnClickListener {
@@ -189,7 +189,7 @@ class MainActivity : AppCompatActivity() {
         val s1btn = findViewById<Button>(R.id.step1Button)
         val shizukuReady: Boolean
         val why = "Shizuku is needed to press buttons on this device: Android does not let one app do that for another, and Shizuku lends SidePad the same access a computer has over USB debugging. No root needed.\n\n" +
-            "It is not needed to use the Thor as a controller for another machine. That goes out over Bluetooth, which any app may do, so you can skip this step if that is all you want. The brightness and volume sliders and the media controls need it either way.\n\n"
+            "It is not needed to use this device as a controller for another machine. That goes out over Bluetooth, which any app may do, so you can skip this step if that is all you want. The brightness and volume sliders and the media controls need it either way.\n\n"
         when {
             !shizukuInstalled() -> {
                 shizukuReady = false
@@ -212,7 +212,7 @@ class MainActivity : AppCompatActivity() {
             else -> {
                 shizukuReady = true
                 s1status.text = "Running and allowed."
-                s1help.text = "Shizuku stops when the Thor reboots. In Shizuku, turn on “Start on boot (wireless debugging)” so it comes back on its own."
+                s1help.text = "Shizuku stops when this device reboots. In Shizuku, turn on “Start on boot (wireless debugging)” so it comes back on its own."
             }
         }
         s1btn.visibility = if (shizukuReady) View.GONE else View.VISIBLE
