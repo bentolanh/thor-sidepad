@@ -64,3 +64,31 @@ The Series controller's own report descriptor, 283 bytes, was dumped on 2026-09-
 report 1 is byte-for-byte identical to ours in every field: same axes, same 10-bit triggers,
 same hat, same Buttons 1..15 at byte 13. It differs only at byte 15, where it carries its Record
 button and we carry padding.
+
+---
+
+## How macOS routes a pad, by identity — measured 2026-09-21
+
+Read from `ioreg` with each identity paired in turn over Bluetooth Low Energy. The pad sent the
+**same report and the same descriptor** every time; only the vendor and product numbers changed.
+
+| identity | service class macOS assigns | synthetic shim | is it a controller? |
+| --- | --- | --- | --- |
+| `1209:5350` (ours, pid.codes pool) | `AppleUserHIDEventService` | none | **no** |
+| `045e:02e0` (Xbox model 1708) | `IOHIDEventDummyService` | yes | yes, on the Xbox path |
+| `2dc8:6012` (8BitDo Ultimate 2) | `AppleGCHIDEventDummyService` | yes | yes, and works natively |
+| `045e:0b13` (real Xbox Series) | `IOHIDEventDummyService`, plus its own `045e:0b12` backed by `AppleUserHIDDevice` | yes | yes, needs Steam Input in Eastward |
+
+**Apple works from a list of known controllers.** An unrecognised vendor gets plain HID and is
+not a game controller at all — tested directly, and the pad stopped being one. So claiming
+Microsoft's numbers is not what puts us on a bad path; it is what gets us recognised.
+
+**But the two recognised paths are not equal.** The 8BitDo is handed to Apple's GameController
+HID service and works natively in everything tried. Xbox-identity devices are handed to the
+generic service with a driver-backed device alongside, and in Eastward a genuine Xbox controller
+needs Steam Input while this pad is read positionally.
+
+**So the theory that dies here** is that our own identity would free us. It does the opposite.
+What remains open is whether an identity on the 8BitDo's path would work better than the Xbox
+one — which cannot be tested without claiming an 8BitDo's numbers, and would need their report
+layout, which does not match their own published descriptor.
