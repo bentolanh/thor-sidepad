@@ -181,6 +181,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     private var bubble: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+    private var bubbleOpacity = 1f
     private var dismissView: View? = null
 
     private val dp get() = ctx.resources.displayMetrics.density
@@ -308,7 +309,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             true
         }
+        v.alpha = bubbleOpacity
         try { wm.addView(v, lp); bubble = v; bubbleParams = lp } catch (e: Exception) { Log.w(TAG, "bubble", e) }
+    }
+
+    /** Matches the button to the pad's transparency, with [BUBBLE_FLOOR] under it. */
+    fun fadeBubble(opacity: Float) {
+        bubbleOpacity = opacity.coerceAtLeast(BUBBLE_FLOOR)
+        bubble?.alpha = bubbleOpacity
     }
 
     fun removeBubble() {
@@ -1132,6 +1140,16 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     companion object {
         private const val TAG = "SidePadOverlay"
+
+        /**
+         * The most see-through the floating button is allowed to be.
+         *
+         * It follows the pad's transparency so the two read as one thing, but it cannot follow it
+         * all the way down. The pad can be taken to a tenth and still be used: it is large, it is
+         * where the player put it, and their thumbs already know it. The button is small, it moves,
+         * and with the shield up it is the only way back — at a tenth it would be a ghost.
+         */
+        private const val BUBBLE_FLOOR = 0.45f
 
         /** True when this machine has no screen of its own to give the pad. */
         fun isSingleScreen(app: Context): Boolean =

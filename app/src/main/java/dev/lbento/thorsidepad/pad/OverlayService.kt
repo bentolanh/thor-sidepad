@@ -1006,6 +1006,10 @@ class OverlayService : Service() {
         // at all. Locked a device out on 2026-09-21. So the shield brings it back.
         val trapped = ov.singleScreen && prefs.shield && visible
         if (!prefs.bubble && !trapped) { ov.removeBubble(); return }
+        // The button wears the pad's transparency, so a pad faded back into the game does not
+        // sit beside an opaque button. showBubble() returns early when one is already up, so the
+        // fade has to be its own call.
+        ov.fadeBubble(prefs.opacity)
         ov.showBubble(prefs.bubbleX, prefs.bubbleY,
             onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
             onLongPress = { showPanel() },
@@ -1398,7 +1402,7 @@ class OverlayService : Service() {
             }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; refreshBubble(); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
-            override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
+            override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.fadeBubble(prefs.opacity) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setDestination(address: String) {
                 // Only the built-in controller. Where the on-screen buttons go is its own
