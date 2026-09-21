@@ -138,6 +138,31 @@ object ControlPanel {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = 14 })
         }
         fun hairline() = View(themed).apply { setBackgroundColor(0x22FFFFFF) }
+
+        /**
+         * The identities a machine can be told this pad is.
+         *
+         * One list, because there were two copies on two pages and they drifted the moment a
+         * third identity was added: the pairing page offered it, the appearance page did not,
+         * and the appearance page is where the choice is actually reached from.
+         */
+        fun identityButtons(into: LinearLayout) {
+            val xbox = state.identity == "XBOX"
+            val neutral = state.identity == "NEUTRAL"
+            val own = !xbox && !neutral
+            val dot = "\u25CF  "
+            into.addView(btn((if (!own) dot else "") + "SidePad", own) { actions.setIdentity("OWN") })
+            into.addView(btn((if (!xbox) dot else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
+            into.addView(btn((if (!neutral) dot else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
+            into.addView(label(
+                "SidePad is honest about what it is, and a machine needs telling once which button is " +
+                "which. An Xbox pad is what nearly every third-party controller claims to be, so most " +
+                "games know the layout already. The third sends exactly what the Xbox setting sends " +
+                "\u2014 same buttons, same sticks \u2014 under our own vendor number rather than " +
+                "Microsoft's, which some machines treat very differently. Any change makes this a new " +
+                "device, so the machine needs pairing again.",
+                12f, grey).apply { setPadding(0, 10, 0, 0) })
+        }
         fun sw(t: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(themed).apply {
             text = t; isChecked = checked; setTextColor(Color.WHITE); setPadding(0, 12, 0, 12)
             setOnCheckedChangeListener { v, on ->
@@ -233,13 +258,7 @@ object ControlPanel {
                 // made the mode live on another page and told the user why Low Energy was
                 // different, which is a plumbing detail dressed up as a choice.
                 card.addView(label("Appears as", 14f, grey))
-                val xbox = state.identity == "XBOX"
-                val neutral = state.identity == "NEUTRAL"
-                val own = !xbox && !neutral
-                card.addView(btn((if (!own) "\u25CF  " else "") + "SidePad", own) { actions.setIdentity("OWN") })
-                card.addView(btn((if (!xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
-                card.addView(btn((if (!neutral) "\u25CF  " else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
-                card.addView(label("The last one sends exactly what the Xbox setting sends \u2014 same buttons, same sticks \u2014 but under our own vendor number instead of Microsoft's. Some machines treat those two very differently.", 12f, grey).apply { setPadding(0, 6, 0, 6) })
+                identityButtons(card)
                 card.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
                     .apply { topMargin = 18; bottomMargin = 14 })
                 if (state.visibleFor > 0) {
@@ -269,12 +288,7 @@ object ControlPanel {
             } else if (page == Page.APPEARANCE) {
                 run {
                     card.addView(label("Known to the machine as", 14f, grey))
-                    val xbox = state.identity == "XBOX"
-                    card.addView(btn((if (!xbox) "\u25CF  " else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
-                    card.addView(btn((if (xbox) "\u25CF  " else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
-                    card.addView(label(
-                        "As SidePad it is honest about what it is, and a machine needs telling once which button is which. As an Xbox pad most games know the layout already, which is what nearly every third-party controller does. Either way this is a different device to the machine, so it needs pairing again after a change.",
-                        12f, grey).apply { setPadding(0, 10, 0, 0) })
+                    identityButtons(card)
                     card.addView(btn("Pair a machine\u2026") { page = Page.PAIRING; render() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                     })
