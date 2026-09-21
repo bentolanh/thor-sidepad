@@ -233,33 +233,45 @@ object ControlPanel {
                     .apply { bottomMargin = 16 }
                 val line = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
 
-                // ---- where the presses end up ----
-                // Two sets of controls, two destinations. The handheld has sticks and buttons of
-                // its own and a pad drawn on its screen, and they do not have to go to the same
-                // place — which is the point, because forwarding the built-in controller takes it
-                // away from this device and the on-screen pad can hand it back.
+                // Two sets of controls, and each gets its own section with the settings that
+                // belong to it. They were one list while everything went to the same place; they
+                // are not one thing, and forwarding the built-in controller while the on-screen
+                // pad still works this handheld is exactly the case that needed saying separately.
                 val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
                 val machineWhere = hostLabel + (if (state.hostConnected) "" else " — not connected")
                 val localPad = if (state.virtual) "This device, as a separate controller"
                                else "This device, as " + (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
-                val sending = group(if (state.remote) away else hereTint)
-                sending.addView(pickerRow("Physical control",
+                val remoteAs = if (state.identity == "XBOX_SERIES") "Xbox Wireless Controller" else "SidePad (not a controller)"
+                // What the machine is told it is belongs to whichever set is being sent there, and
+                // there is only one Bluetooth pad, so it is shown once: with the built-in
+                // controller when that is the thing going, otherwise with the on-screen buttons.
+                val asWithPhysical = state.physicalRemote
+                val asWithPad = state.padRemote && !state.physicalRemote
+
+                // ---- the handheld's own sticks and buttons ----
+                val physGroup = group(if (state.physicalRemote) away else hereTint)
+                physGroup.addView(pickerRow("Goes to",
                     if (state.physicalRemote) machineWhere else "This device") { page = Page.DESTINATION; render() })
-                sending.addView(hairline(), line)
-                sending.addView(pickerRow("On-screen control",
-                    if (state.padRemote) machineWhere else localPad) { page = Page.CONTROLLER; render() })
-                if (state.remote) {
-                    // Only a machine on the other end has an opinion about what we look like.
-                    sending.addView(hairline(), line)
-                    val remoteAs = if (state.identity == "XBOX_SERIES") "Xbox Wireless Controller" else "SidePad (not a controller)"
-                    sending.addView(pickerRow("Appears as", remoteAs) { page = Page.APPEARANCE; render() })
+                if (asWithPhysical) {
+                    physGroup.addView(hairline(), line)
+                    physGroup.addView(pickerRow("Appears as", remoteAs) { page = Page.APPEARANCE; render() })
                 }
-                card.addView(heading("Where presses go", if (state.remote) 0xFF9CC4F0.toInt() else grey))
-                card.addView(sending, groupLp)
-                // ---- the pad drawn on this screen ----
-                val padGroup = group()
+                card.addView(heading("Physical control",
+                    if (state.physicalRemote) 0xFF9CC4F0.toInt() else grey))
+                card.addView(physGroup, groupLp)
+
+                // ---- the buttons drawn on this screen ----
+                val padGroup = group(if (state.padRemote) away else hereTint)
+                padGroup.addView(pickerRow("Goes to",
+                    if (state.padRemote) machineWhere else localPad) { page = Page.CONTROLLER; render() })
+                if (asWithPad) {
+                    padGroup.addView(hairline(), line)
+                    padGroup.addView(pickerRow("Appears as", remoteAs) { page = Page.APPEARANCE; render() })
+                }
+                padGroup.addView(hairline(), line)
                 padGroup.addView(pickerRow("Pad layout", state.activeProfile) { actions.pickProfile() })
-                card.addView(heading("The pad on this screen"))
+                card.addView(heading("On-screen control",
+                    if (state.padRemote) 0xFF9CC4F0.toInt() else grey))
                 card.addView(padGroup, groupLp)
                 card.addView(btn("Edit layout") { actions.editLayout() }.apply {
                     setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
