@@ -345,7 +345,12 @@ object ControlPanel {
         }
         render()
 
-        val scroll = PanelScrollView(themed).apply { addView(card) }
+        // The card is only as tall as what is in it, and the panel is now the whole screen, so a
+        // short page left the rest of the scroller transparent with the scrim showing through —
+        // and the scrim closes the panel when touched. A strip of "outside" in the middle of the
+        // panel, right where a thumb rests. Filling the viewport makes the card reach the bottom
+        // however little it holds.
+        val scroll = PanelScrollView(themed).apply { isFillViewport = true; addView(card) }
         root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx, Gravity.TOP))
         return Handle(root, scrim, scroll) { s -> state = s; render() }
     }
