@@ -203,6 +203,27 @@ class BleSink(
      * `gamecontrollerd`, after which every application that enumerates controllers hangs at launch
      * — which is a far worse thing to inflict than a missing advertisement.
      */
+    /**
+     * Forgets every machine bonded to the pad, because this server is not the one they met.
+     *
+     * Called once as the server comes up. Quietly does nothing when there is nothing to forget,
+     * which is the ordinary case for a pad that has never been paired.
+     */
+    private fun dropStalePairings() {
+        val remembered = dev.lbento.thorsidepad.Prefs(ctx).pairedHostList
+            .split(',').filter { it.isNotBlank() }
+        if (remembered.isEmpty()) return
+        val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter ?: return
+        for (addr in remembered) {
+            val d = try { adapter.getRemoteDevice(addr) } catch (_: Exception) { continue }
+            if (!isBonded(d)) continue
+            // Ask it to go away first: a machine holding an open link to a server that no longer
+            // knows it will sit there claiming to be connected until something says otherwise.
+            try { server?.cancelConnection(d) } catch (_: Exception) {}
+            if (forgetMachine(addr)) Log.i(TAG, "let go of $addr: this is not the server it paired with")
+        }
+    }
+
     private fun restartAdvertising() {
         if (!wantAdvertising) return
         stopAdvertising()
@@ -226,6 +247,21 @@ class BleSink(
             server = srv
             addServices(srv)
             watchBonding()
+            // Anything this server inherited from a previous life is already dead.
+            //
+            // A host keeps the attribute layout of a peripheral it has bonded with and does not
+            // look a second time. This server is a new one — the app was stopped, reinstalled or
+            // killed — so a machine that was paired with the old one holds the connection open
+            // and sees nothing. Measured repeatedly on 2026-09-21: connected on the Mac, bonded
+            // on the handheld, no controller anywhere, every time the app restarted.
+            //
+            // Hiding and showing the pad is the case that does survive, because the server is
+            // deliberately left standing then. This is the case that cannot.
+            //
+            // So let go of it here rather than leaving a pairing that looks fine and does
+            // nothing. The machine's own record still has to be forgotten by hand; this at least
+            // means the two sides agree, and the fresh pairing that follows always works.
+            dropStalePairings()
             if (!startAdvertising(adapter)) { done("Could not advertise"); return }
             done("")
         } catch (e: SecurityException) {
@@ -399,7 +435,22 @@ class BleSink(
             Log.i(TAG, "a machine already has us; staying quiet")
             return true
         }
-        val open = secondsFindable() > 0
+        // Off the air unless somebody is looking.
+        //
+        // The pad used to advertise around the clock so a machine could come back to it. It
+        // cannot: a host keeps the attribute layout of a peripheral it has bonded with, this
+        // server is rebuilt whenever the app is, and the pairing is thrown away on
+        // disconnection anyway. So the quiet advertisement led to nothing and cost an address
+        // every time it restarted — and Android hands out a fresh random one on every start.
+        //
+        // That is where a machine's list fills up with rows nobody can clear. Measured
+        // 2026-09-21: seven addresses in half an hour, seven rows in the Mac's menu, and one
+        // pairing actually stored. Advertising only while findable makes it one per pairing.
+        if (secondsFindable() == 0) {
+            wantAdvertising = true
+            Log.i(TAG, "not findable; off the air until asked")
+            return true
+        }
         // One setting, always, because changing it costs an identity.
         //
         // These used to be loud while findable and quiet otherwise. Since the advertisement
@@ -444,8 +495,8 @@ class BleSink(
             .build()
         val cb = object : AdvertiseCallback() {
             override fun onStartSuccess(s: AdvertiseSettings?) {
-                Log.i(TAG, (if (open) "findable as " else "quietly reachable as ") +
-                    "${identity.label} (${hex(identity.vendor)}:${hex(identity.product)})")
+                Log.i(TAG, "findable as ${identity.label} " +
+                    "(${hex(identity.vendor)}:${hex(identity.product)})")
             }
             override fun onStartFailure(code: Int) {
                 // A long device name is the one thing here that can overflow the packet. Rather
