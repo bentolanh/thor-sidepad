@@ -590,9 +590,31 @@ class InjectorService() : IInjector.Stub() {
         val proc = pb.start()
         val out = proc.inputStream.bufferedReader().readText()
         proc.waitFor()
-        Log.i(TAG, "shell[$cmd] -> ${out.trim().take(200)}")
+        logShell(cmd, out)
         out
     } catch (e: Exception) { Log.w(TAG, "shell failed", e); "error: ${e.message}" }
+
+    // Every shell call used to log its whole answer. That is right for the one-off commands and
+    // ruinous for the keyboard watch, which asks twice a second for as long as the pad is up: the
+    // one line worth reading drowns in two identical lines a second, and a long session leaves a
+    // log nobody can search. An answer that has not changed says nothing the line above it did
+    // not, so only changes are written down. The number skipped goes out with the next change, so
+    // a quiet log still shows the poll was running rather than looking like it had died.
+    private val logLock = Any()
+    private var lastLog: String? = null
+    private var sameAnswers = 0
+
+    private fun logShell(cmd: String, out: String) {
+        val answer = out.trim().take(200)
+        val key = "$cmd\u0000$answer"
+        val skipped = synchronized(logLock) {
+            if (key == lastLog) { sameAnswers++; return }
+            val n = sameAnswers
+            sameAnswers = 0; lastLog = key
+            n
+        }
+        Log.i(TAG, "shell[$cmd] -> $answer" + if (skipped > 0) "  (+$skipped the same)" else "")
+    }
 
     companion object {
         private const val TAG = "SidePadInjector"
