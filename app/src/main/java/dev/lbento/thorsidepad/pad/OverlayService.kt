@@ -513,7 +513,8 @@ class OverlayService : Service() {
                     padDirty = true
                 } else {
                     ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                        onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
+                        onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) },
+                        pointer = if (Injector.current() != null) pointerSink else null)
                     // The shield catches the edge pulls itself; islands mode still needs the strips.
                     if (prefs.shield) ov.removeCatchers() else ensureCatcher()
                 }
@@ -527,6 +528,49 @@ class OverlayService : Service() {
                 toast("Could not show pad: ${e.message}")
             }
         }
+    }
+
+    // ---- the trackpad's end of the wire ----
+
+    @Volatile private var pointerOpen = false
+
+    /**
+     * Drives this device's own pointer for [TrackpadView].
+     *
+     * Opened on first touch rather than with the pad. Most layouts carry no trackpad, and a uinput
+     * mouse that existed regardless would put a second pointer device in front of everything that
+     * enumerates input — including our own controller probe, which is looking for exactly that.
+     */
+    private val pointerSink = object : PointerSink {
+        private fun ready(): IInjector? {
+            val svc = Injector.current() ?: return null
+            if (!pointerOpen) {
+                val why = try { svc.openPointer() } catch (e: Exception) {
+                    Log.w(TAG, "the helper is too old for a pointer; restart SidePad", e); return null
+                }
+                if (!why.isNullOrEmpty()) { Log.w(TAG, "pointer refused: $why"); return null }
+                pointerOpen = true
+            }
+            return svc
+        }
+        private inline fun send(what: String, body: (IInjector) -> Unit) {
+            val svc = ready() ?: return
+            try { body(svc) } catch (e: Exception) {
+                // A dead helper leaves the flag lying; clear it so the next touch opens again.
+                pointerOpen = false
+                Log.w(TAG, "pointer $what failed", e)
+            }
+        }
+        override fun move(dx: Int, dy: Int) = send("move") { it.pointerMove(dx, dy) }
+        override fun button(code: Int, down: Boolean) = send("button") { it.pointerButton(code, down) }
+        override fun wheel(clicks: Int) = send("wheel") { it.pointerWheel(clicks) }
+    }
+
+    /** Takes the virtual mouse away again, so it is not left in front of the system for nothing. */
+    private fun closePointer() {
+        if (!pointerOpen) return
+        pointerOpen = false
+        try { Injector.current()?.closePointer() } catch (e: Exception) { Log.w(TAG, "closing pointer", e) }
     }
 
     private var btSink: PadTransport? = null
@@ -808,6 +852,7 @@ class OverlayService : Service() {
         stopImeWatch(); stopNowWatch(); imeSuspended = false
         overlay?.removeAll()
         engine?.shutdown(); engine = null
+        closePointer()
         try { Injector.current()?.closeTarget() } catch (_: Exception) {}
         visible = false
         updateNotification()
@@ -1144,7 +1189,8 @@ class OverlayService : Service() {
         try {
             Injector.current()?.let { readLevels(it) }
             ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
+                onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) },
+                pointer = if (Injector.current() != null) pointerSink else null)
             if (prefs.shield) ov.removeCatchers() else ensureCatcher()
         } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
     }

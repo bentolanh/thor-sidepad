@@ -282,6 +282,67 @@ class InjectorService() : IInjector.Stub() {
         ""
     }
 
+    // ---- the pointer: its own uinput device, so the gamepad stays a gamepad ----
+
+    private var pointerFd = -1
+    private val pointerLock = Any()
+
+    /**
+     * Creates the virtual mouse the trackpad drives, if it is not already there.
+     *
+     * Separate from the pad's own device on purpose. Relative axes are what tell Android a device
+     * is a mouse, and a gamepad that declared them would be classified as one and stop being read
+     * as a controller — the comment on [openVirtual] has said so since before there was anything
+     * to point at.
+     */
+    override fun openPointer(): String = synchronized(pointerLock) {
+        if (pointerFd >= 0) return ""
+        val f = Native.createUinput(
+            "SidePad Pointer", VENDOR, PRODUCT + 1,
+            intArrayOf(Mouse.LEFT, Mouse.RIGHT, Mouse.MIDDLE),
+            IntArray(0), IntArray(0), IntArray(0),
+            intArrayOf(Rel.X, Rel.Y, Rel.WHEEL),
+        )
+        if (f < 0) return "uinput: ${Native.strerror(f)}"
+        pointerFd = f
+        Log.i(TAG, "created the virtual pointer")
+        ""
+    }
+
+    override fun pointerMove(dx: Int, dy: Int) { synchronized(pointerLock) {
+        val f = pointerFd
+        if (f < 0) return
+        // One report for both axes: sending them separately makes the cursor stair-step.
+        if (dx != 0) Native.writeEvent(f, Ev.REL, Rel.X, dx)
+        if (dy != 0) Native.writeEvent(f, Ev.REL, Rel.Y, dy)
+        if (dx != 0 || dy != 0) Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+    } }
+
+    override fun pointerButton(code: Int, down: Boolean) { synchronized(pointerLock) {
+        val f = pointerFd
+        if (f < 0) return
+        Native.writeEvent(f, Ev.KEY, code, if (down) 1 else 0)
+        Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+    } }
+
+    override fun pointerWheel(clicks: Int) { synchronized(pointerLock) {
+        val f = pointerFd
+        if (f < 0 || clicks == 0) return
+        Native.writeEvent(f, Ev.REL, Rel.WHEEL, clicks)
+        Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+    } }
+
+    override fun closePointer() { synchronized(pointerLock) {
+        val f = pointerFd
+        if (f < 0) return
+        // Never leave a button down on a device that is about to vanish.
+        for (b in intArrayOf(Mouse.LEFT, Mouse.RIGHT, Mouse.MIDDLE)) Native.writeEvent(f, Ev.KEY, b, 0)
+        Native.writeEvent(f, Ev.SYN, Ev.SYN_REPORT, 0)
+        Native.destroyUinput(f)
+        pointerFd = -1
+        Log.i(TAG, "closed the virtual pointer")
+    } }
+
     override fun closeTarget() { synchronized(lock) { closeTargetLocked() } }
 
     private fun closeTargetLocked() {

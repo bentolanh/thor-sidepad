@@ -65,6 +65,7 @@ object Action {
     const val VIDEO_BACK = -28  // jump back ten seconds
     const val VIDEO_FWD = -29   // jump forward ten seconds
     const val VIDEO_APP = -31   // bring the playing app forward on the screen it was on
+    const val TRACKPAD = -32    // a trackpad: drives this device's own pointer
 }
 
 /** The verbs the media unit sends: keys handed to whatever is playing, whichever app that is. */
@@ -75,6 +76,13 @@ fun isMediaUnit(code: Int) = code == Action.MEDIA
 
 /** The video unit: a timeline you drag to seek, with jump back and forward either side of play. */
 fun isVideoUnit(code: Int) = code == Action.VIDEO
+
+/**
+ * The trackpad. Not an action code: an action fires once on release, and a trackpad is a surface
+ * that has to be followed for as long as a finger is on it, which is the sliders' shape rather
+ * than the buttons'.
+ */
+fun isTrackpadUnit(code: Int) = code == Action.TRACKPAD
 
 /** Which verb a tap at [f], measured 0..1 across the unit, means. */
 fun mediaCodeAt(f: Float) = when {
@@ -182,6 +190,7 @@ object Catalog {
         PadCode(Action.TURBO, "TURBO", "the next button you tap repeats until you tap it again"),
         PadCode(Action.MEDIA, "MEDIA", "one unit: previous, play or pause, next"),
         PadCode(Action.VIDEO, "VIDEO", "a timeline you drag, with jump back and forward ten seconds"),
+        PadCode(Action.TRACKPAD, "PAD", "a trackpad for this device's pointer: drag to move, tap to click, two fingers to scroll"),
         PadCode(Action.SHIELD, "SHLD", "toggles the shield on / off"),
         PadCode(Action.HOME_TOP, "HOME", "Home on the main screen"),
         PadCode(Action.HOME_2ND, "HOME", "Home on this screen"),
@@ -207,8 +216,8 @@ object Catalog {
         "Macro" to all.filter { it.code == Action.HOLD || it.code == Action.TURBO },
         // Everything the device itself answers: its screens, what is playing, its levels, and the
         // shield. Media sits here rather than in a page of its own until there is more of it.
-        "System" to all.filter { it.isAction && !isMediaUnit(it.code) && !isVideoUnit(it.code) && it.code != Action.SHIELD } +
-            all.filter { isMediaUnit(it.code) || isVideoUnit(it.code) } +
+        "System" to all.filter { it.isAction && !isMediaUnit(it.code) && !isVideoUnit(it.code) && !isTrackpadUnit(it.code) && it.code != Action.SHIELD } +
+            all.filter { isMediaUnit(it.code) || isVideoUnit(it.code) || isTrackpadUnit(it.code) } +
             all.filter { it.isSlider } + all.filter { it.code == Action.SHIELD },
     )
 

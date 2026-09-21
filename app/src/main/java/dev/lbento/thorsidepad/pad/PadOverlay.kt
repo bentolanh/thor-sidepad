@@ -30,6 +30,7 @@ import dev.lbento.thorsidepad.inject.isDpadCode
 import dev.lbento.thorsidepad.inject.isMediaUnit
 import dev.lbento.thorsidepad.inject.isVideoUnit
 import dev.lbento.thorsidepad.inject.isStickCode
+import dev.lbento.thorsidepad.inject.isTrackpadUnit
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -544,7 +545,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     fun showPlay(layout: PadLayout, opacity: Float, engine: PadEngine, shield: Boolean,
                  backdrop: String, onGesture: (EdgeGesture) -> Unit, onAction: (Int) -> Unit,
-                 levels: MutableMap<Int, Float> = HashMap(), onSlider: (Int, Float, Boolean) -> Unit = { _, _, _ -> }) {
+                 levels: MutableMap<Int, Float> = HashMap(), onSlider: (Int, Float, Boolean) -> Unit = { _, _, _ -> },
+                 pointer: PointerSink? = null) {
         val old = ArrayList(views)
         views.clear()
         shieldView = null; shieldParams = null
@@ -575,6 +577,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             val v: View = when {
                 isStickCode(b.code) -> StickView(ctx, b.code, enabled, engine)
                 isDpadCode(b.code) -> DpadView(ctx, enabled, engine)
+                isTrackpadUnit(b.code) -> TrackpadView(ctx,
+                    onMove = { dx, dy -> pointer?.move(dx, dy) },
+                    onButton = { c, down -> pointer?.button(c, down) },
+                    onWheel = { n -> pointer?.wheel(n) },
+                    enabled = pointer != null)
                 isSliderCode(b.code) -> SliderView(ctx, b.code, levels[b.code] ?: 0.5f, onSlider)
                 b.code == Action.HOLD || b.code == Action.TURBO ->
                     PadButtonView(ctx, b.code, true, {}, {}, layout.style, session = session).also { holdViews.add(it) }
@@ -593,12 +600,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 isSliderCode(b.code) -> (px * 0.5f).roundToInt()
                 isMediaUnit(b.code) -> (px * ButtonPainter.MEDIA_HALF_W).roundToInt()
                 isVideoUnit(b.code) -> (px * ButtonPainter.VIDEO_HALF_W).roundToInt()
+                isTrackpadUnit(b.code) -> (px * TrackpadView.HALF_W).roundToInt()
                 else -> px
             }
             val h = when {
                 isSliderCode(b.code) -> (px * 1.2f).roundToInt()
                 isMediaUnit(b.code) -> (px * ButtonPainter.MEDIA_HALF_H).roundToInt()
                 isVideoUnit(b.code) -> (px * ButtonPainter.VIDEO_HALF_H).roundToInt()
+                isTrackpadUnit(b.code) -> (px * TrackpadView.HALF_H).roundToInt()
                 else -> px
             }
             val lp = WindowManager.LayoutParams(w, h, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)

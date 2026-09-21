@@ -88,4 +88,13 @@ interface IInjector {
     // — which the app does not hold and the shell user does. Oneway: it is a hint, and the caller
     // is on the event path.
     oneway void pokeUserActivity() = 32;
+
+    // A virtual mouse of our own, so the pad can carry a trackpad. Deliberately a second device
+    // rather than relative axes on the gamepad: a pad that declared those would be taken for a
+    // mouse and stop being read as a controller. Returns "" or an "error: " string.
+    String openPointer() = 33;
+    oneway void pointerMove(int dx, int dy) = 34;
+    oneway void pointerButton(int code, boolean down) = 35;
+    oneway void pointerWheel(int clicks) = 36;
+    void closePointer() = 37;
 }
