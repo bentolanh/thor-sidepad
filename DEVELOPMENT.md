@@ -994,11 +994,18 @@ for. Undocked there is no way to satisfy it — hence brightness, not power mode
 
 ### What the setting is actually for
 
-Not comfort — a session ends on a timer without it. The injector grabs the controller with
+Not comfort — play is interrupted on a timer without it. The injector grabs the controller with
 `EVIOCGRAB` so presses do not also reach the handheld, and a grabbed device delivers to nobody
 else, Android's own input reader included. So however hard someone is playing, Android registers
 no user activity, `screen_off_timeout` runs unopposed (1800000 ms, thirty minutes, on both
-handhelds), the display sleeps and the controller stops with it, mid-game.
+handhelds), and the display sleeps in the middle of a game.
+
+What that costs is worth being exact about, because it is easy to overstate and this document
+did. **The connection survives.** The link is held by the Bluetooth controller and the bond does
+not care that the device slept; confirmed on 2026-09-21 by sleeping a connected handheld and
+waking it, whereupon presses reached the Mac immediately with nothing re-paired and nothing lost.
+What stops is the *generation* of events, for as long as the panel is off. So the cost is an
+interruption that has to be woken out of, not a dead session — annoying mid-game, not fatal.
 
 Keeping the display awake also keeps Doze from arming at all, which matters because the app is
 not on the battery-optimisation whitelist (`dumpsys deviceidle whitelist`) and its partial wake
