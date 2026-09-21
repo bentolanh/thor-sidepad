@@ -1017,6 +1017,17 @@ thirty.
 Only buttons count, not axes: sticks report continuously including at rest, so an axis event says
 nothing about whether anybody is there.
 
+Measured 2026-09-21 by making the call as the shell user through `app_process`. On an awake Odin
+2 Mini `lastUserActivityTime` went from 949 seconds ago to 919 milliseconds ago — the timer is
+reset exactly as a real press resets it, and the three-argument
+`userActivity(long, int, int)` overload the injector uses is present on this build.
+
+The same call on the Thor reported success and moved nothing, because that handheld was `Asleep`
+at the time. `PowerManagerService` ignores user activity when the device is not awake, and this
+call does not wake anything — deliberately. It holds off a timeout on a device somebody is
+playing on; it cannot rescue one that has already slept, and is not meant to. Anyone testing this
+should check `mWakefulness=Awake` first or they will conclude it is broken.
+
 This is better than holding the screen on for the whole session, which is what the setting used
 to do. The handheld now sleeps normally the moment play stops, and while play continues the
 screen stays up for the ordinary reason — somebody is using it. It also keeps Doze from arming,
