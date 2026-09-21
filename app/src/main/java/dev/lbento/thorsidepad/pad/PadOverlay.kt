@@ -375,6 +375,45 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
     }
 
+    private var screenHold: View? = null
+
+    /**
+     * Keeps the screen on but as dark as the panel will go.
+     *
+     * The point is to carry on playing on another machine without this one's display burning
+     * power — and the obvious way round, letting the screen sleep while a PARTIAL_WAKE_LOCK holds
+     * the CPU, does not work. A partial lock keeps the processor alive and lets the display go,
+     * which puts the device into Dozing; both these handhelds synthesise their controller in
+     * software (`/devices/virtual/input/...`), and that software stops there. A press that did
+     * survive would only wake the machine, which is not what anyone wants either.
+     *
+     * So the device is not allowed to doze at all. A one-pixel window holds FLAG_KEEP_SCREEN_ON,
+     * which keeps it properly awake, and sets its own screen brightness to the floor — measured
+     * at 0.0 on both the Thor and the Odin 2 Mini, so this goes all the way down rather than to
+     * some dim minimum.
+     */
+    fun holdScreenDark(on: Boolean) {
+        if (!on) {
+            screenHold?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }
+            screenHold = null
+            return
+        }
+        if (screenHold != null) return
+        val v = View(ctx)
+        val lp = WindowManager.LayoutParams(1, 1,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            PixelFormat.TRANSLUCENT)
+        lp.screenBrightness = 0f
+        lp.gravity = Gravity.TOP or Gravity.START
+        lp.title = "SidePad screen hold"
+        lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
+        try { wm.addView(v, lp); screenHold = v; Log.i(TAG, "screen held on, brightness floored") }
+        catch (e: Exception) { Log.w(TAG, "screen hold", e) }
+    }
+
     private var linkBadge: View? = null
 
     /**
@@ -530,7 +569,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
 
 
-    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {} }
+    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {}; holdScreenDark(false) }
 
     /** Whether the compositor can blur what is behind a window (needed for the frosted backdrop). */
     val blurSupported: Boolean get() = try { wm.isCrossWindowBlurEnabled } catch (_: Throwable) { false }
