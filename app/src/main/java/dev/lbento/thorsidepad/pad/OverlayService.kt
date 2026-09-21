@@ -439,14 +439,22 @@ class OverlayService : Service() {
         }
     }
 
-    private fun show() {
+    /**
+     * Puts the pad up.
+     *
+     * [keepPanel] is for the settings that have to rebuild the pad underneath an open panel.
+     * Changing where presses go swaps the sink, which means a new engine, which means building
+     * the pad again — and closing the panel to do that made a player reopen it after every such
+     * change, for a reason that is entirely ours.
+     */
+    private fun show(keepPanel: Boolean = false) {
         // Sending to a machine asks nothing of Shizuku, so the pad opens without waiting for it. The
         // device sliders and the media units still need it and simply have nothing to show without.
-        if (prefs.targetMode == Prefs.MODE_BT) showWith(Injector.current())
-        else withInjector { svc -> showWith(svc) }
+        if (prefs.targetMode == Prefs.MODE_BT) showWith(Injector.current(), keepPanel)
+        else withInjector { svc -> showWith(svc, keepPanel) }
     }
 
-    private fun showWith(svc: IInjector?) {
+    private fun showWith(svc: IInjector?, keepPanel: Boolean = false) {
         run {
             try {
                 val sink: PadSink
@@ -490,12 +498,15 @@ class OverlayService : Service() {
                 }
                 engine = eng
                 val ov = overlayOrCreate()
-                ov.removePanel()
+                if (!keepPanel) ov.removePanel()
                 if (svc != null) { readLevels(svc); syncNowWatch() }
                 ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
                     onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
                 // The shield catches the edge pulls itself; islands mode still needs the strips.
                 if (prefs.shield) ov.removeCatchers() else ensureCatcher()
+                // The pad's windows have just been added, so they sit above a panel that was
+                // opened before them. Lift it back or it is buried and looks like it shut.
+                if (keepPanel) ov.raisePanel()
                 visible = true
                 prefs.padShown = true
                 main.postDelayed({ refreshLinkBadge() }, 1500)
@@ -1229,7 +1240,10 @@ class OverlayService : Service() {
                 // again for no reason.
                 if (address.isNotEmpty()) { prefs.btHost = address; prefs.rememberPairedHost(address) }
                 ControlPanel.page = ControlPanel.Page.MAIN
-                if (visible) { hide(); show() }
+                // Rebuilt underneath the panel rather than instead of it. This does change which
+                // sink the engine writes to, so the pad genuinely has to be built again — but
+                // that is our business, not a reason to make someone reopen the panel.
+                if (visible) { hide(); show(keepPanel = true) }
                 ov.updatePanel(panelState(ov))
             }
 
