@@ -100,6 +100,24 @@ class BleSink(
          * 0x1209 is the pid.codes pool for open projects and is borrowed from nobody.
          */
         NEUTRAL(0x1209, 0x5350, 0x0100, "SidePad, standard layout"),
+
+        /**
+         * The Xbox Series X|S controller, numbers and report map both, taken off a real one.
+         *
+         * The pad has been claiming `045e:02e0`, which is the model 1708 — the Xbox One S
+         * generation. Steam holds a profile for the Series controller and none for that, and it
+         * shows: measured in Eastward on 2026-09-21, a genuine Series pad maps correctly under
+         * Steam Input while this one is read positionally, its bits taken as button numbers.
+         *
+         * Version 0x0520 is not decoration. A program keying its controller database on the SDL
+         * GUID uses vendor, product and version together, and being wrong by two bytes has
+         * already cost this project a mapping once.
+         *
+         * This is not expected to fix native play. A real Series controller is routed to
+         * IOHIDEventDummyService exactly as the 1708 is, and needs Steam Input in Eastward too.
+         * Apple's GameController path is for controllers that are not Microsoft's at all.
+         */
+        XBOX_SERIES(0x045E, 0x0B13, 0x0520, "Xbox Series-compatible"),
     }
 
     @Volatile override var connected = false; private set
@@ -126,9 +144,13 @@ class BleSink(
      * then read as two sticks jammed into a corner.
      */
     private val shape: ReportShape =
-        // NEUTRAL is the Xbox shape under different numbers, so it takes the same report.
-        if (identity == Identity.XBOX || identity == Identity.NEUTRAL)
-            XboxShape(rumble, plainButtons, consumer) else StandardShape()
+        // Every identity but OWN sends the Xbox report; they differ in the numbers they carry
+        // and, for the Series, in sending that controller's own map rather than the 1708's.
+        when (identity) {
+            Identity.XBOX, Identity.NEUTRAL -> XboxShape(rumble, plainButtons, consumer)
+            Identity.XBOX_SERIES -> XboxShape(rumble, plainButtons, consumer, series = true)
+            else -> StandardShape()
+        }
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.

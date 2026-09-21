@@ -133,6 +133,14 @@ class XboxShape(
      * False — the default — is what Apple hosts need and what every host is known to cope with.
      */
     private val consumer: Boolean = false,
+    /**
+     * Send the real Xbox Series controller's report map, verbatim. See [SERIES].
+     *
+     * It already carries its own force-feedback and Consumer declarations, so [rumble] and
+     * [consumer] do not apply: the point is to be exactly what that controller is, and editing
+     * it would defeat that.
+     */
+    private val series: Boolean = false,
 ) : ReportShape {
     private val report = ByteArray(16)
     private var hatX = 0
@@ -144,6 +152,7 @@ class XboxShape(
     }
 
     override val descriptor = when {
+        series -> SERIES
         consumer -> WITH_CONSUMER
         rumble -> DESCRIPTOR
         else -> NO_RUMBLE
@@ -418,6 +427,54 @@ class XboxShape(
             0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x65.toByte(), 0x00.toByte(),
             0x55.toByte(), 0x00.toByte(), 0x09.toByte(), 0x7C.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(),
             0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0xC0.toByte(), 0xC0.toByte()
+        )
+
+        /**
+         * The Xbox Series X|S controller's own report map, read off the real thing.
+         *
+         * Dumped from `045e:0b13` over Bluetooth Low Energy on 2026-09-21 and used verbatim.
+         * Its report one is byte-for-byte the layout this pad already sends — the same 16-bit
+         * sticks, the same 10-bit triggers, the same hat, the same Buttons 1..15 at byte
+         * thirteen — and its report three is an 8-byte force-feedback report like ours. The only
+         * difference is byte fifteen, which carries that controller's Record button on the
+         * Consumer page where this pad has padding.
+         *
+         * Why claim it: Steam holds a profile for 0b13 and none for the 1708 this pad has been
+         * claiming. Measured in Eastward, a real Series controller maps correctly under Steam
+         * Input while this pad is read positionally. Being the thing Steam already knows is the
+         * cheapest way to fix that, and costs no new information — every byte here came off the
+         * user's own controller.
+         *
+         * What it will not fix: native play. The real Series controller is routed to
+         * IOHIDEventDummyService exactly as the 1708 is, and does not work in Eastward without
+         * Steam Input either. Microsoft's numbers keep a pad off Apple's GameController path
+         * whichever Microsoft pad is claimed.
+         */
+        val SERIES: ByteArray = byteArrayOf(
+            0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x05.toByte(), 0xA1.toByte(), 0x01.toByte(), 0x85.toByte(), 0x01.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(),
+            0x09.toByte(), 0x30.toByte(), 0x09.toByte(), 0x31.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(),
+            0x02.toByte(), 0x75.toByte(), 0x10.toByte(), 0x81.toByte(), 0x02.toByte(), 0xC0.toByte(), 0x09.toByte(), 0x01.toByte(), 0xA1.toByte(), 0x00.toByte(), 0x09.toByte(), 0x32.toByte(),
+            0x09.toByte(), 0x35.toByte(), 0x15.toByte(), 0x00.toByte(), 0x27.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x00.toByte(), 0x95.toByte(), 0x02.toByte(), 0x75.toByte(),
+            0x10.toByte(), 0x81.toByte(), 0x02.toByte(), 0xC0.toByte(), 0x05.toByte(), 0x02.toByte(), 0x09.toByte(), 0xC5.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(),
+            0x03.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x0A.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(),
+            0x06.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x02.toByte(), 0x09.toByte(), 0xC4.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(),
+            0xFF.toByte(), 0x03.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x0A.toByte(), 0x81.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(),
+            0x75.toByte(), 0x06.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x01.toByte(), 0x09.toByte(), 0x39.toByte(), 0x15.toByte(), 0x01.toByte(),
+            0x25.toByte(), 0x08.toByte(), 0x35.toByte(), 0x00.toByte(), 0x46.toByte(), 0x3B.toByte(), 0x01.toByte(), 0x66.toByte(), 0x14.toByte(), 0x00.toByte(), 0x75.toByte(), 0x04.toByte(),
+            0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x42.toByte(), 0x75.toByte(), 0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(),
+            0x35.toByte(), 0x00.toByte(), 0x45.toByte(), 0x00.toByte(), 0x65.toByte(), 0x00.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x09.toByte(), 0x19.toByte(), 0x01.toByte(),
+            0x29.toByte(), 0x0F.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x95.toByte(), 0x0F.toByte(), 0x81.toByte(), 0x02.toByte(),
+            0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(), 0x0C.toByte(),
+            0x0A.toByte(), 0xB2.toByte(), 0x00.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x01.toByte(), 0x95.toByte(), 0x01.toByte(), 0x75.toByte(), 0x01.toByte(), 0x81.toByte(),
+            0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(), 0x07.toByte(), 0x95.toByte(), 0x01.toByte(), 0x81.toByte(), 0x03.toByte(), 0x05.toByte(),
+            0x0F.toByte(), 0x09.toByte(), 0x21.toByte(), 0x85.toByte(), 0x03.toByte(), 0xA1.toByte(), 0x02.toByte(), 0x09.toByte(), 0x97.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(),
+            0x01.toByte(), 0x75.toByte(), 0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x00.toByte(), 0x75.toByte(),
+            0x04.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x03.toByte(), 0x09.toByte(), 0x70.toByte(), 0x15.toByte(), 0x00.toByte(), 0x25.toByte(), 0x64.toByte(), 0x75.toByte(),
+            0x08.toByte(), 0x95.toByte(), 0x04.toByte(), 0x91.toByte(), 0x02.toByte(), 0x09.toByte(), 0x50.toByte(), 0x66.toByte(), 0x01.toByte(), 0x10.toByte(), 0x55.toByte(), 0x0E.toByte(),
+            0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0x09.toByte(),
+            0xA7.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(), 0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(),
+            0x65.toByte(), 0x00.toByte(), 0x55.toByte(), 0x00.toByte(), 0x09.toByte(), 0x7C.toByte(), 0x15.toByte(), 0x00.toByte(), 0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), 0x75.toByte(),
+            0x08.toByte(), 0x95.toByte(), 0x01.toByte(), 0x91.toByte(), 0x02.toByte(), 0xC0.toByte(), 0xC0.toByte()
         )
 
         private val NO_RUMBLE: ByteArray by lazy {

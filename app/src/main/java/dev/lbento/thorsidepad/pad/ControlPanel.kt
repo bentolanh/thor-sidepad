@@ -149,7 +149,8 @@ object ControlPanel {
         fun identityButtons(into: LinearLayout) {
             val xbox = state.identity == "XBOX"
             val neutral = state.identity == "NEUTRAL"
-            val own = !xbox && !neutral
+            val series = state.identity == "XBOX_SERIES"
+            val own = !xbox && !neutral && !series
             // The dot marks the one in use and that button is the disabled one, which is the
             // convention every other choice on this panel follows. Getting it backwards made
             // picking the third option look like it had jumped to the first.
@@ -157,13 +158,16 @@ object ControlPanel {
             into.addView(btn((if (own) dot else "") + "SidePad", !own) { actions.setIdentity("OWN") })
             into.addView(btn((if (xbox) dot else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
             into.addView(btn((if (neutral) dot else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
+            into.addView(btn((if (series) dot else "") + "An Xbox Series pad", !series) { actions.setIdentity("XBOX_SERIES") })
             into.addView(label(
                 "SidePad is honest about what it is, and a machine needs telling once which button is " +
                 "which. An Xbox pad is what nearly every third-party controller claims to be, so most " +
                 "games know the layout already. The third sends exactly what the Xbox setting sends " +
                 "\u2014 same buttons, same sticks \u2014 under our own vendor number rather than " +
-                "Microsoft's, which some machines treat very differently. Any change makes this a new " +
-                "device, so the machine needs pairing again.",
+                "Microsoft's, which some machines treat very differently. The Series option is a " +
+                "newer Microsoft pad than the Xbox one, copied off a real controller, and is the " +
+                "one Steam has a profile for. Any change makes this a new device, so the machine " +
+                "needs pairing again.",
                 12f, grey).apply { setPadding(0, 10, 0, 0) })
         }
         fun sw(t: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(themed).apply {
