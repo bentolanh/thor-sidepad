@@ -23,6 +23,7 @@ class GuideView(
     private val onGesture: (EdgeGesture) -> Unit,
     private val onSkip: () -> Unit,
     private val pull: PullListener? = null,     // step 1: the panel follows the finger like the shade
+    private val edges: Boolean = true,          // false on one screen: there are no edge gestures to teach
 ) : View(ctx) {
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2E7DFF.toInt() }
@@ -37,8 +38,8 @@ class GuideView(
     private var edge: EdgeGesture? = null
     private var dragY = 0f
 
-    private val wantsDown get() = step == 1
-    private val wantsUp get() = step == 2 || step == 3
+    private val wantsDown get() = edges && step == 1
+    private val wantsUp get() = edges && (step == 2 || step == 3)
     private val isEnd get() = step == 4
 
     private fun arrow(c: Canvas, cx: Float, fromY: Float, toY: Float, r: Float, dotOffset: Float) {
@@ -67,8 +68,15 @@ class GuideView(
 
         if (isEnd) {
             c.drawText("You're all set", w / 2, h * 0.34f, title)
-            c.drawText("Pull down from the top edge: the SidePad panel", w / 2, h * 0.34f + r * 1.3f, text)
-            c.drawText("Pull up from the bottom edge: show or hide the pad", w / 2, h * 0.34f + r * 2.2f, text)
+            // On one screen the edges belong to Android, so there is nothing to recite here but
+            // the bubble — which is the only way in on such a device, and always present.
+            if (edges) {
+                c.drawText("Pull down from the top edge: the SidePad panel", w / 2, h * 0.34f + r * 1.3f, text)
+                c.drawText("Pull up from the bottom edge: show or hide the pad", w / 2, h * 0.34f + r * 2.2f, text)
+            } else {
+                c.drawText("Tap the floating button: show or hide the pad", w / 2, h * 0.34f + r * 1.3f, text)
+                c.drawText("Hold it: the SidePad panel. Drag it anywhere.", w / 2, h * 0.34f + r * 2.2f, text)
+            }
             val s = skipRect()
             c.drawRoundRect(s[0], s[1], s[2], s[3], 16f, 16f, skipBox)
             c.drawText("Done", w / 2, (s[1] + s[3]) / 2 + text.textSize * 0.35f, text)

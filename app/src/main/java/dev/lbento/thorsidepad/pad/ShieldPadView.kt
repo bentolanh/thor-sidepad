@@ -48,6 +48,7 @@ class ShieldPadView(
     private val levels: MutableMap<Int, Float> = HashMap(),     // slider code -> current 0..1
     private val onSlider: (Int, Float, Boolean) -> Unit = { _, _, _ -> },   // code, level, final (finger lifted)
     private val video: NowPlaying = NowPlaying(),
+    private val edges: Boolean = true,     // false on a single-screen device: the edges are Android's
 ) : View(ctx) {
     private val sliderBy = HashMap<Int, Int>()       // pointerId -> slider index it is dragging
     var opacity: Float = opacity
@@ -323,6 +324,7 @@ class ShieldPadView(
     }
 
     private fun edgeAt(x: Float, y: Float): EdgeGesture? {
+        if (!edges) return null
         val zone = short() * EDGE_ZONE
         return when {
             y < zone -> EdgeGesture.PULL_DOWN            // opens our panel

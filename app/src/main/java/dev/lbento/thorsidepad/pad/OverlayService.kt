@@ -809,7 +809,11 @@ class OverlayService : Service() {
      */
     private fun syncBubble() {
         val ov = overlay ?: return
-        if (!prefs.bubble) { ov.removeBubble(); return }
+        // On a single-screen device the bubble is not a convenience, it is the only way in: the
+        // edges there belong to Android, so nothing else on the pad's own surface reaches the
+        // panel. It is therefore not the player's to switch off, and the setting screen says so
+        // rather than offering a switch that would strand them.
+        if (!prefs.bubble && !ov.singleScreen) { ov.removeBubble(); return }
         ov.showBubble(prefs.bubbleX, prefs.bubbleY,
             onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
             onLongPress = { showPanel() },
@@ -1100,9 +1104,13 @@ class OverlayService : Service() {
         }
         Log.i(TAG, "guide start: saved=$saved visible=$savedVisible")
         prefs.shield = true; prefs.backdrop = Prefs.BACKDROP_FROSTED; prefs.opacity = 1f
-        guideStep = 1
+        // Steps 1 to 3 teach the two edge pulls. On one screen those do not exist, so there is
+        // nothing to rehearse and the guide goes straight to the closing card, which names the
+        // bubble instead. Teaching a gesture that will not answer is worse than teaching none.
+        val first = if (PadOverlay.isSingleScreen(this)) 4 else 1
+        guideStep = first
         if (visible) hide() else ensureCatcher()
-        main.postDelayed({ if (guideStep == 1) showGuideStep(1) }, 600)
+        main.postDelayed({ if (guideStep == first) showGuideStep(first) }, 600)
     }
 
     /** Puts the pad's look and visibility back to what they were before the guide. */

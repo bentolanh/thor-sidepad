@@ -53,7 +53,7 @@
             android:text="Start in the background at boot" />
         <Switch android:id="@+id/bubbleSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Floating button to show and hide the pad" />
-        <TextView style="@style/StepHelp" android:text="For a handheld with one screen, where every edge swipe belongs to Android and there is no spare gesture to reach the pad with. Drag the button anywhere; tap it to show or hide the pad, hold it to open the panel." />
+        <TextView style="@style/StepHelp" android:text="On a handheld with one screen, every edge swipe belongs to Android — the notification shade at the top, Home at the bottom — so SidePad leaves those edges alone and this button is the way in. It stays on there. Drag it anywhere; tap it to show or hide the pad, hold it to open the panel." />
         <Button android:id="@+id/btnCalibrate" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Teach the pad your controls" />
         <TextView style="@style/StepHelp" android:text="Only needed if a button does nothing when the pad is forwarding to another machine. Some handhelds put Start and Select on a separate input device, which the pad cannot find on its own." />

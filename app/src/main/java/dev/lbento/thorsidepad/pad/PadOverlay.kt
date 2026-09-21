@@ -108,6 +108,21 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         Log.i(TAG, "overlay on display $displayId (${display.name}) ${width}x$height")
     }
 
+    /**
+     * True when the pad is on the machine's only screen, and so shares every edge with Android.
+     *
+     * Android hands out exactly one edge: [View.setSystemGestureExclusionRects] covers the back
+     * gesture down the sides and nothing else. The home swipe and the notification shade are not
+     * an app's to take at any price, so on the top and bottom Android's detector and ours both
+     * watch the same finger and neither is told about the other. Whichever's thresholds are met
+     * first appears to win, which is not a gesture — it is a coin toss the player has to keep
+     * making. No threshold we could pick would settle it, because their detector runs upstream
+     * of ours.
+     *
+     * So on one screen the edges are Android's and the bubble is ours.
+     */
+    val singleScreen: Boolean get() = displayId == Display.DEFAULT_DISPLAY
+
     private fun baseFlags() = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -281,6 +296,9 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     /** Thin strips on the top (pull down = panel) and bottom (pull up = show pad) edges. Idempotent. */
     fun showCatchers(onPullDown: () -> Unit, onPullUp: () -> Unit, tracker: PullListener? = null) {
         if (catchers.isNotEmpty()) return
+        // Not built at all on one screen: a strip that only sometimes beats the shade is worse
+        // than no strip, because the player cannot learn it. See [singleScreen].
+        if (singleScreen) return
         for ((down, cb) in listOf(true to onPullDown, false to onPullUp)) {
             val v = EdgeCatcherView(ctx, down, cb, if (down) tracker else null)
             val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.HEIGHT_PX,
@@ -422,7 +440,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     /** One step of the interactive guide over the whole pad screen. */
     fun showGuide(step: Int, onGesture: (EdgeGesture) -> Unit, onSkip: () -> Unit, pull: PullListener? = null) {
         removeGuide()
-        val v = GuideView(ctx, step, onGesture, onSkip, pull)
+        val v = GuideView(ctx, step, onGesture, onSkip, pull, edges = !singleScreen)
         val lp = fullScreenParams("SidePad guide")
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
         wm.addView(v, lp); guide = v
@@ -453,7 +471,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         if (shield) {
             val frosted = backdrop == "frosted" && blurSupported
             val color = backdropColor(backdrop)
-            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider, video = video)
+            val v = ShieldPadView(ctx, layout, engine, onGesture, onAction, pullTracker, shieldOn = true, opacity = opacity, backdropColor = color, levels = levels, onSlider = onSlider, video = video, edges = !singleScreen)
             val lp = WindowManager.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             if (frosted) {
@@ -1015,6 +1033,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     companion object {
         private const val TAG = "SidePadOverlay"
+
+        /** True when this machine has no screen of its own to give the pad. */
+        fun isSingleScreen(app: Context): Boolean =
+            resolveDisplayId(app, -1) == Display.DEFAULT_DISPLAY
 
         /** The user's chosen display, or the first display that is not the main one. */
         fun resolveDisplayId(app: Context, preferred: Int): Int {
