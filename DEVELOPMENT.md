@@ -1107,3 +1107,47 @@ And the Classic path is stale. Everything measured this week — the six-platfor
 pairing behaviour, the reconnect story — was over Low Energy. Classic has been unreachable from
 the panel for a while, and macOS files the handheld as a phone over it, which is the mess that
 cost 2026-09-20. None of that is inherited; it would need its own pass.
+
+## Open for 2026-09-22: stick lag, precision, and whether stale entries actually cost something
+
+Three things left standing at the end of 2026-09-21, in the order worth doing.
+
+### The Mac is not the difference
+
+Measured rather than assumed, by comparing the session where sticks were good against the one
+where they were not:
+
+| | gamecontrollerd | hid pads |
+|---|---|---|
+| 09-20 23:28–23:46, Eastward, sticks good | 0.88–1.12 s/min | 4 |
+| 09-21 23:01–23:49, laggy | 1.10–1.34 s/min | 4, briefly 6 |
+
+Same daemon cost, same pad count, no driver flood either time. Whatever changed is on the
+handheld or in this code. That is a negative result and it rules out a whole branch.
+
+Use those numbers as the baseline for any retest: `gccpu.log` for the Mac, `padlag.log` for the
+handheld's outbound queue.
+
+### Sticks have eight bits, and claim sixteen
+
+`ControllerForwarder` scales a stick from the controller's ±32767 into ±127, because the target
+range comes from `BluetoothSink.CAPS` — the Classic sink's caps. `XboxShape.stick()` then
+stretches ±127 back out to 0…65535. So the pad claims 16-bit axes and delivers 255 positions,
+and a game with a deadzone has very few of those left.
+
+This predates the good session, so it is not what changed — but it is why sticks were never
+right, and why swapping report descriptors produced differences that looked like fixes. The
+change is to take the target range from the shape rather than from the Classic sink's caps, and
+it touches the on-screen pad and the Classic path too, so it wants doing carefully and measuring
+against the baseline above.
+
+### Are the stale Bluetooth entries really only cosmetic?
+
+Concluded on 2026-09-21 that the spare rows are harmless — but that was about the **rows**: the
+Control Center cache and the System Settings list, which are display state and clear themselves.
+It was never a claim about accumulated bonds and HID records, which is a different question.
+
+Worth testing, because the pad count reached six during an evening of repeated pairing and the
+handheld's link was at its worst that same evening. The test: clear every stale Odin entry on the
+Mac, re-pair once, and run the Eastward comparison against the numbers above. If the lag moves
+with the clean-up, they are not cosmetic and the advice in the README is wrong.
