@@ -160,10 +160,14 @@ class ShieldPadView(
                     mark = if (i in latched) 2 else if (b.sticky) 1 else 0, icon = Glyphs.icon(b.code, layout.style), turbo = b.turbo)
             }
         }
-        // Small pills marking the gesture edges: top (panel) and bottom (hide).
-        val w = width * 0.18f; val h = 8f
-        c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
-        c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
+        // Small pills marking the gesture edges: top (panel) and bottom (hide). Not drawn when
+        // those edges are Android's, since a mark promising a gesture that will not answer is
+        // worse than no mark — it is the thing the player keeps trying.
+        if (edges) {
+            val w = width * 0.18f; val h = 8f
+            c.drawRoundRect((width - w) / 2, 10f, (width + w) / 2, 10f + h, h, h, hint)
+            c.drawRoundRect((width - w) / 2, height - 10f - h, (width + w) / 2, height - 10f, h, h, hint)
+        }
         c.restoreToCount(layer)
     }
 
