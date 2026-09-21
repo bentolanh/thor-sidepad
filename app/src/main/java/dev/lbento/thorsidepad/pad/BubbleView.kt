@@ -52,7 +52,8 @@ class BubbleView(ctx: Context) : View(ctx) {
 
     override fun onDraw(c: Canvas) {
         drawController(c, width / 2f, splitY * 0.5f, width * 0.46f)
-        drawSwitch(c, width / 2f, (splitY + height) / 2f, width * 0.22f)
+        // Left of centre so the forwarding arrow has room without widening the button.
+        drawSwitch(c, width * 0.44f, (splitY + height) / 2f, width * 0.20f)
     }
 
     /**
@@ -113,7 +114,13 @@ class BubbleView(ctx: Context) : View(ctx) {
         }
     }
 
-    /** A small switch: a short track with a knob, lit and over to the right when the shield is up. */
+    /**
+     * A small switch: a short track with a knob, lit and over to the right when the shield is up.
+     *
+     * An arrowhead sits past the right end while presses are being forwarded. The glyph above is
+     * already tinted for that, but colour alone is easy to miss on a screen held at arm's length
+     * mid-game, and a shape is not.
+     */
     private fun drawSwitch(c: Canvas, cx: Float, cy: Float, half: Float) {
         val h = 5f * d
         fill.color = if (shieldOn) 0xFF2E7DFF.toInt() else 0x59FFFFFF
@@ -122,5 +129,16 @@ class BubbleView(ctx: Context) : View(ctx) {
         val kx = if (shieldOn) cx + half - knob else cx - half + knob
         fill.color = if (shieldOn) Color.WHITE else 0xCCFFFFFF.toInt()
         c.drawCircle(kx, cy, knob, fill)
+
+        if (!remote) return
+        val a = h * 1.15f
+        val x0 = cx + half + 3f * d
+        blob.reset()
+        blob.moveTo(x0, cy - a)
+        blob.lineTo(x0 + a * 1.15f, cy)
+        blob.lineTo(x0, cy + a)
+        blob.close()
+        fill.color = 0xFF9CC4F0.toInt()
+        c.drawPath(blob, fill)
     }
 }
