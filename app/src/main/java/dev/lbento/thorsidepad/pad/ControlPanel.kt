@@ -301,6 +301,29 @@ object ControlPanel {
                 // become findable is ours to worry about and nobody else's: an earlier version
                 // made the mode live on another page and told the user why Low Energy was
                 // different, which is a plumbing detail dressed up as a choice.
+                // What the pairing actually achieved, at the top where it is looked for. Without
+                // it the screen counted down and then said nothing, so a pairing that worked and
+                // one that failed looked exactly alike — the only way to find out was to go and
+                // press a button.
+                val paired = state.hosts.firstOrNull { it.address == state.hostAddress }
+                card.addView(label(
+                    when {
+                        paired == null -> "Nothing paired yet"
+                        state.hostConnected -> "Connected to ${paired.label}"
+                        else -> "Paired with ${paired.label} \u2014 not connected"
+                    },
+                    18f,
+                    when {
+                        paired == null -> grey
+                        state.hostConnected -> 0xFF6DBF5B.toInt()
+                        else -> 0xFFE0C04A.toInt()
+                    }).apply { setPadding(0, 2, 0, 4) })
+                if (paired != null && !state.hostConnected) card.addView(label(
+                    "It is paired. Connect to it from the other device, or pair again below.",
+                    12f, grey).apply { setPadding(0, 0, 0, 10) })
+                card.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
+                    .apply { topMargin = 8; bottomMargin = 14 })
+
                 card.addView(label("Appears as", 14f, grey))
                 identityButtons(card)
                 card.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)

@@ -713,6 +713,10 @@ class OverlayService : Service() {
     private fun refreshLinkBadge() {
         applyAwakeHold()
         val ov = overlay ?: return
+        // A link coming up or going down is the answer the pairing screen is waiting for, and
+        // only the countdown was refreshing the panel — so a pairing that connected after the two
+        // minutes had run out left the screen still saying nothing had happened.
+        if (ov.isPanelShowing) ov.updatePanel(panelState(ov))
         val bt = btSink
         val remote = prefs.anyToMachine
         // Never while the panel is open. The badge is a nudge for somebody mid-game who has just
