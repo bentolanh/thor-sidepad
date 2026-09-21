@@ -47,7 +47,6 @@ data class PanelState(
     /** Pairing: the name a computer will see, and how long the Thor is still visible for. */
     val padName: String = "",
     val visibleFor: Int = 0,
-    val keepAwake: Boolean = false,
     /** Computers already paired with this Thor that SidePad does not yet know about. */
     val adoptable: List<HostChoice> = emptyList(),
     /** Which radio carries presses to a machine, and what that machine is told the pad is. */
@@ -62,7 +61,6 @@ interface PanelActions {
     fun pickProfile()
     fun editLayout()
     fun setShield(on: Boolean)
-    fun setKeepAwake(on: Boolean)
     fun setOpacity(value: Float)
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
@@ -246,21 +244,6 @@ object ControlPanel {
                     if (state.remote) "Where presses go \u2014 another machine" else "Where presses go \u2014 this device",
                     if (state.remote) 0xFF9CC4F0.toInt() else grey))
                 card.addView(sending, groupLp)
-                if (state.remote) {
-                    // Holding the machine awake does nothing at all when the presses never leave
-                    // it, so the switch is not offered there. The behaviour was already limited
-                    // this way; only the switch was not.
-                    card.addView(sw("Don\u2019t let this device sleep while playing", state.keepAwake) { actions.setKeepAwake(it) })
-                    card.addView(label(
-                        "SidePad takes the controller over while a machine has the pad, so Android never " +
-                        "sees the presses and the screen times out as though nobody were there \u2014 after " +
-                        "thirty minutes it sleeps, and a sleeping handheld sends nothing until it is woken. " +
-                        "Nothing is lost when that happens; it is simply a game interrupted. On, each press " +
-                        "is reported to Android as the activity it is, so the screen stays awake while you " +
-                        "are playing and sleeps as usual once you stop.",
-                        11f, grey).apply { setPadding(0, 0, 0, 16) })
-                }
-
                 // ---- the pad drawn on this screen ----
                 val padGroup = group()
                 padGroup.addView(pickerRow("Pad layout", state.activeProfile) { actions.pickProfile() })

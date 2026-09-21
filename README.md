@@ -228,9 +228,11 @@ touch screen, expect the following:
   belong to whatever is underneath — but not with the shield on, because the shield is one window
   covering the whole screen and every click, mouse included, is its own. The pad says "shield is
   on" in place of the trackpad rather than pretending.
-- Keeping the handheld awake while you play works anywhere Shizuku does. It reports each press
-  to Android as the activity it is, through a call the shell user is allowed to make on any
-  Android build — nothing about it is particular to these handhelds.
+- Keeping the handheld awake while you play works anywhere Shizuku does, and is not a setting.
+  SidePad takes the controller over while a machine has the pad, so Android never sees the
+  presses and would time the screen out as though nobody were there. Each press is reported as
+  the activity it is, through a call the shell user is allowed to make on any Android build —
+  nothing about it is particular to these handhelds. Stop playing and it sleeps as usual.
 - Whether a dark screen stops the controller, though, is the handheld's own business. The Thor
   and the Odin 2 Mini both build their gamepad in software and it stops when their display does,
   so on those two the screen has to stay on while you play. A device with a real controller node

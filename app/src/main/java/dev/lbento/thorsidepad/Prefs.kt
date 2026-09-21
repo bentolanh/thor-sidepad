@@ -139,14 +139,6 @@ class Prefs(ctx: Context) {
      * spends the battery to do it. Neither is obviously right, so it is asked rather than chosen.
      */
     /**
-     * On by default: a session that ends after thirty minutes because the screen timed out is a
-     * fault, not a preference. It applies only while a machine has the pad.
-     */
-    var keepAwake: Boolean
-        get() = sp.getBoolean("keepAwake", true)
-        set(v) = sp.edit().putBoolean("keepAwake", v).apply()
-
-    /**
      * Whether the pad tells a host it has motors in it.
      *
      * Saying so is a force-feedback collection at the end of the report map, and leaving it out

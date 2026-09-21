@@ -276,7 +276,7 @@ class OverlayService : Service() {
         remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
         hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
         padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts(),
-        transport = prefs.btTransport, identity = prefs.btIdentity, keepAwake = prefs.keepAwake,
+        transport = prefs.btTransport, identity = prefs.btIdentity,
         edges = !ov.singleScreen)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
@@ -645,8 +645,10 @@ class OverlayService : Service() {
      * switch is about and startled anyone who touched it while playing.
      */
     private fun applyAwakeHold() {
-        val want = prefs.keepAwake && prefs.targetMode == Prefs.MODE_BT &&
-            visible && btSink?.connected == true
+        // Not a setting. A grabbed controller is invisible to Android, so while a machine has the
+        // pad the screen times out as though nobody were there and the game is interrupted at the
+        // thirty-minute mark. Nobody wants that, so nobody is asked.
+        val want = prefs.targetMode == Prefs.MODE_BT && visible && btSink?.connected == true
         // The lock keeps the processor alive and costs nothing. Holding the *screen* on is no
         // longer done here: pinning it for the whole session was a blunt answer to a narrow
         // problem, which is that a grabbed controller is invisible to Android. Reporting the
@@ -700,9 +702,7 @@ class OverlayService : Service() {
                     // Only while the player has asked for it, and only for presses that Android
                     // will never see: these are being forwarded to another machine off a grabbed
                     // device, so without this the screen times out as though nobody were here.
-                    if (prefs.keepAwake) {
-                        try { svc.pokeUserActivity() } catch (e: Exception) { Log.w(TAG, "poke", e) }
-                    }
+                    try { svc.pokeUserActivity() } catch (e: Exception) { Log.w(TAG, "poke", e) }
                 }, passThrough = { code, down ->
                     when {
                         code !in passThrough -> Unit
@@ -1297,15 +1297,6 @@ class OverlayService : Service() {
                 }
             }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
-            override fun setKeepAwake(on: Boolean) {
-                prefs.keepAwake = on
-                // Takes effect now rather than at the next connection, so the switch does what it
-                // looks like it does — and only that: refreshing the whole badge from here put a
-                // "not connected" notice on screen every time the switch was touched.
-                applyAwakeHold()
-                ov.updatePanel(panelState(ov))
-            }
-
             override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
