@@ -53,7 +53,7 @@ class BubbleView(ctx: Context) : View(ctx) {
     override fun onDraw(c: Canvas) {
         drawController(c, width / 2f, splitY * 0.5f, width * 0.46f)
         // Left of centre so the forwarding arrow has room without widening the button.
-        drawSwitch(c, width * 0.44f, (splitY + height) / 2f, width * 0.20f)
+        drawShield(c, width * 0.42f, (splitY + height) / 2f - 1f * d, width * 0.155f)
     }
 
     /**
@@ -115,24 +115,47 @@ class BubbleView(ctx: Context) : View(ctx) {
     }
 
     /**
-     * A small switch: a short track with a knob, lit and over to the right when the shield is up.
+     * A small shield, filled while it is up and hollow while it is not.
      *
-     * An arrowhead sits past the right end while presses are being forwarded. The glyph above is
+     * It was a track-and-knob switch, which looked like a setting rather than the thing it
+     * controls — and beside a controller glyph, a second abstract widget is one shape too many to
+     * decode at a glance. A shield says what it is.
+     *
+     * An arrowhead sits to its right while presses are being forwarded. The glyph above is
      * already tinted for that, but colour alone is easy to miss on a screen held at arm's length
      * mid-game, and a shape is not.
      */
-    private fun drawSwitch(c: Canvas, cx: Float, cy: Float, half: Float) {
-        val h = 5f * d
-        fill.color = if (shieldOn) 0xFF2E7DFF.toInt() else 0x59FFFFFF
-        c.drawRoundRect(cx - half, cy - h / 2f, cx + half, cy + h / 2f, h / 2f, h / 2f, fill)
-        val knob = h * 0.95f
-        val kx = if (shieldOn) cx + half - knob else cx - half + knob
-        fill.color = if (shieldOn) Color.WHITE else 0xCCFFFFFF.toInt()
-        c.drawCircle(kx, cy, knob, fill)
+    private fun drawShield(c: Canvas, cx: Float, cy: Float, half: Float) {
+        // Straight shoulders, then sides that draw in to a point. A shallower curve gives a
+        // rounded bottom, which reads as a bucket rather than a shield — it did.
+        val top = cy - half * 1.00f
+        val shoulder = cy + half * 0.10f
+        val bottom = cy + half * 1.45f
+        blob.reset()
+        blob.moveTo(cx - half, top)
+        blob.lineTo(cx + half, top)
+        blob.lineTo(cx + half, shoulder)
+        blob.cubicTo(cx + half, cy + half * 0.80f, cx + half * 0.52f, cy + half * 1.16f, cx, bottom)
+        blob.cubicTo(cx - half * 0.52f, cy + half * 1.16f, cx - half, cy + half * 0.80f, cx - half, shoulder)
+        blob.close()
+
+        if (shieldOn) {
+            fill.color = 0xFF2E7DFF.toInt()
+            c.drawPath(blob, fill)
+            // A tick, so "on" reads even where the blue is washed out by what is behind it.
+            line.color = Color.WHITE
+            line.strokeWidth = 1.6f * d
+            c.drawLine(cx - half * 0.40f, cy + half * 0.10f, cx - half * 0.06f, cy + half * 0.48f, line)
+            c.drawLine(cx - half * 0.06f, cy + half * 0.48f, cx + half * 0.46f, cy - half * 0.34f, line)
+        } else {
+            line.color = 0x99FFFFFF.toInt()
+            line.strokeWidth = 1.6f * d
+            c.drawPath(blob, line)
+        }
 
         if (!remote) return
-        val a = h * 1.15f
-        val x0 = cx + half + 3f * d
+        val a = half * 0.85f
+        val x0 = cx + half + 4f * d
         blob.reset()
         blob.moveTo(x0, cy - a)
         blob.lineTo(x0 + a * 1.15f, cy)

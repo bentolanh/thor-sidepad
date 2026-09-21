@@ -110,11 +110,37 @@ class OverlayService : Service() {
      * and goes; an open descriptor to the old node then writes into nothing. Reopen the target
      * whenever Android reports an input device change while the pad is up.
      */
+    /** Input devices SidePad created, so their comings and goings are not mistaken for news. */
+    private val ourInputIds = HashSet<Int>()
+
+    /**
+     * Watches for controllers appearing and disappearing, and ignores its own.
+     *
+     * Reopening the target destroys the virtual pad and makes a new one. Android reports that as
+     * a device arriving, which used to bring us straight back here to reopen again — a loop that
+     * ran about every 0.7 seconds, and which Android announced each time round as a controller
+     * connecting and disconnecting. The device being added is checked by name, and its id
+     * remembered so the matching removal can be ignored too; by then there is nothing left to
+     * look the name up from.
+     */
     private val deviceListener = object : InputManager.InputDeviceListener {
-        override fun onInputDeviceAdded(id: Int) = scheduleReopen("added $id")
-        override fun onInputDeviceRemoved(id: Int) = scheduleReopen("removed $id")
-        override fun onInputDeviceChanged(id: Int) = scheduleReopen("changed $id")
+        override fun onInputDeviceAdded(id: Int) {
+            if (isOurInputDevice(id)) { ourInputIds.add(id); return }
+            scheduleReopen("added $id")
+        }
+        override fun onInputDeviceRemoved(id: Int) {
+            if (ourInputIds.remove(id)) return
+            scheduleReopen("removed $id")
+        }
+        override fun onInputDeviceChanged(id: Int) {
+            if (id in ourInputIds || isOurInputDevice(id)) return
+            scheduleReopen("changed $id")
+        }
     }
+
+    private fun isOurInputDevice(id: Int): Boolean = try {
+        isOurDevice(android.view.InputDevice.getDevice(id)?.name ?: "")
+    } catch (_: Exception) { false }
 
     private fun scheduleReopen(why: String) {
         if (!visible || reopenScheduled) return
