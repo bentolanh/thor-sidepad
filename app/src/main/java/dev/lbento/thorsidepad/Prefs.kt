@@ -220,6 +220,25 @@ class Prefs(ctx: Context) {
             PLATFORM_APPLE else PLATFORM_APPLE
     }
 
+    /**
+     * Throw away this side of the bond whenever a machine lets go.
+     *
+     * A bond that cannot be used is worse than no bond, because it looks like it should work.
+     * macOS stores this pad as a Mobile Phone — the Class of Device comes from the Classic radio
+     * and Android says phone — so on every reconnection it takes the phone path, sweeps SDP,
+     * finds no HID and stops. The pairing survives and the controller does not, which reads as
+     * the pad being broken rather than as needing to be paired again.
+     *
+     * On, the pad forgets the machine as the link drops. Nothing is left claiming to be a
+     * working pairing, and the next session starts from a fresh one, which always works. The
+     * machine's own record cannot be removed from here — no peripheral can make a host forget —
+     * so it still has to be forgotten there by hand; this only makes sure the two sides agree
+     * that it is gone.
+     */
+    var forgetOnDisconnect: Boolean
+        get() = sp.getBoolean("forgetOnDisconnect", false)
+        set(v) = sp.edit().putBoolean("forgetOnDisconnect", v).apply()
+
     var shield: Boolean
         get() = sp.getBoolean("shield", false)
         set(v) = sp.edit().putBoolean("shield", v).apply()

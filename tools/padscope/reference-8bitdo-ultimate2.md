@@ -160,3 +160,49 @@ reconnects like one.
 Untested, and not free: the class is the handheld's, not this app's, so every device it pairs
 with would see the change. It is not a `persist.` property, so a reboot undoes it, which is the
 safety net that makes the experiment reasonable at all.
+
+## Class of Device: tried, and why it cannot be used, 2026-09-21
+
+macOS files this pad as a Mobile Phone because the Class of Device comes from the handheld's
+Classic radio. Android exposes no API for it, but `bluetooth.device.class_of_device` is a system
+property the stack reads at initialisation, it is empty on the Odin 2 Mini, and Shizuku gives
+shell, which can write properties. So it was tried:
+
+```bash
+setprop bluetooth.device.class_of_device "0,5,8"   # Peripheral / Gamepad
+# then Bluetooth off and on, so the stack re-reads it
+```
+
+**It worked, in the sense that mattered.** The Mac's record changed from
+
+```
+Services: 0x900000 < GATT ACL >   Minor Type: Mobile Phone
+```
+
+to
+
+```
+Services: 0x400000 < BLE >
+```
+
+The Classic route — the one that sweeps SDP, finds no HID and gives up on every reconnection —
+was gone. That is the first time anything has moved that record.
+
+**And it broke pairing.** The Mac showed "connecting" and never got there; no connection reached
+the pad at all, and no passkey was offered where every previous pairing had shown one. Announcing
+a gamepad class changes which transport a host reaches for, and macOS went looking for a Classic
+HID gamepad — a profile this pad does not serve, being Low Energy only.
+
+**It is not implementable even if the pairing side were solved.** The Class of Device belongs to
+the handheld, not to this app. While it is set, every device the handheld pairs with — headphones,
+phones, anything — sees a gamepad rather than a phone. Trading the rest of a device's Bluetooth
+for one host's reconnection is not a trade worth making.
+
+**What it is worth.** It locates the wall precisely. The reconnect problem is not a bug in this
+app and not something a peripheral can negotiate around: it is that a handheld has a Classic
+radio announcing what it really is, and macOS files the pairing by that. A real controller has no
+Classic radio at all. Short of the handheld lying about itself system-wide, there is nothing here
+to fix.
+
+The property does not persist, so a reboot undoes it. That is the only reason the experiment was
+safe to run.

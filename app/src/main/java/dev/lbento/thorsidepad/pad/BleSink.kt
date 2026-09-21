@@ -52,6 +52,8 @@ class BleSink(
     private val rumble: Boolean = true,
     /** Send buttons counted straight through, for a host that does not know the identity. */
     private val plainButtons: Boolean = false,
+    /** Throw this side of the bond away when a machine lets go. See Prefs.forgetOnDisconnect. */
+    private val forgetOnDisconnect: Boolean = false,
 ) : PadTransport {
 
     /**
@@ -726,6 +728,19 @@ class BleSink(
                     //
                     // Not instantly, though: a machine needs a moment to put the old device away,
                     // and the 358ms it used to take was not enough.
+                    // A bond that cannot be reconnected is worse than none: it looks like a
+                    // working pairing and behaves like a broken pad. Letting go of it here means
+                    // the two sides agree the machine is gone, and the next session starts from
+                    // a fresh pairing, which is the one thing that has always worked.
+                    if (forgetOnDisconnect) {
+                        val addr = device.address
+                        ticker.schedule({
+                            if (host == null && forgetMachine(addr)) {
+                                Log.i(TAG, "let go of $addr; it will have to be paired again")
+                                onState("Pair again to use the pad")
+                            }
+                        }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
+                    }
                     ticker.schedule({ resumeAdvertising() }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
                     onState("Not connected")
                 }
