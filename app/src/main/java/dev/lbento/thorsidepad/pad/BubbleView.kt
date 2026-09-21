@@ -45,7 +45,11 @@ class BubbleView(ctx: Context) : View(ctx) {
     private val d get() = resources.displayMetrics.density
 
     /** Where the controller ends and the switch begins. */
-    private val splitY get() = height * 0.70f
+    private val splitY get() = height * 0.63f
+
+    /** Half-width of the shield, and the gap its point keeps from the bottom edge. */
+    private val shieldHalf get() = width * 0.15f
+    private val shieldPad get() = 4f * d
 
     /** 0 for the controller, 1 for the shield switch. */
     fun regionAt(y: Float): Int = if (y < splitY) 0 else 1
@@ -53,7 +57,9 @@ class BubbleView(ctx: Context) : View(ctx) {
     override fun onDraw(c: Canvas) {
         drawController(c, width / 2f, splitY * 0.5f, width * 0.46f)
         // Left of centre so the forwarding arrow has room without widening the button.
-        drawShield(c, width * 0.42f, (splitY + height) / 2f - 1f * d, width * 0.155f)
+        // Placed by its point rather than its middle. The shield hangs 1.45 half-widths below
+        // its centre, so centring it in the space left over pushed the tip through the edge.
+        drawShield(c, width * 0.42f, height - shieldPad - 1.45f * shieldHalf, shieldHalf)
     }
 
     /**

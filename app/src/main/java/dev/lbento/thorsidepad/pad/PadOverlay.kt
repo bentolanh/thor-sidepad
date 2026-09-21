@@ -250,7 +250,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         if (bubble != null) return
         val d = themed.resources.displayMetrics.density
         val size = (52 * d).toInt()
-        val tall = (62 * d).toInt()
+        val tall = (68 * d).toInt()
         val v = BubbleView(themed)
         val lp = WindowManager.LayoutParams(size, tall,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
