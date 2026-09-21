@@ -358,7 +358,6 @@ object ControlPanel {
                     else "Pairing a new machine replaces the one above. Sending to a machine needs no " +
                          "Shizuku: this device presents itself as an ordinary Bluetooth gamepad.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
-                if (state.remote) card.addView(btn("What the machine sees\u2026") { page = Page.APPEARANCE; render() })
             } else {
                 card.addView(label("Presses go to", 14f, grey))
                 for (t in state.targets) {
