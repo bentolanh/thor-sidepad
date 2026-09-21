@@ -16,7 +16,7 @@ import android.view.View
 
 /** One controller the pad can write into. `name` is the kernel name; `label` is what the user sees. */
 data class TargetChoice(val name: String, val path: String) {
-    val label: String get() = thorLabel(name) ?: name
+    val label: String get() = builtInLabel(name) ?: name
 }
 
 /** A machine the Thor is paired with, that presses can be sent to instead of into this device. */
@@ -26,12 +26,12 @@ data class HostChoice(val address: String, val label: String)
  * The Thor's built-in controller reports one of two names depending on the Control Center's
  * "Handle Style". Both mean the same physical pad, so both are shown as "Built-in controller".
  */
-fun thorLabel(name: String): String? = when (name) {
+fun builtInLabel(name: String): String? = when (name) {
     "Xbox Wireless Controller" -> "Built-in controller (Xbox style)"
     "Odin Controller" -> "Built-in controller (Standard style)"
     else -> null
 }
-fun isThorName(name: String) = thorLabel(name) != null
+fun isBuiltInName(name: String) = builtInLabel(name) != null
 
 data class PanelState(
     val padVisible: Boolean, val shield: Boolean, val opacity: Float,
@@ -203,37 +203,60 @@ object ControlPanel {
                     notice.addView(btn("Start Shizuku") { actions.startShizuku() })
                     card.addView(notice)
                 }
-                // Quick settings: everything on one page, as before.
-                val target = if (state.virtual) "Virtual pad (2nd player)" else (thorLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
-                val choicesGroup = LinearLayout(themed).apply {
+                // The page is two subjects, and used to run them together in one stack: where the
+                // presses end up, and the pad drawn on this screen. Every row then had to carry
+                // its own context in its title, and two of them could not. "Appears as" was the
+                // worst of it — two unrelated settings sharing a row, telling the pad which
+                // controller to write into when presses stay here and which identity to claim
+                // when they do not, chosen by a mode set one row above.
+                //
+                // So: two headed groups, and a row appears only where it means something.
+                fun heading(t: String) = label(t, 13f, grey).apply { setPadding(0, 4, 0, 6) }
+                fun group() = LinearLayout(themed).apply {
                     orientation = LinearLayout.VERTICAL
                     setBackgroundColor(0xFF2A2D31.toInt())
                 }
-                // Two questions, not one: where the presses go, and what the receiver thinks they
-                // come from. They were the same thing only while there was one possible destination.
+                val groupLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                    .apply { bottomMargin = 16 }
+                val line = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
+
+                // ---- where the presses end up ----
+                val target = if (state.virtual) "Virtual pad (2nd player)" else (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
                 val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
                 val whereTo = if (!state.remote) "This device"
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
-                choicesGroup.addView(pickerRow("Send button presses to", whereTo) { page = Page.DESTINATION; render() })
-                choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-                val remoteAs = if (state.identity == "XBOX_SERIES") "An Xbox-compatible pad" else "SidePad"
-                choicesGroup.addView(pickerRow("Appears as", if (state.remote) remoteAs else target) {
-                    page = if (state.remote) Page.APPEARANCE else Page.CONTROLLER; render()
-                })
-                choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-                choicesGroup.addView(pickerRow("Profile", state.activeProfile) { actions.pickProfile() })
-                card.addView(choicesGroup, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                    .apply { topMargin = 14; bottomMargin = 14 })
-                // The one action on this page, so it is coloured rather than a third grey band.
+                val sending = group()
+                sending.addView(pickerRow("Send button presses to", whereTo) { page = Page.DESTINATION; render() })
+                sending.addView(hairline(), line)
+                if (state.remote) {
+                    // Only a machine on the other end has an opinion about what we look like.
+                    val remoteAs = if (state.identity == "XBOX_SERIES") "An Xbox-compatible pad" else "SidePad"
+                    sending.addView(pickerRow("Appears as", remoteAs) { page = Page.APPEARANCE; render() })
+                } else {
+                    sending.addView(pickerRow("Controller", target) { page = Page.CONTROLLER; render() })
+                }
+                card.addView(heading("Where presses go"))
+                card.addView(sending, groupLp)
+                if (state.remote) {
+                    // Holding the machine awake does nothing at all when the presses never leave
+                    // it, so the switch is not offered there. The behaviour was already limited
+                    // this way; only the switch was not.
+                    card.addView(sw("Keep the controller awake when the screen sleeps", state.keepAwake) { actions.setKeepAwake(it) })
+                    card.addView(label(
+                        "Off, this device sleeps as usual and stops reading its own controller, so presses " +
+                        "stop reaching the machine even though the pad still looks connected. On, it " +
+                        "keeps working with the screens dark and uses more battery.",
+                        11f, grey).apply { setPadding(0, 0, 0, 16) })
+                }
+
+                // ---- the pad drawn on this screen ----
+                val padGroup = group()
+                padGroup.addView(pickerRow("Pad layout", state.activeProfile) { actions.pickProfile() })
+                card.addView(heading("The pad on this screen"))
+                card.addView(padGroup, groupLp)
                 card.addView(btn("Edit layout") { actions.editLayout() }.apply {
                     setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
                 })
-                card.addView(sw("Keep playing with the screens off", state.keepAwake) { actions.setKeepAwake(it) })
-                card.addView(label(
-                    "Off, this device sleeps as usual and stops reading its own controller, so presses " +
-                    "stop reaching the machine even though the pad still looks connected. On, it " +
-                    "keeps working with the screens dark and uses more battery.",
-                    11f, grey).apply { setPadding(0, 0, 0, 8) })
                 card.addView(sw("Shield: block touches to the app behind the pad", state.shield) { actions.setShield(it) })
                 card.addView(label("Behind the pad (shield mode)", 14f, grey))
                 val choices = listOf("clear" to "Clear", "dim" to "Dim", "dark" to "Dark", "frosted" to (if (state.blurSupported) "Frosted" else "Frosted*"))

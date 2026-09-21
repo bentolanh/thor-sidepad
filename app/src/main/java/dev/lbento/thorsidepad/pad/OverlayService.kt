@@ -135,7 +135,7 @@ class OverlayService : Service() {
             if (eng == null) { show(); return }
             eng.rebind(LocalSink(svc), caps)
             overlay?.invalidatePad()
-            Log.i(TAG, "reopened target ($why): ${thorLabel(prefs.physicalName) ?: prefs.physicalName}")
+            Log.i(TAG, "reopened target ($why): ${builtInLabel(prefs.physicalName) ?: prefs.physicalName}")
         } catch (e: Exception) { Log.w(TAG, "reopen failed", e) }
     }
 
@@ -300,7 +300,7 @@ class OverlayService : Service() {
             targets = found
             // The Thor's own pad keeps its identity across style changes even though its name changes.
             val byName = found.firstOrNull { it.name == prefs.physicalName }
-                ?: if (isThorName(prefs.physicalName)) found.firstOrNull { isThorName(it.name) } else null
+                ?: if (isBuiltInName(prefs.physicalName)) found.firstOrNull { isBuiltInName(it.name) } else null
             val chosen = byName ?: found.firstOrNull { it.path == prefs.physicalPath } ?: found.firstOrNull()
             if (chosen != null) {
                 if (prefs.physicalName != chosen.name) prefs.physicalName = chosen.name
