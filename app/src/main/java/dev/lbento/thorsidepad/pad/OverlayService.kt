@@ -660,7 +660,14 @@ class OverlayService : Service() {
         val ov = overlay ?: return
         val bt = btSink
         val remote = prefs.targetMode == Prefs.MODE_BT
-        if (!remote || !visible || bt == null || bt.connected) { ov.showLinkBadge(null) {}; return }
+        // Never while the panel is open. The badge is a nudge for somebody mid-game who has just
+        // found the pad has stopped answering; in the panel it is an interruption, and on the
+        // pairing screen it is nonsense — of course nothing is connected, that is what the screen
+        // is for. Changing what the pad appears as rebuilds it, which is how it turned up there.
+        if (!remote || !visible || bt == null || bt.connected || ov.isPanelShowing) {
+            ov.showLinkBadge(null) {}
+            return
+        }
         val name = pairedHosts().firstOrNull { it.address == prefs.btHost }?.label ?: "the machine"
         ov.showLinkBadge("Not connected to $name \u2014 tap to try again") {
             bt.reconnect()
