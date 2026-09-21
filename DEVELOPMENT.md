@@ -1065,3 +1065,45 @@ Two things already known that bear on it: the pad's own display is chosen by
 docked single-screen handheld the pad and the pointer may end up on different displays by
 different rules. And `/dev/uinput` devices carry no display association at all, so if the pointer
 does land in the wrong place, the fix is not in the device we create.
+
+## Two links at once: a pad on Low Energy, a mouse and keyboard on Classic
+
+Raised 2026-09-21, and it replaces the plan recorded above for how mouse and keyboard reach
+another device.
+
+The earlier thinking was a composite descriptor: gamepad, mouse and keyboard in one report map,
+which rules out the Xbox identity entirely, because that identity is worth having only while it
+is a byte-exact copy of real hardware. Anything added ends it. So mouse and keyboard were going
+to cost the good controller.
+
+They do not, if they arrive on a **second connection**. The handheld can be a Low Energy HID
+peripheral and a Classic HID device at the same time — `bluetooth.profile.gatt.enabled` and
+`bluetooth.profile.hid.device.enabled` are both true on the Thor and the Odin 2 Mini. The other
+device then sees two things, which is what it would see if somebody had plugged in a gamepad and
+a keyboard:
+
+- **Low Energy** — the Xbox controller, descriptor untouched, exactly as it is now.
+- **Classic** — a mouse and keyboard, free to declare whatever it likes because nothing about it
+  is pretending to be particular hardware.
+
+This is also why the destination split matters beyond the case it was built for. The built-in
+controller and the on-screen controls already point where they like; giving each its own radio
+is the same idea one step further.
+
+### What it would take
+
+`btTransport` and `btSink` are both single today: one radio, one sink, shared. This needs a
+transport and a sink per destination, and `openMachineSink` to build whichever kind each asks
+for. The split itself is done, so this is plumbing rather than design.
+
+### What is not known
+
+Whether Android will hold a GATT HID peripheral and a `BluetoothHidDevice` registration at once.
+Both roles are enabled; that is not the same as both working together, and it is the first thing
+to find out — a throwaway build that registers both and connects to a Mac answers it in an
+afternoon.
+
+And the Classic path is stale. Everything measured this week — the six-platform matrix, the
+pairing behaviour, the reconnect story — was over Low Energy. Classic has been unreachable from
+the panel for a while, and macOS files the handheld as a phone over it, which is the mess that
+cost 2026-09-20. None of that is inherited; it would need its own pass.
