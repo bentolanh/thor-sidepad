@@ -47,9 +47,56 @@ class PanelScrollView(ctx: Context) : ScrollView(ctx) {
 
     private fun begin(y: Float) { lastY = y; past = 0f; taking = false; drag = 0f }
 
+    /**
+     * Where the gesture is actually caught.
+     *
+     * Waiting for [ScrollView] to hand the touch over does not work, because it declines to
+     * intercept anything when there is nothing to scroll:
+     *
+     * ```java
+     * // Don't try to intercept touch if we can't scroll anyway.
+     * if (getScrollY() == 0 && !canScrollVertically(1)) return false;
+     * ```
+     *
+     * A panel whose contents fit the screen is exactly that case, and the card underneath
+     * swallows touches of its own, so [onTouchEvent] was never reached and the panel could not be
+     * closed at all. A parent is offered every event before its children, so the decision is made
+     * here instead and the scroller's opinion is not needed.
+     */
     override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
-        if (e.actionMasked == MotionEvent.ACTION_DOWN) begin(e.y)
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> begin(e.y)
+            MotionEvent.ACTION_MOVE -> if (!taking && past(e)) { start(e.y); return true }
+        }
         return super.onInterceptTouchEvent(e)
+    }
+
+    /**
+     * Accumulates how far the finger has travelled up with no list left, and says when that is
+     * far enough to take the gesture.
+     *
+     * One event can pass through both [onInterceptTouchEvent] and [onTouchEvent], which shows up
+     * here as a second call with no movement in it. A zero step therefore leaves the total alone;
+     * only travelling back down clears it.
+     */
+    private fun past(e: MotionEvent): Boolean {
+        val step = e.y - lastY
+        lastY = e.y
+        when {
+            step < 0 && !canScrollVertically(1) -> past -= step
+            step > 0 -> past = 0f
+        }
+        return past > slop
+    }
+
+    private fun start(y: Float) {
+        taking = true
+        baseY = y
+        // Tell the scroller its touch is over, or it keeps its own fling state and fights the drag.
+        val cancel = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+        super.onTouchEvent(cancel)
+        cancel.recycle()
+        Log.i("SidePadPanel", "past the end; the drag now moves the panel")
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -57,22 +104,7 @@ class PanelScrollView(ctx: Context) : ScrollView(ctx) {
             MotionEvent.ACTION_DOWN -> begin(e.y)
 
             MotionEvent.ACTION_MOVE -> {
-                val step = e.y - lastY              // negative while the finger moves up
-                lastY = e.y
-                if (!taking) {
-                    past = if (step < 0 && !canScrollVertically(1)) past - step else 0f
-                    if (past > slop) {
-                        taking = true
-                        baseY = e.y
-                        // Tell the scroller its touch is over, or it keeps its own fling state
-                        // and fights the drag.
-                        val cancel = MotionEvent.obtain(e)
-                        cancel.action = MotionEvent.ACTION_CANCEL
-                        super.onTouchEvent(cancel)
-                        cancel.recycle()
-                        Log.i("SidePadPanel", "past the end; the drag now moves the panel")
-                    }
-                }
+                if (!taking && past(e)) start(e.y)
                 if (taking) {
                     drag = (e.y - baseY).coerceAtMost(0f)
                     onDismissDrag?.invoke(drag)
