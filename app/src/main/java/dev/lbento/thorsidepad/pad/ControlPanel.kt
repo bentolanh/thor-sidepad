@@ -53,6 +53,8 @@ data class PanelState(
     /** Which radio carries presses to a machine, and what that machine is told the pad is. */
     val transport: String = "classic",
     val identity: String = "OWN",
+    /** False on a single-screen device, where the top and bottom edges belong to Android. */
+    val edges: Boolean = true,
 )
 
 /** What the panel can do; each returns nothing and the service decides what happens. */
@@ -250,7 +252,12 @@ object ControlPanel {
                 }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     marginStart = 140; marginEnd = 140
                 })
-                card.addView(label("Tap outside to close. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad.", 12f, grey).apply { setPadding(0, 10, 0, 0) })
+                card.addView(label(
+                    if (state.edges)
+                        "Scroll past the bottom of this list to close, the way the notification shade does. Pull down from the top edge for this panel, pull up from the bottom edge to show or hide the pad."
+                    else
+                        "Scroll past the bottom of this list to close, the way the notification shade does. The top and bottom edges belong to Android on this device, so the floating button is the way back to the pad.",
+                    12f, grey).apply { setPadding(0, 10, 0, 0) })
             } else if (page == Page.PAIRING) {
                 // One screen, one story, whichever radio is underneath. Pick the mode, press the
                 // button, go to the machine and connect. What the two radios do differently to

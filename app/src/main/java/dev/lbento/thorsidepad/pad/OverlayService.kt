@@ -276,7 +276,8 @@ class OverlayService : Service() {
         remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
         hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
         padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts(),
-        transport = prefs.btTransport, identity = prefs.btIdentity, keepAwake = prefs.keepAwake)
+        transport = prefs.btTransport, identity = prefs.btIdentity, keepAwake = prefs.keepAwake,
+        edges = !ov.singleScreen)
 
     /** Applies a shield/islands switch that was chosen while the panel was open. */
     private fun applyDirty() {

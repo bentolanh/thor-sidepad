@@ -414,7 +414,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      */
     fun showPanel(state: PanelState, actions: PanelActions, dragged: Boolean = false, shieldOn: Boolean = false, backdrop: String = "clear") {
         removePanel(animated = false)
-        panelHeight = (height * 0.82f).roundToInt()
+        // Full height. The panel was held to 82% so a strip of the screen behind it stayed
+        // tappable as the way out, which cost a fifth of the screen to buy one gesture. The
+        // close button and the scroll-past-the-end both work from anywhere in the panel, so the
+        // strip bought nothing and the list now has room to breathe.
+        panelHeight = height
         val h = ControlPanel.build(themed, state, actions, panelHeight)
         // The panel does not take focus. It is the one thing meant to be used mid-game, for volume
         // and brightness, and a focusable window on this screen pulls focus off the top one, which
