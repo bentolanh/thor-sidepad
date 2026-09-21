@@ -1361,7 +1361,10 @@ class OverlayService : Service() {
                 prefs.targetMode = Prefs.MODE_BT
                 prefs.btTransport = Prefs.TRANSPORT_LE
                 btSink?.close(); btSink = null
-                if (visible) { hide(); show() }
+                // Rebuilt under the open panel, not instead of it — the same reason setDestination
+                // does: this is reached from a button on the panel and closing it would be a
+                // reply to the wrong question.
+                if (visible) { hide(); show(keepPanel = true) }
                 ControlPanel.page = ControlPanel.Page.PAIRING
                 ov.updatePanel(panelState(ov))
             }

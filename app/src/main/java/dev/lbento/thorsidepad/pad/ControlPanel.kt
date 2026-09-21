@@ -356,31 +356,29 @@ object ControlPanel {
                     })
                 }
             } else if (page == Page.DESTINATION) {
+                // Two places to send presses, not a list. A machine has to pair afresh every time
+                // it comes back, so the roll of everything ever paired answered a question nobody
+                // could act on — picking an old one still meant pairing. The addresses are still
+                // kept, as a record; they are just not a menu any more.
                 card.addView(label("Send presses to", 14f, grey))
                 card.addView(btn((if (!state.remote) "\u25CF  " else "") + "This device", state.remote) { actions.setDestination("") })
-                for (h in state.hosts) {
-                    val active = state.remote && h.address == state.hostAddress
-                    card.addView(btn((if (active) "\u25CF  " else "") + h.label, !active) { actions.setDestination(h.address) })
+                val current = state.hosts.firstOrNull { it.address == state.hostAddress }
+                if (current != null) {
+                    val where = current.label + (if (state.remote && !state.hostConnected) " \u2014 not connected" else "")
+                    card.addView(btn((if (state.remote) "\u25CF  " else "") + where, !state.remote) {
+                        actions.setDestination(current.address)
+                    })
                 }
-                card.addView(btn("Pair a new machine\u2026") { page = Page.PAIRING; render() })
+                // Pairing is the only way to a machine now, so it is also the way into remote
+                // mode: this sets the destination as well as opening the page. The old "A machine"
+                // button did the setting, and removing it without this would have left no route.
+                card.addView(btn("Pair a new machine\u2026") { actions.useLowEnergy() })
                 card.addView(label(
-                    if (state.hosts.isEmpty())
+                    if (current == null)
                         "Nothing paired yet. Pair a computer and this device becomes a controller for it, over Bluetooth."
-                    else "Sending to a machine needs no Shizuku: this device presents itself as an ordinary Bluetooth gamepad.",
+                    else "Pairing a new machine replaces the one above. Sending to a machine needs no " +
+                         "Shizuku: this device presents itself as an ordinary Bluetooth gamepad.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
-                // Low Energy has no machine to pick. Over Classic the Thor dials a computer it has
-                // paired with, so the list above is the question; over Low Energy the computer
-                // comes to the pad, and whoever bonds is the answer. Which is why this cannot live
-                // behind a chosen machine the way it first did — there is nothing to choose until
-                // after the pairing, and the pairing needs this set first.
-                card.addView(label("Or wait to be found", 14f, grey).apply { setPadding(0, 22, 0, 4) })
-                card.addView(btn((if (state.remote) "\u25CF  " else "") + "A machine", !state.remote) {
-                    actions.useLowEnergy()
-                })
-                card.addView(label(
-                    "No machine to pick: the computer finds the pad and connects to it, and whichever " +
-                    "one does is the answer.",
-                    12f, grey).apply { setPadding(0, 6, 0, 0) })
                 if (state.remote) card.addView(btn("What the machine sees\u2026") { page = Page.APPEARANCE; render() })
             } else {
                 card.addView(label("Presses go to", 14f, grey))
