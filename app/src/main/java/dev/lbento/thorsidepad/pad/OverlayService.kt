@@ -1342,8 +1342,12 @@ class OverlayService : Service() {
             override fun setIdentity(value: String) {
                 if (prefs.btIdentity == value) return
                 prefs.btIdentity = value
+                // Changing what we claim to be can change which radio that claim has to arrive
+                // on, so the transport moves with it rather than being left behind on whatever
+                // the previous identity needed.
+                prefs.btTransport = Prefs.transportFor(value)
                 btSink?.close(); btSink = null
-                if (visible) { hide(); show() }
+                if (visible) { hide(); show(keepPanel = true) }
                 ov.updatePanel(panelState(ov))
                 toast("Pair with it again from the machine")
             }
@@ -1357,9 +1361,13 @@ class OverlayService : Service() {
              * first, the way Classic does, made this unreachable for anyone who had not already
              * paired one — and pairing one needs this set.
              */
-            override fun useLowEnergy() {
+            override fun pairNewMachine() {
                 prefs.targetMode = Prefs.MODE_BT
-                prefs.btTransport = Prefs.TRANSPORT_LE
+                // The radio follows what we are appearing as, rather than being fixed here. Both
+                // identities are Low Energy today, so nothing changes yet — but a PlayStation or
+                // Nintendo profile would be Classic, and that belongs to the profile rather than
+                // to this button.
+                prefs.btTransport = Prefs.transportFor(prefs.btIdentity)
                 btSink?.close(); btSink = null
                 // Rebuilt under the open panel, not instead of it — the same reason setDestination
                 // does: this is reached from a button on the panel and closing it would be a

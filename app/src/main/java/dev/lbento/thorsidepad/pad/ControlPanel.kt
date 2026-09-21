@@ -69,7 +69,8 @@ interface PanelActions {
     /** Empty address = this device; otherwise the paired machine to send to. */
     fun setDestination(address: String)
     /** Sends to a machine over Low Energy, which needs no machine chosen first: one comes to us. */
-    fun useLowEnergy()
+    /** Start sending to a machine and open the pairing screen. */
+    fun pairNewMachine()
     fun setTransport(value: String)
     fun setIdentity(value: String)
     fun pairMachine()
@@ -372,7 +373,7 @@ object ControlPanel {
                 // Pairing is the only way to a machine now, so it is also the way into remote
                 // mode: this sets the destination as well as opening the page. The old "A machine"
                 // button did the setting, and removing it without this would have left no route.
-                card.addView(btn("Pair a new machine\u2026") { actions.useLowEnergy() })
+                card.addView(btn("Pair a new machine\u2026") { actions.pairNewMachine() })
                 card.addView(label(
                     if (current == null)
                         "Nothing paired yet. Pair a computer and this device becomes a controller for it, over Bluetooth."

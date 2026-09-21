@@ -282,6 +282,22 @@ class Prefs(ctx: Context) {
         /** Presses go to another machine over Bluetooth rather than into this device. */
         const val MODE_BT = "bt"
         const val TRANSPORT_CLASSIC = "classic"
+
+        /**
+         * Which radio an identity has to arrive on.
+         *
+         * Not a preference. A profile is worth having because it copies real hardware exactly,
+         * and the radio is part of what it copies: an Xbox Series controller speaks Low Energy
+         * over Bluetooth, while a DualSense and a Switch Pro are both Classic. A PlayStation pad
+         * offered over Low Energy would be the wrong device wearing the right numbers, which is
+         * the one thing these profiles exist not to be.
+         *
+         * So nothing asks the user which radio to use. Choosing what to appear as chooses it.
+         */
+        fun transportFor(identity: String): String = when (identity) {
+            "XBOX_SERIES", "OWN" -> TRANSPORT_LE
+            else -> TRANSPORT_CLASSIC
+        }
         const val PLATFORM_AUTO = "auto"
         /** Mac, iPad and iPhone together: one GameController framework, one set of quirks. */
         const val PLATFORM_APPLE = "apple"
