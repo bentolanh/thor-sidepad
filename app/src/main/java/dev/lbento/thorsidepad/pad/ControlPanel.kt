@@ -267,6 +267,11 @@ object ControlPanel {
                     card.addView(label(
                         "On the computer, open Bluetooth and connect to \u201C${state.padName}\u201D.",
                         13f, grey).apply { setPadding(0, 14, 0, 0) })
+                    // While the window is open there used to be nothing to press. A pairing that
+                    // failed — and the first attempt often did — left the player watching a
+                    // countdown for up to two minutes with no way to try again.
+                    card.addView(btn("Start the two minutes again") { actions.makeVisible() }
+                        .apply { setPadding(0, 12, 0, 0) })
                 } else {
                     card.addView(btn("Make the Thor visible") { actions.makeVisible() }.apply {
                         setBackgroundColor(0xFF31507E.toInt()); setTextColor(Color.WHITE)
