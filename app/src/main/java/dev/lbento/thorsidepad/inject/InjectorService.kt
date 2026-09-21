@@ -387,17 +387,44 @@ class InjectorService() : IInjector.Stub() {
     private var fwdDeath: android.os.IBinder.DeathRecipient? = null
     private var fwdClient: android.os.IBinder? = null
 
+
+    /**
+     * Take the device away from this machine, retrying while the last reader lets go.
+     *
+     * A grab is exclusive, so restarting a forward races its own predecessor: the old reader can
+     * still be inside a 250ms read when the new one opens the node, and the kernel answers EBUSY.
+     * The old policy was to shrug and carry on unguarded, which is not a small thing — an
+     * ungrabbed controller drives the handheld as well as the machine, so every press lands twice
+     * and the player sees the Odin reacting to a button meant for the Mac. Observed on
+     * 2026-09-21 after changing identity, which tears down one forward and starts another.
+     *
+     * The predecessor exits within a read timeout, so a second of retries covers it comfortably.
+     */
+    private fun grabWithRetry(fd: Int, path: String): Boolean {
+        var wait = 20L
+        repeat(8) { attempt ->
+            val g = Native.grabDevice(fd, true)
+            if (g >= 0) {
+                if (attempt > 0) Log.i(TAG, "grabbed $path on attempt ${attempt + 1}")
+                return true
+            }
+            if (attempt == 0) Log.i(TAG, "grab busy on $path; the last reader is still letting go")
+            try { Thread.sleep(wait) } catch (_: InterruptedException) { return false }
+            wait = (wait * 2).coerceAtMost(250L)
+        }
+        // Worth saying loudly. Carrying on unguarded is not a degraded mode anyone would choose:
+        // the handheld acts on every press as well as the machine.
+        Log.w(TAG, "could not take $path from this device; presses will reach BOTH the machine and the handheld")
+        return false
+    }
+
     override fun forwardStart(path: String?, grab: Boolean, cb: IPadEvents?): String {
         forwardStop()
         if (path.isNullOrEmpty() || cb == null) return "error: no device"
         val f = Native.openDevice(path, false)
         if (f < 0) return "error: ${Native.strerror(f)}"
-        if (grab) {
-            // Taking the device means a press drives the other machine and not this one. If the
-            // kernel refuses, carry on: both machines see it, which is untidy but still works.
-            val g = Native.grabDevice(f, true)
-            if (g < 0) Log.w(TAG, "grab refused: ${Native.strerror(g)}")
-        }
+        var grabbed = true
+        if (grab) grabbed = grabWithRetry(f, path)
         val keys = (Native.deviceCodes(f, Ev.KEY) ?: IntArray(0)).toList()
         val absJson = JSONObject()
         (Native.deviceCodes(f, Ev.ABS) ?: IntArray(0)).forEach { c ->
@@ -425,7 +452,8 @@ class InjectorService() : IInjector.Stub() {
         }, "sidepad-forward")
         t.isDaemon = true; fwdThread = t; t.start()
         Log.i(TAG, "forwarding $path grab=$grab keys=${keys.size}")
-        return JSONObject().put("keys", JSONArray(keys)).put("abs", absJson).put("virtual", false).toString()
+        return JSONObject().put("keys", JSONArray(keys)).put("abs", absJson)
+            .put("virtual", false).put("grabbed", grabbed).toString()
     }
 
     override fun controllerNodes(): String {
@@ -459,6 +487,7 @@ class InjectorService() : IInjector.Stub() {
         if (paths.isNullOrEmpty() || cb == null) return "error: no devices"
         val gen = ++fwdGen
         val nodes = JSONArray()
+        var allGrabbed = true
         val opened = mutableListOf<Pair<Int, Int>>()   // index within paths, fd
 
         paths.forEachIndexed { i, path ->
@@ -470,10 +499,7 @@ class InjectorService() : IInjector.Stub() {
                 nodes.put(JSONObject().put("path", path).put("error", Native.strerror(f)))
                 return@forEachIndexed
             }
-            if (grab) {
-                val g = Native.grabDevice(f, true)
-                if (g < 0) Log.w(TAG, "grab refused on $path: ${Native.strerror(g)}")
-            }
+            if (grab && !grabWithRetry(f, path)) allGrabbed = false
             val keys = (Native.deviceCodes(f, Ev.KEY) ?: IntArray(0)).toList()
             val absJson = JSONObject()
             (Native.deviceCodes(f, Ev.ABS) ?: IntArray(0)).forEach { c ->
@@ -506,7 +532,7 @@ class InjectorService() : IInjector.Stub() {
             t.isDaemon = true; fwdThreads.add(t); t.start()
         }
         Log.i(TAG, "forwarding ${opened.size} node(s) grab=$grab")
-        return JSONObject().put("nodes", nodes).toString()
+        return JSONObject().put("nodes", nodes).put("grabbed", allGrabbed).toString()
     }
 
     override fun forwardStop() {

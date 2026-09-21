@@ -633,6 +633,12 @@ class OverlayService : Service() {
                     Log.w(TAG, "forward refused: ${caps ?: "the helper is too old; restart SidePad"}")
                     return@Thread
                 }
+                // A refused grab is not a detail. The handheld keeps acting on every press as
+                // well as the machine, which reads as the pad being broken, so say it plainly
+                // rather than leaving it in a log nobody opens.
+                if (!JSONObject(caps).optBoolean("grabbed", true)) main.post {
+                    toast("Could not take the controller from this device \u2014 presses will reach both. Hide the pad and show it again.")
+                }
                 openPassThrough(svc, bt, caps)
                 forwarder = f
                 held = true
