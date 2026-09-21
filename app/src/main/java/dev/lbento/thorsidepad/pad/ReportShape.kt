@@ -151,15 +151,13 @@ class XboxShape(
         // them on the Consumer page — View as AC Back, the last bit of this report, and Guide as
         // AC Home in a report of its own. A host that knows this identity looks for them there
         // and nowhere else.
-        // Only where the host knows the identity. A host that counts buttons expects Back and
-        // Guide among them, at seven and nine, and never looks at the Consumer page at all —
-        // so in that order they are ordinary buttons and fall through to the table below.
-        if (!plainButtons && code == dev.lbento.thorsidepad.inject.Btn.SELECT) {
-            synchronized(report) {
-                report[15] = if (down) 1 else 0
-            }
-            return
-        }
+        // View used to be written here, to byte fifteen, as AC Back on the Consumer page —
+        // which is what the model 1708 does and is therefore what copying its descriptor gave
+        // us. macOS does not translate it. Measured 2026-09-21 with PadScope: this pad produced
+        // a flawless standard mapping, every index in place and matching two 8BitDo controllers
+        // exactly, with one hole — buttons[8], View, where nothing arrived at all. So View is
+        // an ordinary button now, at bit ten, immediately below Menu at eleven, which is where
+        // the Xbox layout puts it and where macOS looks for it.
         if (!plainButtons && code == dev.lbento.thorsidepad.inject.Btn.MODE) {
             synchronized(system) { system[0] = if (down) 1 else 0 }
             return
@@ -296,6 +294,7 @@ class XboxShape(
             dev.lbento.thorsidepad.inject.Btn.Z to 5,
             dev.lbento.thorsidepad.inject.Btn.TL to 6,
             dev.lbento.thorsidepad.inject.Btn.TR to 7,
+            dev.lbento.thorsidepad.inject.Btn.SELECT to 10,
             dev.lbento.thorsidepad.inject.Btn.START to 11,
             dev.lbento.thorsidepad.inject.Btn.THUMBL to 13,
             dev.lbento.thorsidepad.inject.Btn.THUMBR to 14,
