@@ -1041,3 +1041,27 @@ If this is revisited, the test that settles it is the one that removes human tim
 screen from a second process. Runs that asked for presses "during the dark period" produced
 clusters at the boundary that read equally well as "buffered and flushed" or "pressed late", and
 were worthless.
+
+## The trackpad, and the question the dock will answer
+
+First tried on 2026-09-21. A trackpad unit on the pad drives this device's own pointer through a
+uinput mouse the injector creates on first touch. It works: dragging moves a cursor, tapping
+clicks, two fingers scroll.
+
+The cursor appears on the **top** screen of the Thor — the default display — not the screen the
+pad is drawn on. That is Android's doing rather than a choice of ours: a uinput mouse is a system
+pointer and the system decides where it points. It happens to be the right answer here, since the
+hand is on the bottom screen and the thing being pointed at is on the top.
+
+**Open: what happens when the handheld is docked to an external monitor.** A dock adds a display,
+and where the pointer goes then is not something this has been tried against. Three outcomes are
+possible and only one needs work — it follows the external display (right, nothing to do), it
+stays on the built-in one (wrong, and probably needs the pointer associated with a display), or
+it becomes unreachable on whichever screen is not in use. Worth an afternoon with the Odin
+Station before any of this is called finished.
+
+Two things already known that bear on it: the pad's own display is chosen by
+`PadOverlay.resolveDisplayId`, which prefers a screen that is not the default one — so on a
+docked single-screen handheld the pad and the pointer may end up on different displays by
+different rules. And `/dev/uinput` devices carry no display association at all, so if the pointer
+does land in the wrong place, the fix is not in the device we create.
