@@ -569,6 +569,11 @@ class OverlayService : Service() {
                         pointer = if (Injector.current() != null) pointerSink else null)
                     // The shield catches the edge pulls itself; islands mode still needs the strips.
                     if (prefs.shield) ov.removeCatchers() else ensureCatcher()
+                // The floating button is not the catchers' business. It was only ever synced from
+                // inside ensureCatcher, which the shield skips — so turning the shield on quietly
+                // stopped the one thing that could put the button back, and the check that exists
+                // to prevent a locked screen never ran.
+                syncBubble()
                 }
                 visible = true
                 prefs.padShown = true
@@ -1282,6 +1287,11 @@ class OverlayService : Service() {
                 onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) },
                 pointer = if (Injector.current() != null) pointerSink else null)
             if (prefs.shield) ov.removeCatchers() else ensureCatcher()
+                // The floating button is not the catchers' business. It was only ever synced from
+                // inside ensureCatcher, which the shield skips — so turning the shield on quietly
+                // stopped the one thing that could put the button back, and the check that exists
+                // to prevent a locked screen never ran.
+                syncBubble()
         } catch (e: Exception) { Log.e(TAG, "rebuild failed", e); show() }
     }
 
