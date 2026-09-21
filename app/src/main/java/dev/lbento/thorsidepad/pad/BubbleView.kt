@@ -79,16 +79,31 @@ class BubbleView(ctx: Context) : View(ctx) {
         line.strokeWidth = 1.7f * d
         c.drawPath(body, line)
 
-        // A d-pad on the left and two buttons on the right: enough asymmetry that it reads as a
-        // controller rather than a face.
+        // A d-pad on the left and four buttons on the right: enough asymmetry that it reads as a
+        // controller rather than a face, which two dots did.
         val dx = cx - bw * 0.45f; val dy = cy - bh * 0.18f
         val arm = bh * 0.34f; val thick = bh * 0.20f
         fill.color = ink
         c.drawRect(dx - arm, dy - thick / 2f, dx + arm, dy + thick / 2f, fill)
         c.drawRect(dx - thick / 2f, dy - arm, dx + thick / 2f, dy + arm, fill)
+
+        // The four in a diamond, in their usual colours while the pad is up. Colour is the
+        // quickest way to say "this is live" without another shape to learn; with the pad down
+        // they go to the outline's ink and the whole glyph dims.
         val bxc = cx + bw * 0.45f
-        c.drawCircle(bxc - bh * 0.22f, dy + bh * 0.16f, bh * 0.15f, fill)
-        c.drawCircle(bxc + bh * 0.16f, dy - bh * 0.16f, bh * 0.15f, fill)
+        val spread = bh * 0.30f
+        val dot = bh * 0.155f
+        val live = padShown
+        val faces = arrayOf(
+            Triple(0f, spread, 0xFF6DBF5B.toInt()),    // A, below
+            Triple(spread, 0f, 0xFFD9534F.toInt()),    // B, right
+            Triple(-spread, 0f, 0xFF5B8FD9.toInt()),   // X, left
+            Triple(0f, -spread, 0xFFE0C04A.toInt()),   // Y, above
+        )
+        for ((ox, oy, colour) in faces) {
+            fill.color = if (live) colour else ink
+            c.drawCircle(bxc + ox, dy + oy, dot, fill)
+        }
 
         // Dimmed while the pad is down, so the button says what a tap will do without a second
         // shape to learn.
