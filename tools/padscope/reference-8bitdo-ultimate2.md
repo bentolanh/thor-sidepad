@@ -206,3 +206,32 @@ to fix.
 
 The property does not persist, so a reboot undoes it. That is the only reason the experiment was
 safe to run.
+
+## The rows that pile up in a Mac's Bluetooth list, 2026-09-21
+
+Several "Odin2Mini" rows accumulate where an 8BitDo leaves one. Three guesses were wrong before
+the evidence settled it: they are not stored pairings, not failed pairings, and not scan results.
+
+**They are orphaned connection records.** Two of them offered a "Disconnect" button while the pad
+was provably off the air with no bond at all, and pressing it did nothing — macOS believed it held
+Low Energy links to devices that no longer existed.
+
+**Where they come from.** A Low Energy link is torn down by the peripheral saying goodbye, which
+`close()` does. Every `adb install` force-stops the app instead: the process dies mid-link with no
+goodbye, and the host keeps a connection to a peripheral that silently vanished. Each happens at
+whatever rotating address was in use, so each leaves its own row. Around twenty installs in one
+day produced several.
+
+**Why forgetting does not clear them.** They were never pairings. Forgetting acts on bonds; these
+are connections. The one entry in My Devices — phone icon, `Minor Type: Mobile Phone` — is the
+bond, and forgetting it does exactly what it should while leaving the orphans untouched.
+
+**Why an 8BitDo never does this.** Fixed address, and nobody force-stops its firmware.
+
+**What clears them.** Turning Bluetooth off and on on the Mac. Confirmed: afterwards Nearby
+Devices was empty and `system_profiler` reported one Odin record. The menu bar list still showed
+five, so that UI lags the system's own database — a macOS staleness, not something a peripheral
+can influence.
+
+**What reduces them.** Advertising only while findable, changed the same day. Off the air, there
+is no address to orphan.
