@@ -603,11 +603,11 @@ class OverlayService : Service() {
     private fun applyAwakeHold() {
         val want = prefs.keepAwake && prefs.targetMode == Prefs.MODE_BT &&
             visible && btSink?.connected == true
-        // The CPU lock alone was the whole of this and did nothing useful: it lets the display
-        // sleep, the device dozes, and the controller these handhelds synthesise in software
-        // stops with it. Keeping the screen on and black is what actually keeps a pad alive.
+        // The CPU lock alone did nothing useful: it lets the display sleep, and the controller
+        // these handhelds synthesise in software stops when the display does. Keeping the screen
+        // awake is the part that keeps a session alive; the lock stays because it costs nothing.
         holdAwake(want)
-        overlay?.holdScreenDark(want)
+        overlay?.holdScreenAwake(want)
     }
 
     private fun refreshLinkBadge() {

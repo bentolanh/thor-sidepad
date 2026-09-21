@@ -992,6 +992,20 @@ AYN's own condition is satisfied and the internal panel can go dark with the con
 alive. That is what `settings system keep_screen_on` and their `VideoOutputMode` machinery are
 for. Undocked there is no way to satisfy it — hence brightness, not power mode.
 
+### What the setting is actually for
+
+Not comfort — a session ends on a timer without it. The injector grabs the controller with
+`EVIOCGRAB` so presses do not also reach the handheld, and a grabbed device delivers to nobody
+else, Android's own input reader included. So however hard someone is playing, Android registers
+no user activity, `screen_off_timeout` runs unopposed (1800000 ms, thirty minutes, on both
+handhelds), the display sleeps and the controller stops with it, mid-game.
+
+Keeping the display awake also keeps Doze from arming at all, which matters because the app is
+not on the battery-optimisation whitelist (`dumpsys deviceidle whitelist`) and its partial wake
+lock would be ignored there.
+
+Brightness is left alone. Anyone who wants a dark screen can turn it down themselves.
+
 If this is revisited, the test that settles it is the one that removes human timing: capture
 `getevent` continuously, wait until presses are demonstrably arriving, and only then black the
 screen from a second process. Runs that asked for presses "during the dark period" produced

@@ -138,8 +138,12 @@ class Prefs(ctx: Context) {
      * stop arriving while the link still looks fine. On, it plays with both screens dark and
      * spends the battery to do it. Neither is obviously right, so it is asked rather than chosen.
      */
+    /**
+     * On by default: a session that ends after thirty minutes because the screen timed out is a
+     * fault, not a preference. It applies only while a machine has the pad.
+     */
     var keepAwake: Boolean
-        get() = sp.getBoolean("keepAwake", false)
+        get() = sp.getBoolean("keepAwake", true)
         set(v) = sp.edit().putBoolean("keepAwake", v).apply()
 
     /**

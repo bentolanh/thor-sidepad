@@ -250,13 +250,13 @@ object ControlPanel {
                     // Holding the machine awake does nothing at all when the presses never leave
                     // it, so the switch is not offered there. The behaviour was already limited
                     // this way; only the switch was not.
-                    card.addView(sw("Keep playing with the screen dark", state.keepAwake) { actions.setKeepAwake(it) })
+                    card.addView(sw("Don\u2019t let this device sleep while playing", state.keepAwake) { actions.setKeepAwake(it) })
                     card.addView(label(
-                        "On, the screen stays on but goes fully black while a machine has the pad, so the " +
-                        "controller keeps working. Letting the screen sleep instead does not work on these " +
-                        "handhelds: they build their controller in software, and it stops when the device " +
-                        "does. The on-screen buttons are not usable while it is dark \u2014 this is for " +
-                        "playing on the controller itself.",
+                        "SidePad takes the controller over while a machine has the pad, so Android never " +
+                        "sees the presses and the screen times out as though nobody were there \u2014 after " +
+                        "thirty minutes it sleeps and the controller stops with it, mid-game. On, the screen " +
+                        "stays awake for as long as the machine is connected. Turn the brightness down if it " +
+                        "bothers you.",
                         11f, grey).apply { setPadding(0, 0, 0, 16) })
                 }
 

@@ -378,21 +378,23 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     private var screenHold: View? = null
 
     /**
-     * Keeps the screen on but as dark as the panel will go.
+     * Stops the device falling asleep while a machine is being played on.
      *
-     * The point is to carry on playing on another machine without this one's display burning
-     * power — and the obvious way round, letting the screen sleep while a PARTIAL_WAKE_LOCK holds
-     * the CPU, does not work. A partial lock keeps the processor alive and lets the display go,
-     * which puts the device into Dozing; both these handhelds synthesise their controller in
-     * software (`/devices/virtual/input/...`), and that software stops there. A press that did
-     * survive would only wake the machine, which is not what anyone wants either.
+     * Not a comfort setting — without it a session ends on a timer. The injector grabs the
+     * controller so presses do not also reach the handheld, and a grabbed device delivers to
+     * nobody else, Android's own input reader included. So however hard someone is playing,
+     * Android sees no user activity at all, the screen timeout runs unopposed (thirty minutes on
+     * both handhelds), and when the display goes the controller goes with it: these devices
+     * synthesise their gamepad in software and that software follows the display. Measured at
+     * 0.9 seconds from panel off to silence. See DEVELOPMENT.md.
      *
-     * So the device is not allowed to doze at all. A one-pixel window holds FLAG_KEEP_SCREEN_ON,
-     * which keeps it properly awake, and sets its own screen brightness to the floor — measured
-     * at 0.0 on both the Thor and the Odin 2 Mini, so this goes all the way down rather than to
-     * some dim minimum.
+     * Keeping the display awake also keeps Doze from ever arming, which matters because the app
+     * is not on the battery-optimisation whitelist and its wake lock would be ignored there.
+     *
+     * Brightness is deliberately left alone. Anyone who wants a dim screen can dim it themselves,
+     * and doing it for them would be taking a decision that was never ours.
      */
-    fun holdScreenDark(on: Boolean) {
+    fun holdScreenAwake(on: Boolean) {
         if (!on) {
             screenHold?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }
             screenHold = null
@@ -406,11 +408,10 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.TRANSLUCENT)
-        lp.screenBrightness = 0f
         lp.gravity = Gravity.TOP or Gravity.START
-        lp.title = "SidePad screen hold"
+        lp.title = "SidePad awake"
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
-        try { wm.addView(v, lp); screenHold = v; Log.i(TAG, "screen held on, brightness floored") }
+        try { wm.addView(v, lp); screenHold = v; Log.i(TAG, "holding the screen awake for the session") }
         catch (e: Exception) { Log.w(TAG, "screen hold", e) }
     }
 
@@ -569,7 +570,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
 
 
-    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {}; holdScreenDark(false) }
+    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {}; holdScreenAwake(false) }
 
     /** Whether the compositor can blur what is behind a window (needed for the frosted backdrop). */
     val blurSupported: Boolean get() = try { wm.isCrossWindowBlurEnabled } catch (_: Throwable) { false }
