@@ -202,11 +202,15 @@ function renderBytes(data) {
   const t = performance.now();
   for (let i = 0; i < data.length; i++) {
     const cell = host.children[i];
-    cell.children[1].textContent = hex2(data[i]);
+    const h = hex2(data[i]);
+    if (cell.lastHex !== h) { cell.children[1].textContent = h; cell.lastHex = h; }
     const moved = recentMove.has(i) && (t - recentMove.get(i)) < 900;
     const noisy = (churn[i] ?? 0) >= 0.2;
-    cell.className = 'byte' + (moved ? ' moved' : (everMoved.has(i) ? ' ever' : '')) + (noisy ? ' noisy' : '');
-    cell.title = noisy ? 'changes constantly — motion or analogue, not a button' : '';
+    const cls = 'byte' + (moved ? ' moved' : (everMoved.has(i) ? ' ever' : '')) + (noisy ? ' noisy' : '');
+    if (cell.className !== cls) {
+        cell.className = cls;
+        cell.title = noisy ? 'changes constantly — motion or analogue, not a button' : '';
+    }
   }
 }
 
@@ -450,63 +454,99 @@ else navigator.hid.getDevices().then(ds => { if (ds.length) log(ds.length + ' de
 
 let stampMoves = 0, lastStampAt = 0;
 const stamps = new Map();     // pad index -> last timestamp seen
+const padCells = new Map();   // pad index -> {buttons:[el], axes:[{label,bar}]}
+let lastPaint = 0;
 
-// Every connected pad is shown and every connected pad is watched. Looking only at the first
-// one meant that with two controllers attached you could map one pad while reading another —
-// which is precisely what happened with an SN30 Pro and an Ultimate 2 both awake.
-function pollPads() {
-  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
-  const host = $('gpinfo'), bhost = $('gpbuttons'), ahost = $('gpaxes');
+// The DOM is built once per pad and then only its text and classes change.
+//
+// The first version rebuilt every button and axis element on every animation frame. With eight
+// pads attached — three controllers plus the virtual ones Steam mints for each — that is well
+// over a hundred elements recreated sixty times a second, and with the page open in two
+// browsers it cost about a core and a half between the renderers and WindowServer repainting
+// after them. A diagnostic tool that loads the machine it is measuring is worse than useless:
+// it was running through every measurement taken on 2026-09-21, flood tests included.
+function padBlock(p) {
+    let cell = padCells.get(p.index);
+    if (cell && cell.count === p.buttons.length && cell.axCount === p.axes.length) return cell;
 
-  if (!pads.length) {
-    host.textContent = 'No gamepad seen. Press a button to wake one.';
-    bhost.innerHTML = ''; ahost.innerHTML = '';
-  } else {
-    for (const p of pads) {
-      if (stamps.get(p.index) !== p.timestamp) {
-        stamps.set(p.index, p.timestamp); stampMoves++; lastStampAt = performance.now();
-      }
-    }
-    host.innerHTML = pads.map(p =>
-      `<div style="margin:2px 0">#${p.index} <strong>${p.id}</strong> mapping="${p.mapping || '(none)'}" ` +
-      `buttons=${p.buttons.length} axes=${p.axes.length}</div>`).join('');
-
-    bhost.innerHTML = '';
-    ahost.innerHTML = '';
-    for (const p of pads) {
-      const label = document.createElement('div');
-      label.style.cssText = 'width:100%;color:var(--dim);font-size:11px;margin:6px 0 2px';
-      label.textContent = `#${p.index} ${p.id.split('(')[0].trim()}`;
-      bhost.appendChild(label);
-      p.buttons.forEach((b, i) => {
+    const bhost = $('gpbuttons'), ahost = $('gpaxes');
+    const label = document.createElement('div');
+    label.style.cssText = 'width:100%;color:var(--dim);font-size:11px;margin:6px 0 2px';
+    label.textContent = `#${p.index} ${p.id.split('(')[0].trim()}`;
+    bhost.appendChild(label);
+    const buttons = p.buttons.map((_, i) => {
         const d = document.createElement('div');
-        d.className = 'byte' + (b.pressed ? ' moved' : '');
-        d.innerHTML = `<div class="i">b${i}</div><div class="v">${b.value.toFixed(2).replace(/\.00$/, '')}</div>`;
+        d.className = 'byte';
+        d.innerHTML = `<div class="i">b${i}</div><div class="v">0</div>`;
         bhost.appendChild(d);
-      });
-      const alab = label.cloneNode(true); ahost.appendChild(alab);
-      p.axes.forEach((v, i) => {
+        return d;
+    });
+    ahost.appendChild(label.cloneNode(true));
+    const axes = p.axes.map((_, i) => {
         const row = document.createElement('div');
         row.style.margin = '3px 0';
-        const w = Math.abs(v) * 50, left = v < 0 ? 50 - w : 50;
-        row.innerHTML = `<div style="color:var(--dim);font-size:11px">axis ${i} ${v.toFixed(3)}</div>` +
-                        `<div class="bar"><i style="left:${left}%;width:${w}%"></i></div>`;
+        row.innerHTML = `<div class="al" style="color:var(--dim);font-size:11px">axis ${i}</div>` +
+                        `<div class="bar"><i></i></div>`;
         ahost.appendChild(row);
-      });
-      tryLearnGamepad(p);
-    }
-  }
+        return { label: row.querySelector('.al'), bar: row.querySelector('.bar i') };
+    });
+    cell = { count: p.buttons.length, axCount: p.axes.length, buttons, axes };
+    padCells.set(p.index, cell);
+    return cell;
+}
 
-  const focused = document.hasFocus();
-  const anyValue = pads.some(p => p.buttons.some(b => b.value > 0) || p.axes.some(v => Math.abs(v) > 0.2));
-  $('diag').textContent =
-    (focused ? 'focused' : 'NOT FOCUSED — click the page') +
-    '  ·  updates: ' + stampMoves +
-    (stampMoves > 20 && !anyValue
-      ? '  ·  values all zero while the pad reports — Brave is blocking this; use Chrome or lower Shields'
-      : '');
-  $('diag').className = 'status' + ((stampMoves > 20 && !anyValue) ? ' armed' : '');
-  requestAnimationFrame(pollPads);
+function pollPads() {
+    requestAnimationFrame(pollPads);
+    const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+
+    // Learning has to see every frame — a press can be shorter than a repaint — but the screen
+    // does not. Thirty updates a second is past what anyone can read.
+    for (const p of pads) {
+        if (stamps.get(p.index) !== p.timestamp) {
+            stamps.set(p.index, p.timestamp); stampMoves++; lastStampAt = performance.now();
+        }
+        tryLearnGamepad(p);
+    }
+    const t = performance.now();
+    if (t - lastPaint < 33) return;
+    lastPaint = t;
+
+    if (!pads.length) {
+        $('gpinfo').textContent = 'No gamepad seen. Press a button to wake one.';
+        if (padCells.size) { $('gpbuttons').innerHTML = ''; $('gpaxes').innerHTML = ''; padCells.clear(); }
+    } else {
+        $('gpinfo').innerHTML = pads.map(p =>
+          `<div style="margin:2px 0">#${p.index} <strong>${p.id}</strong> mapping="${p.mapping || '(none)'}" ` +
+          `buttons=${p.buttons.length} axes=${p.axes.length}</div>`).join('');
+        for (const p of pads) {
+            const cell = padBlock(p);
+            p.buttons.forEach((b, i) => {
+                const el = cell.buttons[i]; if (!el) return;
+                const v = b.value.toFixed(2).replace(/\.00$/, '');
+                if (el.lastV !== v) { el.children[1].textContent = v; el.lastV = v; }
+                const cls = 'byte' + (b.pressed ? ' moved' : '');
+                if (el.className !== cls) el.className = cls;
+            });
+            p.axes.forEach((v, i) => {
+                const ax = cell.axes[i]; if (!ax) return;
+                const txt = `axis ${i} ${v.toFixed(3)}`;
+                if (ax.label.textContent !== txt) ax.label.textContent = txt;
+                const w = Math.abs(v) * 50, left = v < 0 ? 50 - w : 50;
+                ax.bar.style.left = left + '%';
+                ax.bar.style.width = w + '%';
+            });
+        }
+    }
+
+    const focused = document.hasFocus();
+    const anyValue = pads.some(p => p.buttons.some(b => b.value > 0) || p.axes.some(v => Math.abs(v) > 0.2));
+    $('diag').textContent =
+      (focused ? 'focused' : 'NOT FOCUSED — click the page') +
+      '  ·  updates: ' + stampMoves +
+      (stampMoves > 20 && !anyValue
+        ? '  ·  values all zero while the pad reports — Brave is blocking this; use Chrome or lower Shields'
+        : '');
+    $('diag').className = 'status' + ((stampMoves > 20 && !anyValue) ? ' armed' : '');
 }
 
 window.addEventListener('gamepadconnected', (e) => log('gamepad api saw: ' + e.gamepad.id));
