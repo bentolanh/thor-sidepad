@@ -40,6 +40,16 @@ class EdgeCatcherView(ctx: Context, private val pullDown: Boolean, private val o
 
     companion object {
         const val PULL_PX = 140f
-        const val HEIGHT_PX = 28
+        /**
+         * How tall the strip is, in dp rather than raw pixels.
+         *
+         * It was 28 pixels, which on a screen at this density is about twelve dp — a quarter of
+         * the smallest target a thumb can be asked to find, and the reason the pull from the top
+         * had to be aimed for rather than simply made.
+         */
+        const val EDGE_DP = 40
+
+        fun heightPx(ctx: android.content.Context): Int =
+            (EDGE_DP * ctx.resources.displayMetrics.density).toInt()
     }
 }

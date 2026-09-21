@@ -371,7 +371,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         if (singleScreen) return
         for ((down, cb) in listOf(true to onPullDown, false to onPullUp)) {
             val v = EdgeCatcherView(ctx, down, cb, if (down) tracker else null)
-            val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.HEIGHT_PX,
+            val lp = WindowManager.LayoutParams((width * 0.6f).roundToInt(), EdgeCatcherView.heightPx(ctx),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
             lp.gravity = (if (down) Gravity.TOP else Gravity.BOTTOM) or Gravity.CENTER_HORIZONTAL
             lp.title = if (down) "SidePad catcher top" else "SidePad catcher bottom"
@@ -404,7 +404,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         // Below the top edge strip, so pulling the panel down still works over it.
         lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        lp.y = EdgeCatcherView.HEIGHT_PX + 8
+        lp.y = EdgeCatcherView.heightPx(ctx) + 8
         lp.title = "SidePad link"
         lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
         wm.addView(v, lp); linkBadge = v

@@ -94,6 +94,10 @@ class OverlayService : Service() {
     /** Keyboard up on the pad's screen: take the pad windows down; keyboard gone: put them back. */
     private fun onImeVisible(shown: Boolean) {
         val ov = overlay ?: return
+        // The button goes too, and not only when the pad is up. It floats above everything the
+        // keyboard included, and it sits exactly where a thumb reaches — so it was covering keys
+        // whether or not there was a pad behind it.
+        if (shown) ov.removeBubble()
         if (shown && visible && !imeSuspended) {
             imeSuspended = true
             ov.removePanel(); ov.removeAll(); ov.removeCatchers()
@@ -103,6 +107,8 @@ class OverlayService : Service() {
             Log.i(TAG, "keyboard gone: pad back")
             if (visible) rebuildPad() else ensureCatcher()
         }
+        // Put it back whatever the pad was doing, since it was taken away the same way.
+        if (!shown) syncBubble()
     }
 
     /**
