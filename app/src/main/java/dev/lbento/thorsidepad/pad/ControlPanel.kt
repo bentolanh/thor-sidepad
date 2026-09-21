@@ -226,7 +226,7 @@ object ControlPanel {
                 val line = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
 
                 // ---- where the presses end up ----
-                val target = if (state.virtual) "Virtual pad (2nd player)" else (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
+                val target = if (state.virtual) "A separate controller" else (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
                 val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
                 val whereTo = if (!state.remote) "This device"
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
@@ -347,9 +347,9 @@ object ControlPanel {
                     val active = !state.virtual && t.name == state.targetName
                     card.addView(btn((if (active) "●  " else "") + t.label, !active) { actions.setTarget(t) })
                 }
-                card.addView(btn((if (state.virtual) "●  " else "") + "Virtual pad (shows up as a 2nd player)", !state.virtual) { actions.setTarget(null) })
+                card.addView(btn((if (state.virtual) "●  " else "") + "Show up as a separate controller", !state.virtual) { actions.setTarget(null) })
                 if (state.targets.isEmpty()) card.addView(label("No controller found. Is Shizuku running?", 12f, grey))
-                card.addView(label("A Bluetooth controller appears here by name once it is connected. Writing into a real controller keeps games seeing one pad; the virtual pad is a separate device.", 12f, grey).apply { setPadding(0, 14, 0, 0) })
+                card.addView(label("Writing into a real controller keeps games seeing one pad. The other way makes a device of its own, so a game sees two controllers \u2014 this one and yours.", 12f, grey).apply { setPadding(0, 14, 0, 0) })
             }
         }
         render()
