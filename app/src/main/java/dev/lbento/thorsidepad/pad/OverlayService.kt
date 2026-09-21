@@ -500,13 +500,23 @@ class OverlayService : Service() {
                 val ov = overlayOrCreate()
                 if (!keepPanel) ov.removePanel()
                 if (svc != null) { readLevels(svc); syncNowWatch() }
-                ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
-                    onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
-                // The shield catches the edge pulls itself; islands mode still needs the strips.
-                if (prefs.shield) ov.removeCatchers() else ensureCatcher()
-                // The pad's windows have just been added, so they sit above a panel that was
-                // opened before them. Lift it back or it is buried and looks like it shut.
-                if (keepPanel) ov.raisePanel()
+                if (keepPanel && ov.isPanelShowing) {
+                    // The panel covers the screen, so the pad beneath it cannot be seen or
+                    // touched: building it now would gain nothing and cost the one thing that
+                    // matters. Windows stack in the order they are added, so new pad windows land
+                    // above the panel, and the only way to put the panel back on top is to add it
+                    // again — which blinks, because a window really is destroyed and recreated.
+                    //
+                    // So the pad waits. padDirty is the existing path for "rebuild when the panel
+                    // closes", the engine above is already the new one, and the rebuild happens
+                    // when there is something to look at.
+                    padDirty = true
+                } else {
+                    ov.showPlay(PadLayout.fromJson(prefs.layoutJson), prefs.opacity, eng, prefs.shield, prefs.backdrop,
+                        onGesture = { g -> onGesture(g) }, onAction = { code -> onAction(code) }, levels = levels, onSlider = { c, l, f -> onSlider(c, l, f) })
+                    // The shield catches the edge pulls itself; islands mode still needs the strips.
+                    if (prefs.shield) ov.removeCatchers() else ensureCatcher()
+                }
                 visible = true
                 prefs.padShown = true
                 main.postDelayed({ refreshLinkBadge() }, 1500)
@@ -575,9 +585,9 @@ class OverlayService : Service() {
                 w.setReferenceCounted(false)
                 w.acquire()
                 awake = w
-                Log.i(TAG, "keeping the Thor awake while the machine has the pad")
+                Log.i(TAG, "keeping this device awake while the machine has the pad")
             } else {
-                awake?.let { if (it.isHeld) { it.release(); Log.i(TAG, "letting the Thor sleep again") } }
+                awake?.let { if (it.isHeld) { it.release(); Log.i(TAG, "letting this device sleep again") } }
                 awake = null
             }
         } catch (e: Exception) { Log.w(TAG, "wake lock", e) }

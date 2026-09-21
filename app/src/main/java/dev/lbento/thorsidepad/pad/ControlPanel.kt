@@ -211,10 +211,17 @@ object ControlPanel {
                 // when they do not, chosen by a mode set one row above.
                 //
                 // So: two headed groups, and a row appears only where it means something.
-                fun heading(t: String) = label(t, 13f, grey).apply { setPadding(0, 4, 0, 6) }
-                fun group() = LinearLayout(themed).apply {
+                // Which mode the pad is in decides half of what this page means, and the only
+                // sign of it was one word inside one row. So the sending group is coloured: a
+                // cool blue while presses are leaving for another machine, plain grey while they
+                // stay here. The heading takes the same colour, which is enough to read across
+                // the room without adding a word.
+                val away = 0xFF2E4C6D.toInt()
+                val hereTint = 0xFF2A2D31.toInt()
+                fun heading(t: String, color: Int = grey) = label(t, 13f, color).apply { setPadding(0, 4, 0, 6) }
+                fun group(tint: Int = hereTint) = LinearLayout(themed).apply {
                     orientation = LinearLayout.VERTICAL
-                    setBackgroundColor(0xFF2A2D31.toInt())
+                    setBackgroundColor(tint)
                 }
                 val groupLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                     .apply { bottomMargin = 16 }
@@ -225,7 +232,7 @@ object ControlPanel {
                 val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
                 val whereTo = if (!state.remote) "This device"
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
-                val sending = group()
+                val sending = group(if (state.remote) away else hereTint)
                 sending.addView(pickerRow("Send button presses to", whereTo) { page = Page.DESTINATION; render() })
                 sending.addView(hairline(), line)
                 if (state.remote) {
@@ -235,7 +242,9 @@ object ControlPanel {
                 } else {
                     sending.addView(pickerRow("Controller", target) { page = Page.CONTROLLER; render() })
                 }
-                card.addView(heading("Where presses go"))
+                card.addView(heading(
+                    if (state.remote) "Where presses go \u2014 another machine" else "Where presses go \u2014 this device",
+                    if (state.remote) 0xFF9CC4F0.toInt() else grey))
                 card.addView(sending, groupLp)
                 if (state.remote) {
                     // Holding the machine awake does nothing at all when the presses never leave

@@ -467,20 +467,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         panelScrim?.animate()?.alpha(if (open) 1f else 0f)?.setDuration(220)?.start()
     }
 
-    /**
-     * Put the open panel back on top of the pad.
-     *
-     * Same ordering rule as the bubble: windows of one type stack in the order they were added,
-     * and rebuilding the pad adds a full-screen shield. A panel left underneath it is still
-     * there, still listening, and completely hidden — which reads as having closed itself.
-     */
-    fun raisePanel() {
-        val root = panel ?: return
-        val lp = panelParams ?: return
-        try { wm.removeViewImmediate(root) } catch (_: Exception) {}
-        try { wm.addView(root, lp) } catch (e: Exception) { Log.w(TAG, "raise panel", e); panel = null }
-    }
-
     /** Re-renders the open panel with new state; the window stays, so nothing flashes. */
     fun updatePanel(state: PanelState) { panelUpdate?.invoke(state) }
 
