@@ -126,7 +126,7 @@ class OverlayService : Service() {
     private fun reopenTarget(why: String) {
         if (!visible) return
         val svc = Injector.current() ?: return
-        if (prefs.targetMode == Prefs.MODE_BT) return   // nothing here to reopen
+        if (prefs.padTo != Prefs.TO_DEVICE) return   // nothing local to reopen
         try {
             val err = openTarget(svc)
             if (err.isNotEmpty()) { Log.w(TAG, "reopen ($why): $err"); toast(err); return }
@@ -271,9 +271,10 @@ class OverlayService : Service() {
     }
 
     private fun panelState(ov: PadOverlay) = PanelState(ov.isShowing, prefs.shield, prefs.opacity, prefs.backdrop, ov.blurSupported,
-        targets, prefs.physicalName, prefs.targetMode == Prefs.MODE_VIRTUAL,
+        targets, prefs.physicalName, prefs.padSeparate,
         shizukuReady = Injector.state() == Injector.ShizukuState.READY, activeProfile = prefs.activePreset,
-        remote = prefs.targetMode == Prefs.MODE_BT, hosts = pairedHosts(),
+        remote = prefs.anyToMachine, hosts = pairedHosts(),
+        physicalRemote = prefs.physicalTo == Prefs.TO_MACHINE, padRemote = prefs.padTo == Prefs.TO_MACHINE,
         hostAddress = prefs.btHost, hostConnected = btSink?.connected == true,
         padName = bluetoothName(), visibleFor = secondsVisible(), adoptable = adoptableHosts(),
         transport = prefs.btTransport, identity = prefs.btIdentity,
@@ -429,7 +430,7 @@ class OverlayService : Service() {
     /** Opens the configured target (a controller node or a virtual pad). Returns an error or "". */
     private fun openTarget(svc: IInjector): String {
         refreshTargets(svc)
-        return if (prefs.targetMode == Prefs.MODE_VIRTUAL) {
+        return if (prefs.padSeparate) {
             val abs = Catalog.virtualAbs
             svc.openVirtual("Thor SidePad", Catalog.virtualKeys,
                 abs.map { it.first }.toIntArray(), abs.map { it.second }.toIntArray(), abs.map { it.third }.toIntArray())
@@ -450,8 +451,34 @@ class OverlayService : Service() {
     private fun show(keepPanel: Boolean = false) {
         // Sending to a machine asks nothing of Shizuku, so the pad opens without waiting for it. The
         // device sliders and the media units still need it and simply have nothing to show without.
-        if (prefs.targetMode == Prefs.MODE_BT) showWith(Injector.current(), keepPanel)
-        else withInjector { svc -> showWith(svc, keepPanel) }
+        if (prefs.padTo == Prefs.TO_DEVICE) withInjector { svc -> showWith(svc, keepPanel) }
+        else showWith(Injector.current(), keepPanel)
+    }
+
+    /**
+     * The Bluetooth pad, built once and reused. Opening is asynchronous, so the pad goes up now
+     * and the first presses simply do not land until the host answers; the state callback says so.
+     */
+    private fun openMachineSink(): PadTransport? {
+        // A pad that went quiet waiting for somebody is being reached for now.
+        (btSink as? BleSink)?.wake()
+        btSink?.let { return it }
+        val note = linkNote()
+        return try {
+            if (prefs.btTransport != Prefs.TRANSPORT_CLASSIC) {
+                // A Low Energy pad does not dial a host; it makes itself findable and the host
+                // comes to it. So there is no address to open with.
+                BleSink(this, bleIdentity(), note, prefs.rumble, prefs.plainButtons).also { s ->
+                    btSink = s
+                    s.open { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+                }
+            } else {
+                BluetoothSink(this, note).also { s ->
+                    btSink = s
+                    s.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
+                }
+            }
+        } catch (e: Exception) { Log.w(TAG, "could not present a pad", e); null }
     }
 
     private fun showWith(svc: IInjector?, keepPanel: Boolean = false) {
@@ -459,42 +486,32 @@ class OverlayService : Service() {
             try {
                 val sink: PadSink
                 val caps: Caps
-                if (prefs.targetMode == Prefs.MODE_BT) {
-                    // Another machine. Opening is asynchronous, so the pad goes up now and the first
-                    // presses simply do not land until the host answers; the state callback says so.
-                    val note = linkNote()
-                    // Low Energy unless something has deliberately asked for Classic, which
-                    // nothing in the panel does any more.
-                    // A pad that went quiet waiting for somebody is being reached for now.
-                    (btSink as? BleSink)?.wake()
-                    val bt = btSink ?: if (prefs.btTransport != Prefs.TRANSPORT_CLASSIC) {
-                        // A Low Energy pad does not dial a host; it makes itself findable and the
-                        // host comes to it. So there is no address to open with.
-                        BleSink(this, bleIdentity(), note, prefs.rumble, prefs.plainButtons).also { s ->
-                            btSink = s
-                            s.open { err -> if (err.isNotEmpty()) main.post { toast(err) } }
-                        }
-                    } else {
-                        BluetoothSink(this, note).also { s ->
-                            btSink = s
-                            s.open(prefs.btHost) { err -> if (err.isNotEmpty()) main.post { toast(err) } }
-                        }
-                    }
+                // The Bluetooth pad goes up if anything at all is headed for a machine — the
+                // built-in controller, the on-screen buttons, or both. Which of them it carries
+                // is decided separately below.
+                val bt = if (prefs.anyToMachine) openMachineSink() else null
+                if (prefs.padTo == Prefs.TO_MACHINE) {
+                    if (bt == null) { toast("Could not present a pad"); return@run }
                     sink = bt; caps = BluetoothSink.CAPS
-                    // The pad does not wait for Shizuku here, but forwarding the real controller
-                    // does need it, so ask for it in the background and start when it arrives.
-                    if (svc != null) startForwarding(bt, svc)
-                    else Injector.connect(this) { late -> startForwarding(bt, late) }
                 } else {
                     if (svc == null) { toast("Shizuku is not ready"); return@run }
                     val err = openTarget(svc)
                     if (err.isNotEmpty()) { toast(err); return@run }
                     sink = LocalSink(svc); caps = Caps.fromJson(svc.targetCaps())
                 }
+                // The built-in controller is only taken over when it is the thing being sent
+                // away. Left alone it keeps working as this handheld's own controller, which is
+                // the whole point of being able to point the two at different places.
+                if (prefs.physicalTo == Prefs.TO_MACHINE && bt != null) {
+                    if (svc != null) startForwarding(bt, svc)
+                    else Injector.connect(this) { late -> startForwarding(bt, late) }
+                } else if (prefs.physicalTo != Prefs.TO_MACHINE) {
+                    try { Injector.current()?.forwardStop() } catch (_: Exception) {}
+                }
                 engine?.shutdown()
                 // Only the local destination can be reopened; a Bluetooth one reconnects on its own terms.
                 val eng = PadEngine(sink, caps) {
-                    if (prefs.targetMode != Prefs.MODE_BT) main.post { scheduleReopen("write failed") }
+                    if (prefs.padTo == Prefs.TO_DEVICE) main.post { scheduleReopen("write failed") }
                 }
                 engine = eng
                 val ov = overlayOrCreate()
@@ -648,7 +665,7 @@ class OverlayService : Service() {
         // Not a setting. A grabbed controller is invisible to Android, so while a machine has the
         // pad the screen times out as though nobody were there and the game is interrupted at the
         // thirty-minute mark. Nobody wants that, so nobody is asked.
-        val want = prefs.targetMode == Prefs.MODE_BT && visible && btSink?.connected == true
+        val want = prefs.physicalTo == Prefs.TO_MACHINE && visible && btSink?.connected == true
         // The lock keeps the processor alive and costs nothing. Holding the *screen* on is no
         // longer done here: pinning it for the whole session was a blunt answer to a narrow
         // problem, which is that a grabbed controller is invisible to Android. Reporting the
@@ -661,7 +678,7 @@ class OverlayService : Service() {
         applyAwakeHold()
         val ov = overlay ?: return
         val bt = btSink
-        val remote = prefs.targetMode == Prefs.MODE_BT
+        val remote = prefs.anyToMachine
         // Never while the panel is open. The badge is a nudge for somebody mid-game who has just
         // found the pad has stopped answering; in the panel it is an interruption, and on the
         // pairing screen it is nonsense — of course nothing is connected, that is what the screen
@@ -1284,8 +1301,9 @@ class OverlayService : Service() {
         Injector.current()?.let { refreshTargets(it) }
         ov.showPanel(panelState(ov), dragged = dragged, shieldOn = prefs.shield, backdrop = prefs.backdrop, actions = object : PanelActions {
             override fun setTarget(choice: TargetChoice?) {
-                if (choice == null) prefs.targetMode = Prefs.MODE_VIRTUAL
-                else { prefs.targetMode = Prefs.MODE_PHYSICAL; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }
+                prefs.padTo = Prefs.TO_DEVICE
+                if (choice == null) prefs.padSeparate = true
+                else { prefs.padSeparate = false; prefs.physicalName = choice.name; prefs.physicalPath = choice.path }
                 if (visible) reopenTarget("target chosen")   // reopens the injector; the windows stay
                 ov.updatePanel(panelState(ov))
             }
@@ -1301,7 +1319,10 @@ class OverlayService : Service() {
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setDestination(address: String) {
-                prefs.targetMode = if (address.isEmpty()) Prefs.MODE_PHYSICAL else Prefs.MODE_BT
+                // Only the built-in controller. Where the on-screen buttons go is its own
+                // question now, and answering both from here is what made the old single setting
+                // unable to express the useful combination.
+                prefs.physicalTo = if (address.isEmpty()) Prefs.TO_DEVICE else Prefs.TO_MACHINE
                 // Going back to this device changes where presses go, not which machine is known:
                 // forgetting it here would drop it out of the list and it would have to be paired
                 // again for no reason.
@@ -1322,12 +1343,23 @@ class OverlayService : Service() {
              * other, and the machine has to pair again with whichever is chosen. Saying that
              * plainly on the page is kinder than letting someone discover it.
              */
+            override fun setPadTo(machine: Boolean) {
+                val want = if (machine) Prefs.TO_MACHINE else Prefs.TO_DEVICE
+                if (prefs.padTo == want) return
+                prefs.padTo = want
+                ControlPanel.page = ControlPanel.Page.MAIN
+                // A different sink for the on-screen buttons means a different engine, so the pad
+                // is built again — under the open panel, like every other destination change.
+                if (visible) { hide(); show(keepPanel = true) }
+                ov.updatePanel(panelState(ov))
+            }
+
             override fun setTransport(value: String) {
-                if (prefs.btTransport == value && prefs.targetMode == Prefs.MODE_BT) return
+                if (prefs.btTransport == value && prefs.anyToMachine) return
                 prefs.btTransport = value
                 // Choosing a radio is choosing to send somewhere, so this no longer depends on a
                 // destination having been picked first on another page.
-                prefs.targetMode = Prefs.MODE_BT
+                prefs.physicalTo = Prefs.TO_MACHINE; prefs.padTo = Prefs.TO_MACHINE
                 btSink?.close(); btSink = null
                 if (visible) { hide(); show() }
                 ov.updatePanel(panelState(ov))
@@ -1360,7 +1392,7 @@ class OverlayService : Service() {
              * paired one — and pairing one needs this set.
              */
             override fun pairNewMachine() {
-                prefs.targetMode = Prefs.MODE_BT
+                prefs.physicalTo = Prefs.TO_MACHINE; prefs.padTo = Prefs.TO_MACHINE
                 // The radio follows what we are appearing as, rather than being fixed here. Both
                 // identities are Low Energy today, so nothing changes yet — but a PlayStation or
                 // Nintendo profile would be Classic, and that belongs to the profile rather than

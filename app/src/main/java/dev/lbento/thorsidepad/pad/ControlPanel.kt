@@ -39,8 +39,11 @@ data class PanelState(
     val targets: List<TargetChoice>, val targetName: String, val virtual: Boolean,
     val shizukuReady: Boolean = true,
     val activeProfile: String = "",
-    /** Where presses go: this device, or one of [hosts]. */
+    /** True when anything at all is being sent to a machine. */
     val remote: Boolean = false,
+    /** Each set of controls has its own destination. */
+    val physicalRemote: Boolean = false,
+    val padRemote: Boolean = false,
     val hosts: List<HostChoice> = emptyList(),
     val hostAddress: String = "",
     val hostConnected: Boolean = false,
@@ -65,7 +68,11 @@ interface PanelActions {
     fun setBackdrop(value: String)
     fun setTarget(choice: TargetChoice?)   // null = virtual pad (player 2)
     /** Empty address = this device; otherwise the paired machine to send to. */
+    /** Where the handheld's own sticks and buttons go. */
     fun setDestination(address: String)
+
+    /** Where the buttons drawn on the screen go. */
+    fun setPadTo(machine: Boolean)
     /** Sends to a machine over Low Energy, which needs no machine chosen first: one comes to us. */
     /** Start sending to a machine and open the pairing screen. */
     fun pairNewMachine()
@@ -179,9 +186,10 @@ object ControlPanel {
             if (page != Page.MAIN) bar.addView(btn("‹ Back") { page = Page.MAIN; render() })
             bar.addView(label(when (page) {
                 Page.MAIN -> "SidePad"
-                Page.DESTINATION -> "Send button presses to"
+                Page.DESTINATION -> "Physical control"
                 Page.APPEARANCE -> "Appears as"
                 Page.PAIRING -> "Pair a new machine"
+                Page.CONTROLLER -> "On-screen control"
                 else -> "Appears as"
             }, 20f),
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER_VERTICAL; marginStart = if (page != Page.MAIN) 16 else 0 })
@@ -226,23 +234,27 @@ object ControlPanel {
                 val line = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
 
                 // ---- where the presses end up ----
-                val target = if (state.virtual) "A separate controller" else (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
+                // Two sets of controls, two destinations. The handheld has sticks and buttons of
+                // its own and a pad drawn on its screen, and they do not have to go to the same
+                // place — which is the point, because forwarding the built-in controller takes it
+                // away from this device and the on-screen pad can hand it back.
                 val hostLabel = state.hosts.firstOrNull { it.address == state.hostAddress }?.label ?: "a machine"
-                val whereTo = if (!state.remote) "This device"
-                              else hostLabel + (if (state.hostConnected) "" else " — not connected")
+                val machineWhere = hostLabel + (if (state.hostConnected) "" else " — not connected")
+                val localPad = if (state.virtual) "This device, as a separate controller"
+                               else "This device, as " + (builtInLabel(state.targetName) ?: state.targetName).ifEmpty { "no controller found" }
                 val sending = group(if (state.remote) away else hereTint)
-                sending.addView(pickerRow("Send button presses to", whereTo) { page = Page.DESTINATION; render() })
+                sending.addView(pickerRow("Physical control",
+                    if (state.physicalRemote) machineWhere else "This device") { page = Page.DESTINATION; render() })
                 sending.addView(hairline(), line)
+                sending.addView(pickerRow("On-screen control",
+                    if (state.padRemote) machineWhere else localPad) { page = Page.CONTROLLER; render() })
                 if (state.remote) {
                     // Only a machine on the other end has an opinion about what we look like.
+                    sending.addView(hairline(), line)
                     val remoteAs = if (state.identity == "XBOX_SERIES") "Xbox Wireless Controller" else "SidePad (not a controller)"
                     sending.addView(pickerRow("Appears as", remoteAs) { page = Page.APPEARANCE; render() })
-                } else {
-                    sending.addView(pickerRow("Controller", target) { page = Page.CONTROLLER; render() })
                 }
-                card.addView(heading(
-                    if (state.remote) "Where presses go \u2014 another machine" else "Where presses go \u2014 this device",
-                    if (state.remote) 0xFF9CC4F0.toInt() else grey))
+                card.addView(heading("Where presses go", if (state.remote) 0xFF9CC4F0.toInt() else grey))
                 card.addView(sending, groupLp)
                 // ---- the pad drawn on this screen ----
                 val padGroup = group()
@@ -322,12 +334,12 @@ object ControlPanel {
                 // it comes back, so the roll of everything ever paired answered a question nobody
                 // could act on — picking an old one still meant pairing. The addresses are still
                 // kept, as a record; they are just not a menu any more.
-                card.addView(label("Send presses to", 14f, grey))
-                card.addView(btn((if (!state.remote) "\u25CF  " else "") + "This device", state.remote) { actions.setDestination("") })
+                card.addView(label("The handheld\u2019s own sticks and buttons go to", 14f, grey))
+                card.addView(btn((if (!state.physicalRemote) "\u25CF  " else "") + "This device", state.physicalRemote) { actions.setDestination("") })
                 val current = state.hosts.firstOrNull { it.address == state.hostAddress }
                 if (current != null) {
-                    val where = current.label + (if (state.remote && !state.hostConnected) " \u2014 not connected" else "")
-                    card.addView(btn((if (state.remote) "\u25CF  " else "") + where, !state.remote) {
+                    val where = current.label + (if (state.physicalRemote && !state.hostConnected) " \u2014 not connected" else "")
+                    card.addView(btn((if (state.physicalRemote) "\u25CF  " else "") + where, !state.physicalRemote) {
                         actions.setDestination(current.address)
                     })
                 }
@@ -342,14 +354,28 @@ object ControlPanel {
                          "Shizuku: this device presents itself as an ordinary Bluetooth gamepad.",
                     12f, grey).apply { setPadding(0, 14, 0, 0) })
             } else {
-                card.addView(label("Presses go to", 14f, grey))
-                for (t in state.targets) {
-                    val active = !state.virtual && t.name == state.targetName
-                    card.addView(btn((if (active) "●  " else "") + t.label, !active) { actions.setTarget(t) })
+                card.addView(label("The buttons drawn on this screen go to", 14f, grey))
+                val machine = state.hosts.firstOrNull { it.address == state.hostAddress }
+                if (machine != null) {
+                    val where = machine.label + (if (state.padRemote && !state.hostConnected) " \u2014 not connected" else "")
+                    card.addView(btn((if (state.padRemote) "●  " else "") + where, !state.padRemote) { actions.setPadTo(true) })
                 }
-                card.addView(btn((if (state.virtual) "●  " else "") + "Show up as a separate controller", !state.virtual) { actions.setTarget(null) })
-                if (state.targets.isEmpty()) card.addView(label("No controller found. Is Shizuku running?", 12f, grey))
-                card.addView(label("Writing into a real controller keeps games seeing one pad. The other way makes a device of its own, so a game sees two controllers \u2014 this one and yours.", 12f, grey).apply { setPadding(0, 14, 0, 0) })
+                // Writing into the built-in controller is only possible while it is still here.
+                // Sent to a machine it is taken over, and there is nothing left to write into.
+                if (!state.physicalRemote) {
+                    for (t in state.targets) {
+                        val active = !state.padRemote && !state.virtual && t.name == state.targetName
+                        card.addView(btn((if (active) "●  " else "") + "This device, as " + t.label, !active) { actions.setTarget(t) })
+                    }
+                    if (state.targets.isEmpty()) card.addView(label("No controller found. Is Shizuku running?", 12f, grey))
+                }
+                val sep = !state.padRemote && state.virtual
+                card.addView(btn((if (sep) "●  " else "") + "This device, as a separate controller", !sep) { actions.setTarget(null) })
+                card.addView(label(
+                    if (state.physicalRemote)
+                        "The built-in controller is being sent to a machine, so there is nothing here to write into \u2014 the on-screen buttons become this device\u2019s controller instead."
+                    else "Writing into a real controller keeps games seeing one pad. The other way makes a device of its own, so a game sees two controllers \u2014 this one and yours.",
+                    12f, grey).apply { setPadding(0, 14, 0, 0) })
             }
         }
         render()

@@ -5,10 +5,44 @@ import android.content.Context
 class Prefs(ctx: Context) {
     private val sp = ctx.applicationContext.getSharedPreferences("sidepad", Context.MODE_PRIVATE)
 
-    /** "physical" writes into the handheld's own controller node; "virtual" creates a separate uinput pad. */
-    var targetMode: String
+    // ---- where each set of controls goes ----
+    //
+    // Two questions, not one. There is a physical controller built into the handheld and a set of
+    // buttons drawn on its screen, and each can be pointed at this device or at a machine over
+    // Bluetooth. A single three-way setting could only describe three of the four combinations,
+    // and the one it could not say was the useful one: the built-in controller playing on a
+    // machine while the on-screen buttons still work this handheld — which matters because
+    // forwarding grabs the built-in controller, leaving this device with nothing otherwise.
+
+    /** Where the handheld's own sticks and buttons go: [TO_DEVICE] or [TO_MACHINE]. */
+    var physicalTo: String
+        get() = sp.getString("physicalTo", null) ?: if (legacyMode == MODE_BT) TO_MACHINE else TO_DEVICE
+        set(v) = sp.edit().putString("physicalTo", v).apply()
+
+    /** Where the buttons drawn on the screen go. */
+    var padTo: String
+        get() = sp.getString("padTo", null) ?: if (legacyMode == MODE_BT) TO_MACHINE else TO_DEVICE
+        set(v) = sp.edit().putString("padTo", v).apply()
+
+    /**
+     * When the on-screen buttons stay on this device: a controller of their own, or written into
+     * the built-in one so a game sees a single pad.
+     *
+     * Forced when the built-in controller is being forwarded, because forwarding grabs it and
+     * there is then nothing to write into. Not a setting anyone has to reason about — the
+     * situation decides it.
+     */
+    var padSeparate: Boolean
+        get() = if (physicalTo == TO_MACHINE) true
+                else sp.getBoolean("padSeparate", legacyMode == MODE_VIRTUAL)
+        set(v) = sp.edit().putBoolean("padSeparate", v).apply()
+
+    /** True when anything at all is being sent over Bluetooth. */
+    val anyToMachine: Boolean get() = physicalTo == TO_MACHINE || padTo == TO_MACHINE
+
+    /** The old single setting, read once to carry an existing install into the pair above. */
+    private val legacyMode: String
         get() = sp.getString("targetMode", MODE_PHYSICAL) ?: MODE_PHYSICAL
-        set(v) = sp.edit().putString("targetMode", v).apply()
 
     /** Last resolved node of the chosen controller; re-resolved from [physicalName] whenever the pad shows. */
     /**
@@ -269,6 +303,10 @@ class Prefs(ctx: Context) {
         const val BACKDROP_DIM = "dim"
         const val BACKDROP_DARK = "dark"
         const val BACKDROP_FROSTED = "frosted"
+        /** Destinations. */
+        const val TO_DEVICE = "device"
+        const val TO_MACHINE = "machine"
+
         const val MODE_PHYSICAL = "physical"
         const val MODE_VIRTUAL = "virtual"
         /** Presses go to another machine over Bluetooth rather than into this device. */
