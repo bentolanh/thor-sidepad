@@ -5,25 +5,27 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.view.View
 
 /**
- * The floating button: a controller that says where presses are going, over a switch for the
- * shield.
+ * The floating button: a controller, with a small switch under it for the shield.
  *
  * It was a plain circle that did one thing. On a single-screen handheld it is the only thing
- * always on screen, which makes it the only place a state can be read without opening anything —
- * and two states are worth reading mid-game. Whether the handheld's own sticks are driving
- * another device, because that decides what a press will do. And whether the shield is up,
- * because that decides whether a touch reaches the game underneath.
+ * always on screen, which makes it the only place a state can be read without opening something —
+ * and two are worth reading mid-game. Whether the handheld's own sticks are driving another
+ * device, because that decides what a press will do. And whether the shield is up, because that
+ * decides whether a touch reaches the game underneath.
  *
- * So the controller is the indicator and the pad toggle, and the switch beneath it is the shield.
- * Neither needs a label: a switch looks like a switch, and the controller is tinted the same blue
- * the panel uses for "gone to another device".
+ * The controller is the button itself rather than an icon inside a box, and it is a silhouette
+ * with grips, a d-pad and buttons rather than a rectangle with two dots — which read as a face.
+ * The switch beneath it is small on purpose: it is a state to glance at, not a control to aim
+ * for. Its touch area is the whole lower third regardless, so it is easy to hit and quiet to look
+ * at.
  */
 class BubbleView(ctx: Context) : View(ctx) {
 
-    /** True while the pad is on screen; the controller is filled rather than outlined. */
+    /** True while the pad is on screen; the controller brightens. */
     var padShown = false
         set(v) { field = v; invalidate() }
 
@@ -36,62 +38,74 @@ class BubbleView(ctx: Context) : View(ctx) {
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val path = Path()
+    private val body = Path()
+    private val blob = Path()
+    private val rect = RectF()
 
     private val d get() = resources.displayMetrics.density
 
     /** Where the controller ends and the switch begins. */
-    private val splitY get() = height * 0.64f
+    private val splitY get() = height * 0.70f
 
     /** 0 for the controller, 1 for the shield switch. */
     fun regionAt(y: Float): Int = if (y < splitY) 0 else 1
 
     override fun onDraw(c: Canvas) {
-        val w = width.toFloat()
-        val r = 14f * d
-
-        // The body, tinted by where presses are going.
-        fill.color = if (remote) 0xE62E4C6D.toInt() else 0xE6303337.toInt()
-        c.drawRoundRect(0f, 0f, w, height.toFloat(), r, r, fill)
-        line.color = 0x55FFFFFF
-        line.strokeWidth = 1.5f * d
-        c.drawRoundRect(0.75f * d, 0.75f * d, w - 0.75f * d, height - 0.75f * d, r, r, line)
-
-        drawController(c, w / 2f, splitY / 2f, w * 0.30f)
-        drawSwitch(c, w / 2f, (splitY + height) / 2f, w * 0.34f)
+        drawController(c, width / 2f, splitY * 0.5f, width * 0.46f)
+        drawSwitch(c, width / 2f, (splitY + height) / 2f, width * 0.22f)
     }
 
     /**
-     * A gamepad in outline: a rounded body with two grips and two thumbsticks. Filled while the
-     * pad is showing, hollow while it is not, so the button says what a tap will do.
+     * A gamepad silhouette: a body with two grips, a d-pad on the left and two buttons on the
+     * right. The grips are unioned into the body so the outline is one continuous edge rather
+     * than three shapes with seams through them.
      */
-    private fun drawController(c: Canvas, cx: Float, cy: Float, r: Float) {
-        val on = Color.WHITE
-        fill.color = if (padShown) on else 0x00000000
-        line.color = on
-        line.strokeWidth = 1.8f * d
+    private fun drawController(c: Canvas, cx: Float, cy: Float, half: Float) {
+        val bw = half; val bh = half * 0.62f
+        body.reset()
+        rect.set(cx - bw, cy - bh, cx + bw, cy + bh * 0.55f)
+        body.addRoundRect(rect, bh * 0.55f, bh * 0.55f, Path.Direction.CW)
+        // The grips, as two rounded lobes hanging off the lower corners.
+        for (sx in intArrayOf(-1, 1)) {
+            blob.reset()
+            blob.addCircle(cx + sx * bw * 0.66f, cy + bh * 0.42f, bh * 0.58f, Path.Direction.CW)
+            body.op(blob, Path.Op.UNION)
+        }
 
-        path.reset()
-        val bw = r * 1.55f; val bh = r * 0.95f
-        path.addRoundRect(cx - bw, cy - bh * 0.72f, cx + bw, cy + bh, r * 0.55f, r * 0.55f, Path.Direction.CW)
-        if (padShown) c.drawPath(path, fill)
-        c.drawPath(path, line)
+        val ink = if (remote) 0xFF9CC4F0.toInt() else Color.WHITE
+        fill.color = if (remote) 0xE6223549.toInt() else 0xE6262A2E.toInt()
+        c.drawPath(body, fill)
+        line.color = ink
+        line.strokeWidth = 1.7f * d
+        c.drawPath(body, line)
 
-        // Two sticks, drawn in the opposite ink so they read either way round.
-        fill.color = if (padShown) 0xFF303337.toInt() else on
-        c.drawCircle(cx - bw * 0.46f, cy + bh * 0.05f, r * 0.24f, fill)
-        c.drawCircle(cx + bw * 0.46f, cy + bh * 0.05f, r * 0.24f, fill)
+        // A d-pad on the left and two buttons on the right: enough asymmetry that it reads as a
+        // controller rather than a face.
+        val dx = cx - bw * 0.45f; val dy = cy - bh * 0.18f
+        val arm = bh * 0.34f; val thick = bh * 0.20f
+        fill.color = ink
+        c.drawRect(dx - arm, dy - thick / 2f, dx + arm, dy + thick / 2f, fill)
+        c.drawRect(dx - thick / 2f, dy - arm, dx + thick / 2f, dy + arm, fill)
+        val bxc = cx + bw * 0.45f
+        c.drawCircle(bxc - bh * 0.22f, dy + bh * 0.16f, bh * 0.15f, fill)
+        c.drawCircle(bxc + bh * 0.16f, dy - bh * 0.16f, bh * 0.15f, fill)
+
+        // Dimmed while the pad is down, so the button says what a tap will do without a second
+        // shape to learn.
+        if (!padShown) {
+            fill.color = 0x66000000
+            c.drawPath(body, fill)
+        }
     }
 
-    /** An ordinary switch: track plus knob, over to the right and lit when the shield is up. */
-    private fun drawSwitch(c: Canvas, cx: Float, cy: Float, halfW: Float) {
-        val h = halfW * 0.86f
-        val left = cx - halfW; val right = cx + halfW
-        fill.color = if (shieldOn) 0xFF2E7DFF.toInt() else 0x40FFFFFF
-        c.drawRoundRect(left, cy - h / 2f, right, cy + h / 2f, h / 2f, h / 2f, fill)
-        val knob = h * 0.40f
-        val kx = if (shieldOn) right - knob - 2f * d else left + knob + 2f * d
-        fill.color = Color.WHITE
+    /** A small switch: a short track with a knob, lit and over to the right when the shield is up. */
+    private fun drawSwitch(c: Canvas, cx: Float, cy: Float, half: Float) {
+        val h = 5f * d
+        fill.color = if (shieldOn) 0xFF2E7DFF.toInt() else 0x59FFFFFF
+        c.drawRoundRect(cx - half, cy - h / 2f, cx + half, cy + h / 2f, h / 2f, h / 2f, fill)
+        val knob = h * 0.95f
+        val kx = if (shieldOn) cx + half - knob else cx - half + knob
+        fill.color = if (shieldOn) Color.WHITE else 0xCCFFFFFF.toInt()
         c.drawCircle(kx, cy, knob, fill)
     }
 }
