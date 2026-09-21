@@ -207,7 +207,28 @@ to fix.
 The property does not persist, so a reboot undoes it. That is the only reason the experiment was
 safe to run.
 
-## The rows that pile up in a Mac's Bluetooth list, 2026-09-21
+## The rows that pile up in a Mac's Bluetooth list are Control Center's cache, 2026-09-21
+
+**Settled: `killall ControlCenter` clears them.** Harmless, instant, and Control Center relaunches
+itself. Everything below this heading was written before that was known and is kept because the
+wrong turns are instructive, but the answer is that one line.
+
+What made it hard to see:
+
+- `system_profiler` under-reports. It showed one Odin record throughout, including while the menu
+  showed seven. It is not the authoritative view of Low Energy devices, and treating it as one
+  cost several wrong conclusions.
+- The pad genuinely is two devices to a Mac. The Classic record — phone icon, `Minor Type: Mobile
+  Phone` — sits in My Devices and is never used. The working Low Energy gamepad never gets
+  promoted there at all, so it appears only in the menu and under Nearby Devices. Seeing the
+  phone entry say "Not Connected" while the pad works is correct, not a fault.
+- One pairing did add one row, which looked like permanent growth and was not: a Control Center
+  restart cleared every one of them.
+
+**So the re-pair-to-reconnect design does not accumulate anything permanent.** The conclusion
+that it carried an unbounded cost was wrong and is withdrawn.
+
+## Earlier reasoning about those rows, superseded
 
 Several "Odin2Mini" rows accumulate where an 8BitDo leaves one. Three guesses were wrong before
 the evidence settled it: they are not stored pairings, not failed pairings, and not scan results.
