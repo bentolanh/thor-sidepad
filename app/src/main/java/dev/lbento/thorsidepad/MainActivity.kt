@@ -118,23 +118,6 @@ class MainActivity : AppCompatActivity() {
             OverlayService.send(this, OverlayService.ACTION_START)
         }
 
-        val platform = findViewById<Spinner>(R.id.platformSpinner)
-        val platformKeys = Prefs.PLATFORM_LABELS.map { it.first }
-        platform.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item,
-            Prefs.PLATFORM_LABELS.map { it.second })
-        platform.setSelection(platformKeys.indexOf(prefs.hostPlatform).coerceAtLeast(0))
-        platform.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>, v: View?, pos: Int, id: Long) {
-                val picked = platformKeys.getOrNull(pos) ?: return
-                if (picked == prefs.hostPlatform) return
-                prefs.hostPlatform = picked
-                OverlayService.send(this@MainActivity, OverlayService.ACTION_START)
-                android.widget.Toast.makeText(this@MainActivity,
-                    "Changed what the pad says it is. Forget and pair the machine again for it to take effect.",
-                    android.widget.Toast.LENGTH_LONG).show()
-            }
-            override fun onNothingSelected(p: AdapterView<*>) {}
-        }
 
         findViewById<android.widget.Button>(R.id.btnCalibrate).setOnClickListener {
             startActivity(android.content.Intent(this, CalibrateActivity::class.java))

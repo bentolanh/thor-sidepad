@@ -147,27 +147,20 @@ object ControlPanel {
          * and the appearance page is where the choice is actually reached from.
          */
         fun identityButtons(into: LinearLayout) {
-            val xbox = state.identity == "XBOX"
-            val neutral = state.identity == "NEUTRAL"
-            val series = state.identity == "XBOX_SERIES"
-            val own = !xbox && !neutral && !series
-            // The dot marks the one in use and that button is the disabled one, which is the
-            // convention every other choice on this panel follows. Getting it backwards made
-            // picking the third option look like it had jumped to the first.
+            // Two choices, not four. Two Xbox modes meant offering one that was measured as
+            // worse, and the fourth shared this one's vendor and product while sending a
+            // different report.
+            val xbox = state.identity == "XBOX_SERIES"
             val dot = "\u25CF  "
-            into.addView(btn((if (own) dot else "") + "SidePad", !own) { actions.setIdentity("OWN") })
-            into.addView(btn((if (xbox) dot else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX") })
-            into.addView(btn((if (neutral) dot else "") + "A standard pad, our own name", !neutral) { actions.setIdentity("NEUTRAL") })
-            into.addView(btn((if (series) dot else "") + "An Xbox Series pad", !series) { actions.setIdentity("XBOX_SERIES") })
+            into.addView(btn((if (!xbox) dot else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
+            into.addView(btn((if (xbox) dot else "") + "An Xbox-compatible pad", !xbox) { actions.setIdentity("XBOX_SERIES") })
             into.addView(label(
-                "SidePad is honest about what it is, and a machine needs telling once which button is " +
-                "which. An Xbox pad is what nearly every third-party controller claims to be, so most " +
-                "games know the layout already. The third sends exactly what the Xbox setting sends " +
-                "\u2014 same buttons, same sticks \u2014 under our own vendor number rather than " +
-                "Microsoft's, which some machines treat very differently. The Series option is a " +
-                "newer Microsoft pad than the Xbox one, copied off a real controller, and is the " +
-                "one Steam has a profile for. Any change makes this a new device, so the machine " +
-                "needs pairing again.",
+                "As an Xbox pad it behaves as a real Xbox controller does, which is what nearly " +
+                "every third-party controller claims to be: games that work with one work with " +
+                "this, and games that want Steam Input want it either way. As SidePad it is " +
+                "honest about what it is, and a machine has to be taught which button is which " +
+                "\u2014 some, macOS among them, will not treat it as a game controller at all. " +
+                "Either way this is a different device to the machine, so it needs pairing again.",
                 12f, grey).apply { setPadding(0, 10, 0, 0) })
         }
         fun sw(t: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(themed).apply {
@@ -221,7 +214,7 @@ object ControlPanel {
                               else hostLabel + (if (state.hostConnected) "" else " — not connected")
                 choicesGroup.addView(pickerRow("Send to", whereTo) { page = Page.DESTINATION; render() })
                 choicesGroup.addView(hairline(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-                val remoteAs = if (state.identity == "XBOX") "An Xbox-compatible pad" else "SidePad"
+                val remoteAs = if (state.identity == "XBOX_SERIES") "An Xbox-compatible pad" else "SidePad"
                 choicesGroup.addView(pickerRow("Appears as", if (state.remote) remoteAs else target) {
                     page = if (state.remote) Page.APPEARANCE else Page.CONTROLLER; render()
                 })

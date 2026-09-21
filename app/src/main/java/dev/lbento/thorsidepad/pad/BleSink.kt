@@ -52,8 +52,6 @@ class BleSink(
     private val rumble: Boolean = true,
     /** Send buttons counted straight through, for a host that does not know the identity. */
     private val plainButtons: Boolean = false,
-    /** Offer the Consumer collections the real controller carries. See Prefs.hostPlatform. */
-    private val consumer: Boolean = false,
 ) : PadTransport {
 
     /**
@@ -68,38 +66,7 @@ class BleSink(
      */
     enum class Identity(val vendor: Int, val product: Int, val version: Int, val label: String) {
         OWN(0x1209, 0x5350, 0x0100, "SidePad"),
-        // The version is part of the identity and not decoration. A program carrying its own list
-        // of controllers keys it on the whole thing, so two bytes of firmware number are enough to
-        // miss by: Eastward logged `no joystick mapping found` against
-        // `030000005e040000e002000000010000`, which is this pad ending in a version of 1.0, while
-        // every pad here that it does accept reports 9.0.3 and ends in `0309`. Same vendor, same
-        // product, different answer.
-        XBOX(0x045E, 0x02E0, 0x0903, "Xbox-compatible"),
 
-        /**
-         * The same pad, the same report, our own numbers.
-         *
-         * macOS routes a gamepad by who it claims to be, and the two routes are not equal.
-         * Measured 2026-09-21 from the registry, with both attached over Low Energy:
-         *
-         *     045e:02e0  (this pad)   IOHIDUserDevice -> IOHIDInterface -> IOHIDEventDummyService
-         *     2dc8:6012  (an 8BitDo)  IOHIDUserDevice -> IOHIDInterface -> AppleGCHIDEventDummyService
-         *
-         * The 8BitDo is handed to Apple's GameController HID service. This pad is handed to the
-         * generic one. A real Xbox Series controller is also handed to the generic one, and gets
-         * a second device of its own at 045e:0b12 backed by AppleUserHIDDevice — a driver that
-         * expects a genuine Xbox controller, not plain HID.
-         *
-         * So claiming Microsoft's numbers looks like the safe choice and may be the opposite of
-         * it: too Xbox for the generic treatment, not Xbox enough for the Xbox driver, landing
-         * between the two with nothing claiming the device. The 8BitDo, which claims nobody
-         * else's numbers, is the one pad that has worked natively in everything tried.
-         *
-         * This exists to test that, and changes exactly one thing. The report, the descriptor
-         * and the button order are identical to [XBOX]; only the vendor and product differ.
-         * 0x1209 is the pid.codes pool for open projects and is borrowed from nobody.
-         */
-        NEUTRAL(0x1209, 0x5350, 0x0100, "SidePad, standard layout"),
 
         /**
          * The Xbox Series X|S controller, numbers and report map both, taken off a real one.
@@ -117,7 +84,7 @@ class BleSink(
          * IOHIDEventDummyService exactly as the 1708 is, and needs Steam Input in Eastward too.
          * Apple's GameController path is for controllers that are not Microsoft's at all.
          */
-        XBOX_SERIES(0x045E, 0x0B13, 0x0520, "Xbox Series-compatible"),
+        XBOX_SERIES(0x045E, 0x0B13, 0x0520, "Xbox-compatible"),
     }
 
     @Volatile override var connected = false; private set
@@ -146,11 +113,7 @@ class BleSink(
     private val shape: ReportShape =
         // Every identity but OWN sends the Xbox report; they differ in the numbers they carry
         // and, for the Series, in sending that controller's own map rather than the 1708's.
-        when (identity) {
-            Identity.XBOX, Identity.NEUTRAL -> XboxShape(rumble, plainButtons, consumer)
-            Identity.XBOX_SERIES -> XboxShape(rumble, plainButtons, consumer, series = true)
-            else -> StandardShape()
-        }
+        if (identity == Identity.XBOX_SERIES) XboxShape(rumble, plainButtons) else StandardShape()
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.
@@ -673,12 +636,6 @@ class BleSink(
                     return
                 }
                 host = device; connected = true
-                // The name is nearly all a peripheral learns about a machine, and the automatic
-                // platform choice has nothing else to go on. Recorded whether or not it is used.
-                try {
-                    val n = device.name
-                    if (!n.isNullOrBlank()) dev.lbento.thorsidepad.Prefs(ctx).lastHostName = n
-                } catch (_: SecurityException) {}
                 sleeper?.cancel(false)
                 Log.i(TAG, "${device.address} connected")
                 // Outside a pairing window a controller stops calling out the moment a machine
