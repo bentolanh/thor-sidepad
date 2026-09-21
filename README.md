@@ -110,6 +110,36 @@ Everything happens on the bottom screen.
 - SidePad never reads your controller's buttons, so it does not interfere with key mappers.
 - The app icon can be switched between a Famicom and a Game Boy look in the settings.
 
+## Spare "Odin2Mini" rows in a Mac's Bluetooth list
+
+Pairing the pad more than once leaves extra rows behind, all with the pad's name. They are
+**cosmetic**. Nothing is wrong, nothing is using them, and a restart clears them on its own —
+leave them alone if they do not bother you.
+
+They appear because a Low Energy peripheral on Android advertises under a random address that
+changes, so a Mac files each pairing separately rather than recognising it as the same pad. A
+controller with fixed firmware never does this, which is why an 8BitDo leaves one row forever.
+
+Two places show them, and each is cleared differently:
+
+**The Bluetooth pane in System Settings** — turn Bluetooth off and on. The strays under Nearby
+Devices are connections the Mac never saw closed, usually because the app was stopped or
+reinstalled mid-link, and restarting the radio drops them.
+
+**The Bluetooth menu in the menu bar** — that list is Control Center's own cache and a radio
+restart does not touch it. Restart Control Center instead:
+
+```bash
+killall ControlCenter
+```
+
+It comes straight back, and the list is rebuilt from what the Mac actually knows.
+
+One thing that looks wrong and is not: the pad shows up twice on a Mac. An entry with a phone
+icon in My Devices, which stays "Not Connected" and is never used, and the gamepad itself, which
+lives in the menu and under Nearby Devices. Android hands out both identities and a Mac files
+them separately; the gamepad is the one doing the work.
+
 ## Other devices
 
 SidePad was built and tested on the AYN Thor. On another Android 11+ device with a second
