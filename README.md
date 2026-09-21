@@ -146,10 +146,14 @@ nothing to sort this one by, and a list that hides what it cannot sort hides thi
 looks for the gamepad service itself and never filters on Appearance, which is why Macs and
 iPads find the pad without being asked twice.
 
-One last thing that looks wrong everywhere and only matters in one place: every host files the
-pad as a phone, because the handheld's ordinary Bluetooth radio says it is one. On Android,
-SteamOS and Windows that is no more than an icon in a list. On macOS the label is acted on, and
-it is why a dropped connection there has to be paired again instead of coming back on its own.
+One last thing that looks wrong everywhere and only matters in one place: no host works out what
+the pad actually is, and no two guess alike. macOS, Android and SteamOS file it as a phone,
+because the handheld's ordinary Bluetooth radio says it is one; Windows shows it as a desktop
+computer instead. That is the Appearance problem again, seen from the other end — with nothing
+to sort the pad by, each stack falls back on its own default.
+
+On three of them the wrong icon is all it is. On macOS the label is acted on, and it is why a
+dropped connection there has to be paired again instead of coming back on its own.
 
 ## Spare "Odin2Mini" rows in a Mac's Bluetooth list
 
