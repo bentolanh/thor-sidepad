@@ -41,3 +41,26 @@ The raw HID bytes are NOT the report this device's descriptor advertises. The de
 as buttons at byte 7; the live report puts them around byte 14, and seven bytes stream motion
 data continuously. Do not copy a raw layout from the descriptor alone — it does not describe
 what the device actually sends.
+
+---
+
+## Identities measured on this Mac, 2026-09-21
+
+Read from `ioreg` while each was connected. The version is not decoration: a game keying its
+controller database on the SDL GUID uses vendor, product **and** version, and being wrong by two
+bytes has already cost this project a mapping once.
+
+| device | identity | version | transport |
+| --- | --- | --- | --- |
+| Xbox Wireless Controller (Series X\|S) | `045e:0b13` | `0x0520` (1312) | Bluetooth LE |
+| 8BitDo Ultimate 2 Wireless | `2dc8:6012` | `0x0001` | Bluetooth LE |
+| SidePad (what we claim) | `045e:02e0` | `0x0903` (2307) | Bluetooth LE |
+
+`045e:02e0` is the Xbox Wireless Controller **model 1708**, the Xbox One S generation — not the
+Series controller. Eastward and Steam map the Series pad correctly and read ours positionally,
+which is consistent with Steam holding a profile for `0b13` and none for what we send.
+
+The Series controller's own report descriptor, 283 bytes, was dumped on 2026-09-21 and its
+report 1 is byte-for-byte identical to ours in every field: same axes, same 10-bit triggers,
+same hat, same Buttons 1..15 at byte 13. It differs only at byte 15, where it carries its Record
+button and we carry padding.
