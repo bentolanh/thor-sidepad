@@ -49,9 +49,20 @@ class Prefs(ctx: Context) {
         get() = sp.getString("btTransport", TRANSPORT_LE) ?: TRANSPORT_LE
         set(v) = sp.edit().putString("btTransport", v).apply()
 
-    /** What a host is told the pad is, when it is carried over Low Energy. See BleSink.Identity. */
+    /**
+     * What a host is told the pad is, when it is carried over Low Energy. See BleSink.Identity.
+     *
+     * The Xbox Series pad by default, measured 2026-09-21. It behaves exactly as a genuine one
+     * does: games that work natively with a real Xbox controller work with this, and games that
+     * need Steam Input with a real one need it here too. The model 1708 this used to claim has
+     * no profile in Steam and was read positionally — its bit positions taken as button numbers
+     * — which is what made face buttons land in the wrong places.
+     *
+     * OWN is honest about what the pad is and needs a host taught which button is which, so it
+     * is a choice rather than a default.
+     */
     var btIdentity: String
-        get() = sp.getString("btIdentity", "OWN") ?: "OWN"
+        get() = sp.getString("btIdentity", "XBOX_SERIES") ?: "XBOX_SERIES"
         set(v) = sp.edit().putString("btIdentity", v).apply()
 
     /** The paired machine presses are sent to, when the destination is another machine. */
