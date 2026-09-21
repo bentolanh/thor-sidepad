@@ -110,6 +110,42 @@ Everything happens on the bottom screen.
 - SidePad never reads your controller's buttons, so it does not interfere with key mappers.
 - The app icon can be switched between a Famicom and a Game Boy look in the settings.
 
+## Pairing with a computer, console or phone
+
+The pad is a Bluetooth Low Energy gamepad, so anything that accepts one should accept this. It
+has been tried on macOS, iPadOS, Android, SteamOS and Windows 11. Three take it as it comes;
+two hide it until a setting is changed.
+
+Whichever you are pairing from, **the pad is only on the air while it is findable**. Make it
+findable from the panel and scan during that window. Outside it the pad is silent on purpose,
+and a host scanning then hears nothing at all — which looks exactly like a device that does not
+work, and was the first wrong answer on three of these platforms.
+
+**macOS, iPadOS and Android** need nothing special. Pair from the machine while the pad is
+findable.
+
+**SteamOS** hides it by default. In Game Mode: Settings → Bluetooth, turn on **Show all
+devices**. The pad then appears and pairs from that screen, and Steam reads its battery level,
+so it sits in the list like any other controller.
+
+**Windows 11** hides it the same way. Settings → Bluetooth & devices → Devices → **Bluetooth
+devices discovery**, and change **Default** to **Advanced**. Microsoft describes the switch in
+its own words: Default connects common accessories, Advanced shows all types of device.
+
+Both hide it for the same reason, and it is not something this app can fix. A Low Energy device
+says what kind of thing it is through a GAP value called Appearance, and Android gives an app no
+way to set one: an advertisement can carry a name, service UUIDs, service data and manufacturer
+data, and that is the whole list — while the GAP service that holds Appearance belongs to the
+Bluetooth stack rather than to us. A pairing list that sorts devices by Appearance therefore has
+nothing to sort this one by, and a list that hides what it cannot sort hides this. Apple's stack
+looks for the gamepad service itself and never filters on Appearance, which is why Macs and
+iPads find the pad without being asked twice.
+
+One last thing that looks wrong everywhere and only matters in one place: every host files the
+pad as a phone, because the handheld's ordinary Bluetooth radio says it is one. On Android,
+SteamOS and Windows that is no more than an icon in a list. On macOS the label is acted on, and
+it is why a dropped connection there has to be paired again instead of coming back on its own.
+
 ## Spare "Odin2Mini" rows in a Mac's Bluetooth list
 
 Pairing the pad more than once leaves extra rows behind, all with the pad's name. They are
