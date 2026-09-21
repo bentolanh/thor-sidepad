@@ -958,3 +958,42 @@ installed apps declare `android.intent.category.HOME`, one of them the button in
 itself, and several accessibility services compete for the key. A single press produced one
 `input -d 4 keyevent 3` from us and then two launcher starts from the interceptor — the
 duplication is downstream of anything we send.
+
+## The controller follows the display, not the device's sleep state
+
+Measured on the Odin 2 Mini, 2026-09-21, with the Thor confirmed identical in construction.
+
+"Keep playing with the screen dark" holds the screen **on** at zero brightness. That looks like a
+workaround for not being allowed to turn the display off, and it is not — turning the display off
+is possible, and it breaks the controller. The panel has to stay on. Only its brightness can go.
+
+Both handhelds synthesise their gamepad in software: `/proc/bus/input/devices` reports
+`Xbox Wireless Controller` at `/devices/virtual/input/...`, not a real HID node. Something of
+AYN's reads the physical controller and feeds that virtual device, and **it stops when the display
+powers off**, whatever the device's wakefulness says.
+
+Three routes were tried against a steady 4 Hz stream of real button presses, timestamped by
+`getevent` and compared against a window bracketed with `/proc/uptime`:
+
+- **`PARTIAL_WAKE_LOCK`, letting the screen sleep.** The lock is genuinely taken — visible in
+  `dumpsys power` as `SidePad:controller`. It keeps the CPU alive and lets the display go, so the
+  device dozes and the controller stops with it. This is what the setting used to do, which is why
+  it never worked.
+- **`SurfaceControl.setDisplayPowerMode(token, 0)`.** Reachable: the shell user holds
+  `ACCESS_SURFACE_FLINGER` and `DEVICE_POWER`, so the Shizuku injector can call it, and it does
+  blank the panel while `mWakefulness` stays `Awake`. The controller carried on for **0.9 seconds**
+  and then went silent for the whole 16-second window, resuming the instant the display returned.
+  Thirteen presses before, four in the first second of darkness, nothing at all after that.
+- **Screen on, brightness floored to 0.** Works, because the display never leaves. Both handhelds
+  report `mScreenBrightnessMinimum=0.0`, so this goes fully black rather than merely dim.
+
+The dock behaves differently for a reason that fits: docked there is an active video output, so
+AYN's own condition is satisfied and the internal panel can go dark with the controller still
+alive. That is what `settings system keep_screen_on` and their `VideoOutputMode` machinery are
+for. Undocked there is no way to satisfy it — hence brightness, not power mode.
+
+If this is revisited, the test that settles it is the one that removes human timing: capture
+`getevent` continuously, wait until presses are demonstrably arriving, and only then black the
+screen from a second process. Runs that asked for presses "during the dark period" produced
+clusters at the boundary that read equally well as "buffered and flushed" or "pressed late", and
+were worthless.
