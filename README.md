@@ -148,6 +148,29 @@ nothing to sort this one by, and a list that hides what it cannot sort hides thi
 looks for the gamepad service itself and never filters on Appearance, which is why Macs and
 iPads find the pad without being asked twice.
 
+### What to appear as
+
+Two choices on the pairing screen, and they are not two versions of the same thing.
+
+**Xbox Wireless Controller** is the one to play with. It behaves as a real Xbox controller does,
+which is what nearly every third-party controller claims to be: games that work with one work
+with this, and games that want Steam Input want it either way. It is the only controller SidePad
+offers at the moment; a PlayStation or Nintendo one would sit beside it.
+
+It works because its report map is copied byte for byte off real hardware, and that copy is
+exactly what earns it native treatment on all six platforms above. Nothing can be added to it
+without ending that — which is why the trackpad, and the keyboard and media keys when they
+arrive, cannot live there.
+
+**SidePad** is where those live instead. It is honest about what it is, and a machine has to be
+taught which button is which. As a game controller it is the weaker choice — macOS will not treat
+it as one at all — so it is not the way to play.
+
+Either is a different device as far as the machine is concerned, so changing this means pairing
+again. The radio changes with it where it has to: the Xbox pad speaks Low Energy, as this one
+does, while a PlayStation or Nintendo profile would be Bluetooth Classic, because that is what
+those controllers are. Nothing asks which radio to use — choosing what to appear as chooses it.
+
 One last thing that looks wrong everywhere and only matters in one place: no host works out what
 the pad actually is, and no two guess alike. macOS, Android and SteamOS file it as a phone,
 because the handheld's ordinary Bluetooth radio says it is one; Windows shows it as a desktop

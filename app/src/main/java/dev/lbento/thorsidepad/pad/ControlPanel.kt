@@ -150,42 +150,20 @@ object ControlPanel {
          * and the appearance page is where the choice is actually reached from.
          */
         /**
-         * Which controller the machine is told this is, and below it the one mode that is not a
-         * controller at all.
+         * What the machine is told this is: one controller, and one thing that is not a
+         * controller. A PlayStation or Nintendo profile would join the first as a peer.
          *
-         * These used to be offered as a matched pair, which was the wrong shape. There is one
-         * controller layout — Xbox — and a PlayStation or Nintendo one would join it here as
-         * peers. SidePad belongs to a different question: it is the identity a keyboard, a mouse
-         * and media keys can live under, because the Xbox descriptor is copied byte for byte from
-         * real hardware and that is precisely what earns it native treatment. Adding anything to
-         * it would end that. So SidePad sits apart, described as what it is for, rather than
-         * competing as a second-rate pad.
+         * Only SidePad carries a line of its own, naming what it is for, because its name says
+         * nothing. Why the Xbox one works, and why a keyboard cannot be added to it, is in the
+         * README — a panel reached mid-game is not where anyone reads an explanation.
          */
         fun identityButtons(into: LinearLayout) {
             val xbox = state.identity == "XBOX_SERIES"
             val dot = "\u25CF  "
-            into.addView(label("As a controller", 13f, grey).apply { setPadding(0, 2, 0, 6) })
             into.addView(btn((if (xbox) dot else "") + "Xbox Wireless Controller", !xbox) { actions.setIdentity("XBOX_SERIES") })
-            into.addView(label(
-                "It behaves as a real Xbox controller does, which is what nearly every " +
-                "third-party controller claims to be: games that work with one work with this, " +
-                "and games that want Steam Input want it either way. Tested on macOS, iOS, " +
-                "iPadOS, Android, SteamOS and Windows.",
-                12f, grey).apply { setPadding(0, 8, 0, 16) })
-
-            into.addView(label("As something other than a controller", 13f, grey).apply { setPadding(0, 2, 0, 6) })
             into.addView(btn((if (!xbox) dot else "") + "SidePad", xbox) { actions.setIdentity("OWN") })
-            into.addView(label(
-                "Where the keyboard, mouse and media keys will live, once they exist. They cannot " +
-                "be added to the Xbox one: it works because it is an exact copy of real hardware, " +
-                "and anything extra would stop it being that. As a game controller this is the " +
-                "weaker choice \u2014 macOS will not treat it as one at all \u2014 so it is not " +
-                "the way to play.",
-                12f, grey).apply { setPadding(0, 8, 0, 0) })
-
-            into.addView(label(
-                "Either is a different device to the machine, so changing this needs pairing again.",
-                12f, grey).apply { setPadding(0, 14, 0, 0) })
+            into.addView(label("Trackpad, keyboard, media control", 12f, grey)
+                .apply { setPadding(0, 6, 0, 0) })
         }
         fun sw(t: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(themed).apply {
             text = t; isChecked = checked; setTextColor(Color.WHITE); setPadding(0, 12, 0, 12)
