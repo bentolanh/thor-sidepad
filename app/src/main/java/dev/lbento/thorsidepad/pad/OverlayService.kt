@@ -988,7 +988,13 @@ class OverlayService : Service() {
             prefs.bubbleDefaulted = true
             if (ov.singleScreen) prefs.bubble = true
         }
-        if (!prefs.bubble) { ov.removeBubble(); return }
+        // The shield owns every touch on its screen, and on a handheld with only one screen the
+        // edges belong to Android, so the button is the only way back to the panel. Dismissing it
+        // while the shield is up is already refused — but nothing stopped the shield going up
+        // after it had been dismissed, or the pad starting that way, and then there is no way in
+        // at all. Locked a device out on 2026-09-21. So the shield brings it back.
+        val trapped = ov.singleScreen && prefs.shield && visible
+        if (!prefs.bubble && !trapped) { ov.removeBubble(); return }
         ov.showBubble(prefs.bubbleX, prefs.bubbleY,
             onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
             onLongPress = { showPanel() },
