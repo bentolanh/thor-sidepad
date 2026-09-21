@@ -214,6 +214,11 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         try { wm.addView(tv, lp); dismissView = tv } catch (e: Exception) { Log.w(TAG, "dismiss target", e) }
     }
 
+    /** Keeps the floating button showing what is actually true. */
+    fun updateBubble(padShown: Boolean, remote: Boolean, shieldOn: Boolean) {
+        (bubble as? BubbleView)?.let { it.padShown = padShown; it.remote = remote; it.shieldOn = shieldOn }
+    }
+
     private fun removeDismissTarget() {
         dismissView?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }
         dismissView = null
@@ -240,18 +245,14 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * whatever is playing, so it has to be findable without being in the way.
      */
     fun showBubble(x: Int, y: Int, onMoved: (Int, Int) -> Unit, onLongPress: () -> Unit, onTap: () -> Unit,
-                   canDismiss: () -> Boolean = { true }, onDismiss: () -> Unit = {}) {
+                   canDismiss: () -> Boolean = { true }, onDismiss: () -> Unit = {},
+                   onShield: () -> Unit = {}) {
         if (bubble != null) return
         val d = themed.resources.displayMetrics.density
         val size = (52 * d).toInt()
-        val v = View(themed).apply {
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(0xCC31507E.toInt())
-                setStroke((2 * d).toInt(), 0x66FFFFFF)
-            }
-        }
-        val lp = WindowManager.LayoutParams(size, size,
+        val tall = (80 * d).toInt()
+        val v = BubbleView(themed)
+        val lp = WindowManager.LayoutParams(size, tall,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
         lp.title = "SidePad bubble"
         lp.gravity = android.view.Gravity.TOP or android.view.Gravity.START
@@ -288,17 +289,20 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                     if (dragged) {
                         lp.x = startX + dx.toInt(); lp.y = startY + dy.toInt()
                         try { wm.updateViewLayout(v, lp) } catch (_: Exception) {}
-                        overDismiss(lp.x + size / 2f, lp.y + size / 2f)
+                        overDismiss(lp.x + size / 2f, lp.y + tall / 2f)
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                     v.removeCallbacks(hold)
-                    val thrownAway = dragged && overDismiss(lp.x + size / 2f, lp.y + size / 2f)
+                    val thrownAway = dragged && overDismiss(lp.x + size / 2f, lp.y + tall / 2f)
                     removeDismissTarget()
                     when {
                         thrownAway -> { v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS); onDismiss() }
                         dragged -> onMoved(lp.x, lp.y)
-                        !held -> onTap()
+                        // The switch is the shield, the controller above it shows and hides the
+                        // pad. Holding either still opens the panel, so nothing is lost by
+                        // splitting the tap.
+                        !held -> if (v.regionAt(e.y) == 1) onShield() else onTap()
                     }
                 }
             }

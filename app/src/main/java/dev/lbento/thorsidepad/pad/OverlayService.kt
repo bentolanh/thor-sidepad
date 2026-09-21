@@ -417,6 +417,7 @@ class OverlayService : Service() {
         try { levelThread.quitSafely() } catch (_: Exception) {}
         running = false
         visible = false
+        refreshBubble()
         // Only a deliberate Stop lets the shell process go. Dying any other way has to leave it
         // running, because it is the thing that puts the pad back.
         // The service is going; nothing is left to hold the gamepad up.
@@ -545,6 +546,7 @@ class OverlayService : Service() {
                 }
                 visible = true
                 prefs.padShown = true
+                refreshBubble()
                 main.postDelayed({ refreshLinkBadge() }, 1500)
                 updateNotification()
                 startImeWatch()
@@ -929,6 +931,24 @@ class OverlayService : Service() {
      * on a handheld whose pad has a screen to itself an edge swipe is free, and on one with a
      * single screen every edge belongs to Android and a button is the only way in.
      */
+    /**
+     * The shield, from the floating button rather than the panel.
+     *
+     * The panel defers this until it closes, because switching while it is open would rebuild the
+     * pad underneath it for nothing. There is no panel here, so it takes effect at once, which is
+     * the whole point of putting it on the button.
+     */
+    private fun toggleShield() {
+        prefs.shield = !prefs.shield
+        if (visible) rebuildPad()
+        refreshBubble()
+    }
+
+    /** Keeps the floating button showing what is true, whatever changed it. */
+    private fun refreshBubble() {
+        overlay?.updateBubble(visible, prefs.physicalTo == Prefs.TO_MACHINE, prefs.shield)
+    }
+
     private fun syncBubble() {
         val ov = overlay ?: return
         // Offered by default on a machine with one screen, where there are no edge gestures left
@@ -943,6 +963,7 @@ class OverlayService : Service() {
             onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
             onLongPress = { showPanel() },
             onTap = { toggle() },
+            onShield = { toggleShield() },
             // With the shield up this button is the only way out of a screen that is entirely
             // ours, so it cannot be thrown away. Anywhere else Android is still reachable and
             // there is no reason to refuse.
@@ -957,6 +978,7 @@ class OverlayService : Service() {
                 if (takePadToo) hide()
                 Log.i(TAG, "bubble thrown away" + if (takePadToo) "; pad went with it" else "")
             })
+        refreshBubble()
     }
 
     /**
@@ -1323,7 +1345,7 @@ class OverlayService : Service() {
                 }
             }
             override fun editLayout() { ov.removePanel(); padDirty = false; edit() }
-            override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
+            override fun setShield(on: Boolean) { prefs.shield = on; padDirty = true; refreshBubble(); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setOpacity(value: Float) { prefs.opacity = value; ov.updateLooks(prefs.opacity, prefs.backdrop) }
             override fun setBackdrop(value: String) { prefs.backdrop = value; ov.updateLooks(prefs.opacity, prefs.backdrop); ov.updatePanel(panelState(ov)); ov.updatePanelLook(prefs.shield, prefs.backdrop) }
             override fun setDestination(address: String) {
@@ -1331,6 +1353,7 @@ class OverlayService : Service() {
                 // question now, and answering both from here is what made the old single setting
                 // unable to express the useful combination.
                 prefs.physicalTo = if (address.isEmpty()) Prefs.TO_DEVICE else Prefs.TO_MACHINE
+                refreshBubble()
                 // Going back to this device changes where presses go, not which machine is known:
                 // forgetting it here would drop it out of the list and it would have to be paired
                 // again for no reason.
