@@ -117,3 +117,46 @@ layout is Xbox-style so button prompts would stay correct. Both need that contro
 report layout, and the 8BitDo's does not match its own published descriptor, so it would have to
 be read off the wire with PadScope. Neither is necessary now that parity with real hardware is
 reached.
+
+---
+
+## Why reconnecting has never worked, 2026-09-21
+
+macOS stores this pad as a **Mobile Phone**, not a gamepad. Side by side, from
+`system_profiler`:
+
+```
+Odin2Mini                        8BitDo Lite 2 pink
+  Vendor:  0x045E                  Vendor:  0x2DC8
+  Product: 0x0B13                  Product: 0x5112
+  Minor Type: Mobile Phone         Minor Type: Gamepad
+  Services: < GATT ACL >
+```
+
+The Minor Type comes from the Bluetooth Class of Device, which the Classic radio broadcasts and
+which Android sets to a phone because that is what the handheld is. A real controller has no
+Classic radio and no phone identity, so it is stored as a gamepad.
+
+**What that costs.** At pairing, macOS reads the GATT database, finds the HID service, and builds
+a controller — which is why a fresh pairing always works. But the record it keeps says phone. So
+every reconnection takes the phone path: connect over Classic, sweep the SDP records, find no HID,
+stop. Confirmed in the log at 12:17:29 — `SDP_CONNECT_STATE`, `Found service class GATT with
+profile version: 0 ... Not creating remote service`. It never runs the HID reconnect path,
+because as far as the stored record is concerned this is not a HID device.
+
+It also explains why the only row a user can click is a computer icon: the persistent record is
+the Classic one. The Low Energy gamepad appears only transiently under Nearby Devices.
+
+**What does not fix it.** Remembering the host's subscription, which was a real and separate bug
+and is fixed — the pad resumes correctly now and the log says so. It does not help, because
+macOS has no HID device to deliver the reports to.
+
+**What might.** The Class of Device is the whole difference. Android exposes no API for it, but
+`bluetooth.device.class_of_device` is a system property the stack reads, it is empty on this
+device, and shell — which Shizuku gives us — can write properties. Setting it to a peripheral
+class and restarting Bluetooth would test whether macOS then files the pad as a gamepad and
+reconnects like one.
+
+Untested, and not free: the class is the handheld's, not this app's, so every device it pairs
+with would see the change. It is not a `persist.` property, so a reboot undoes it, which is the
+safety net that makes the experiment reasonable at all.
