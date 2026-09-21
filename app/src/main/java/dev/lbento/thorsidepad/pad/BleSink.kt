@@ -140,6 +140,9 @@ class BleSink(
     private var goodbye: java.util.concurrent.CountDownLatch? = null
     private val sendLock = Any()
     @Volatile private var inFlight = false
+    /** The last frame handed to the radio, and the one-shot that says it again if nothing follows. */
+    @Volatile private var lastFrame: ByteArray? = null
+    private var settle: ScheduledFuture<*>? = null
     private var sleeper: ScheduledFuture<*>? = null
     /** Set only by the directed-connection experiment; keeps the pad off the air while it runs. */
     @Volatile private var experimenting = false
@@ -970,6 +973,7 @@ class BleSink(
 
     private fun send(): Int {
         if (!subscribed || host == null) return -1
+        settle?.cancel(false)
         synchronized(lock) {
             queue.addLast(shape.snapshot())
             if (!draining) { draining = true; pool.execute(::drain) }
@@ -979,14 +983,52 @@ class BleSink(
 
     private fun drain() {
         while (true) {
+            // Wait for the radio before offering it anything else. This is the whole of the fix:
+            // the queue collapses while we wait, so what finally goes out is the newest state
+            // rather than a backlog. Pushing regardless is what filled the radio's twenty-packet
+            // queue, after which the stack stopped queueing reports and started discarding them —
+            // "cannot send, already congested ... failed to write data to L2CAP" — which is a
+            // stick that moves in steps, a press that never arrives, and a button that never
+            // comes up because the frame releasing it was the one thrown away.
+            if (!awaitIdle()) {
+                // Far longer than any report should take. Assume the acknowledgement itself was
+                // lost rather than going quiet forever.
+                synchronized(sendLock) { inFlight = false }
+            }
             var next: ByteArray? = null
             synchronized(lock) {
                 collapse()
                 next = queue.removeFirstOrNull()
                 if (next == null) draining = false
             }
-            deliver(next ?: return)
+            val frame = next
+            if (frame == null) { scheduleSettle(); return }
+            deliver(frame)
         }
+    }
+
+    /**
+     * Says the last thing again, once, shortly after everything goes quiet.
+     *
+     * A notification is not acknowledged by the machine, only by our own radio, so a packet lost
+     * over the air leaves the host holding whatever it last heard. In the middle of a movement
+     * that corrects itself on the next report; at the end of one there is no next report, and a
+     * button stays down or a stick stays pushed. One repeat after the quiet costs nothing — the
+     * link is idle by then — and it is the only thing standing between a dropped final frame and
+     * a controller that appears to have jammed.
+     */
+    private fun scheduleSettle() {
+        settle?.cancel(false)
+        val frame = lastFrame ?: return
+        settle = try {
+            ticker.schedule({
+                if (subscribed && host != null) {
+                    synchronized(lock) {
+                        if (queue.isEmpty() && !draining) { draining = true; queue.addLast(frame); pool.execute(::drain) }
+                    }
+                }
+            }, SETTLE_MS, TimeUnit.MILLISECONDS)
+        } catch (_: Exception) { null }
     }
 
     /** Drops frames the radio no longer needs. A press is never what gets dropped. */
@@ -1013,10 +1055,13 @@ class BleSink(
                 @Suppress("DEPRECATION")
                 srv.notifyCharacteristicChanged(d, c, false)
             } catch (e: Exception) { inFlight = false; Log.w(TAG, "notify failed", e); return }
-            if (taken) { awaitSent(); return }
+            if (taken) { lastFrame = frame; return }
+            // The stack refused it outright, which is its own kind of back-pressure. Give the
+            // radio longer than two milliseconds to breathe: retrying that hard is how a refusal
+            // turns into a burst the moment it stops refusing.
             inFlight = false
             tries++
-            try { Thread.sleep(2) } catch (_: InterruptedException) { return }
+            try { Thread.sleep(REFUSED_BACKOFF_MS) } catch (_: InterruptedException) { return }
         }
         // Every retry refused. The report is gone, and until now that happened in silence — which
         // is why the missed presses this was built to survive were never diagnosed, only covered
@@ -1039,15 +1084,25 @@ class BleSink(
      * None of this showed while a bug meant nothing was subscribed and the reports went nowhere.
      * The moment they were really delivered, the link became the limit.
      */
-    private fun awaitSent() {
-        val until = System.nanoTime() + SEND_WAIT_MS * 1_000_000
+    /**
+     * Waits until the radio has nothing of ours outstanding. True if it said so, false if it
+     * never did.
+     *
+     * This used to clear the flag itself on timeout and return as though the report had gone,
+     * which was a lie with consequences: the next report went out on top of one still queued,
+     * and the one after that, until the radio's queue was full and the stack began discarding
+     * them. Timing out means the radio is busy, not that it is free, and the caller is told so.
+     */
+    private fun awaitIdle(): Boolean {
+        val until = System.nanoTime() + STALL_MS * 1_000_000
         synchronized(sendLock) {
             while (inFlight) {
                 val left = (until - System.nanoTime()) / 1_000_000
-                if (left <= 0) { inFlight = false; return }
-                try { (sendLock as Object).wait(left) } catch (_: InterruptedException) { return }
+                if (left <= 0) return false
+                try { (sendLock as Object).wait(left) } catch (_: InterruptedException) { return false }
             }
         }
+        return true
     }
 
     /** The same steady beat the Classic sink keeps, and for the same reason: silence reads badly. */
@@ -1138,7 +1193,12 @@ class BleSink(
         /** How long the pad keeps offering itself to nobody before going quiet. */
         const val SLEEP_AFTER_MS = 10 * 60 * 1000L
         /** Longest we wait for the radio to report a frame gone before giving up on it. */
-        const val SEND_WAIT_MS = 60L
+        /** How long to let the radio finish one report before assuming its answer is lost. */
+        const val STALL_MS = 400L
+        /** Pause after the stack refuses a report outright. */
+        const val REFUSED_BACKOFF_MS = 6L
+        /** Quiet after which the last state is said once more, in case its frame went missing. */
+        const val SETTLE_MS = 90L
         /**
          * How many times to repeat a report after something changes.
          *
