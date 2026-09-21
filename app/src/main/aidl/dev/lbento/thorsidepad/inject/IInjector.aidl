@@ -79,4 +79,13 @@ interface IInjector {
     // Every input device that looks like it carries controller controls, as JSON:
     // [{"path","name","keys":[..],"abs":[..]}]. Used to decide what to listen to while calibrating.
     String controllerNodes() = 31;
+
+    // Tell Android somebody is still there.
+    //
+    // A grabbed controller delivers to nobody else, so while presses are being forwarded to
+    // another machine Android sees no user activity at all and the screen times out as though the
+    // handheld were abandoned. PowerManager.userActivity resets that timer, and needs DEVICE_POWER
+    // — which the app does not hold and the shell user does. Oneway: it is a hint, and the caller
+    // is on the event path.
+    oneway void pokeUserActivity() = 32;
 }

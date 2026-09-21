@@ -1007,9 +1007,21 @@ waking it, whereupon presses reached the Mac immediately with nothing re-paired 
 What stops is the *generation* of events, for as long as the panel is off. So the cost is an
 interruption that has to be woken out of, not a dead session — annoying mid-game, not fatal.
 
-Keeping the display awake also keeps Doze from arming at all, which matters because the app is
-not on the battery-optimisation whitelist (`dumpsys deviceidle whitelist`) and its partial wake
-lock would be ignored there.
+The fix is to report the presses rather than to pin the screen on. `PowerManager.userActivity`
+resets the same timer a real press would, and is exactly what a grabbed device stops happening by
+itself. It needs `DEVICE_POWER`, which the app does not hold and the shell user does, so the call
+lives in the injector (`pokeUserActivity`, reflection — it is not in the SDK) and is made from
+`ControllerForwarder` when a button arrives, throttled to once a minute against a timeout of
+thirty.
+
+Only buttons count, not axes: sticks report continuously including at rest, so an axis event says
+nothing about whether anybody is there.
+
+This is better than holding the screen on for the whole session, which is what the setting used
+to do. The handheld now sleeps normally the moment play stops, and while play continues the
+screen stays up for the ordinary reason — somebody is using it. It also keeps Doze from arming,
+which matters because the app is not on the battery-optimisation whitelist
+(`dumpsys deviceidle whitelist`) and its partial wake lock would be ignored there.
 
 Brightness is left alone. Anyone who wants a dark screen can turn it down themselves.
 

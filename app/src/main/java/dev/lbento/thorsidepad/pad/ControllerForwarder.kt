@@ -27,7 +27,15 @@ class ControllerForwarder(
      * a control sits on an unexpected code or an unexpected device.
      */
     private val calibration: PadCalibration = PadCalibration.EMPTY,
+    /**
+     * Called now and then while real presses are arriving, so Android can be told somebody is
+     * still playing. Not called per event: once a minute is enough to hold off a screen timeout
+     * measured in tens of minutes, and it keeps a binder call off the event path.
+     */
+    private val stillPlaying: () -> Unit = {},
 ) : IPadEvents.Stub() {
+
+    private var lastReported = 0L
 
     /**
      * Axis scaling, keyed by the device it came from as well as the code.
@@ -107,6 +115,12 @@ class ControllerForwarder(
      * arrives from, which is the behaviour this had before several devices could be read at once.
      */
     override fun onEventAt(node: Int, type: Int, code: Int, value: Int) {
+        // Sticks report constantly, including while resting, so only a button counts as somebody
+        // being there. Throttled to once a minute; the timeout it is holding off is thirty.
+        if (type == Ev.KEY && value != 0) {
+            val now = android.os.SystemClock.uptimeMillis()
+            if (now - lastReported > 60_000L) { lastReported = now; stillPlaying() }
+        }
         var code = code
         var flip = false
         val rawCode = code

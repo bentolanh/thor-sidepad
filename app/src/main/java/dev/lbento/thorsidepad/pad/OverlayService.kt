@@ -603,11 +603,12 @@ class OverlayService : Service() {
     private fun applyAwakeHold() {
         val want = prefs.keepAwake && prefs.targetMode == Prefs.MODE_BT &&
             visible && btSink?.connected == true
-        // The CPU lock alone did nothing useful: it lets the display sleep, and the controller
-        // these handhelds synthesise in software stops when the display does. Keeping the screen
-        // awake is the part that keeps a session alive; the lock stays because it costs nothing.
+        // The lock keeps the processor alive and costs nothing. Holding the *screen* on is no
+        // longer done here: pinning it for the whole session was a blunt answer to a narrow
+        // problem, which is that a grabbed controller is invisible to Android. Reporting the
+        // presses as user activity solves it where it happens — see ControllerForwarder — and
+        // lets the handheld sleep normally the moment somebody stops playing.
         holdAwake(want)
-        overlay?.holdScreenAwake(want)
     }
 
     private fun refreshLinkBadge() {
@@ -644,7 +645,14 @@ class OverlayService : Service() {
                 val calib = PadCalibration.parse(prefs.calibration)
                 val path = prefs.physicalPath.ifEmpty { targets.firstOrNull()?.path.orEmpty() }
                 if (path.isEmpty() && calib.isEmpty) { Log.w(TAG, "no controller to forward"); return@Thread }
-                val f = ControllerForwarder(bt, calibration = calib, passThrough = { code, down ->
+                val f = ControllerForwarder(bt, calibration = calib, stillPlaying = {
+                    // Only while the player has asked for it, and only for presses that Android
+                    // will never see: these are being forwarded to another machine off a grabbed
+                    // device, so without this the screen times out as though nobody were here.
+                    if (prefs.keepAwake) {
+                        try { svc.pokeUserActivity() } catch (e: Exception) { Log.w(TAG, "poke", e) }
+                    }
+                }, passThrough = { code, down ->
                     when {
                         code !in passThrough -> Unit
                         // Home is not handed back as a key. Injected from our own device it

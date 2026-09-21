@@ -583,6 +583,25 @@ class InjectorService() : IInjector.Stub() {
         return report.toString()
     }
 
+    /**
+     * Resets Android's screen-off timer, as a real press on an ungrabbed device would.
+     *
+     * [android.os.PowerManager.userActivity] is a system API behind DEVICE_POWER, which the app
+     * does not hold; the shell user this runs as does, so the call belongs here. Reflection
+     * because it is not in the SDK.
+     */
+    override fun pokeUserActivity() {
+        try {
+            val pm = context?.getSystemService(Context.POWER_SERVICE) ?: return
+            val m = pm.javaClass.getMethod("userActivity",
+                java.lang.Long.TYPE, Integer.TYPE, Integer.TYPE)
+            // USER_ACTIVITY_EVENT_BUTTON: a press, which is exactly what happened.
+            m.invoke(pm, SystemClock.uptimeMillis(), 1, 0)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not report user activity; the screen may still time out mid-game", e)
+        }
+    }
+
     override fun shell(cmd: String): String = try {
         // The user-service process may have no PATH; be explicit about where sh and the tools live.
         val pb = ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true)

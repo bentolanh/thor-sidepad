@@ -254,10 +254,10 @@ object ControlPanel {
                     card.addView(label(
                         "SidePad takes the controller over while a machine has the pad, so Android never " +
                         "sees the presses and the screen times out as though nobody were there \u2014 after " +
-                        "thirty minutes it sleeps, and a sleeping handheld sends nothing. The connection " +
-                        "survives and presses get through again the moment it wakes, so nothing is lost; it " +
-                        "is simply a game interrupted. On, the screen stays awake while the machine is " +
-                        "connected. Turn the brightness down if it bothers you.",
+                        "thirty minutes it sleeps, and a sleeping handheld sends nothing until it is woken. " +
+                        "Nothing is lost when that happens; it is simply a game interrupted. On, each press " +
+                        "is reported to Android as the activity it is, so the screen stays awake while you " +
+                        "are playing and sleeps as usual once you stop.",
                         11f, grey).apply { setPadding(0, 0, 0, 16) })
                 }
 

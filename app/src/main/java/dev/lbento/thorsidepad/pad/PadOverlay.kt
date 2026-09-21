@@ -375,50 +375,6 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         }
     }
 
-    private var screenHold: View? = null
-
-    /**
-     * Stops the device falling asleep while a machine is being played on.
-     *
-     * Not a comfort setting — without it play is interrupted on a timer. The injector grabs the
-     * controller so presses do not also reach the handheld, and a grabbed device delivers to
-     * nobody else, Android's own input reader included. So however hard someone is playing,
-     * Android sees no user activity at all, the screen timeout runs unopposed (thirty minutes on
-     * both handhelds), and when the display goes the controller goes with it: these devices
-     * synthesise their gamepad in software and that software follows the display. Measured at
-     * 0.9 seconds from panel off to silence.
-     *
-     * The connection itself survives sleep — the link is the Bluetooth controller's, not ours,
-     * and presses reach the machine again the moment the handheld wakes. So this prevents an
-     * interruption, not a lost session. See DEVELOPMENT.md.
-     *
-     * Keeping the display awake also keeps Doze from ever arming, which matters because the app
-     * is not on the battery-optimisation whitelist and its wake lock would be ignored there.
-     *
-     * Brightness is deliberately left alone. Anyone who wants a dim screen can dim it themselves,
-     * and doing it for them would be taking a decision that was never ours.
-     */
-    fun holdScreenAwake(on: Boolean) {
-        if (!on) {
-            screenHold?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }
-            screenHold = null
-            return
-        }
-        if (screenHold != null) return
-        val v = View(ctx)
-        val lp = WindowManager.LayoutParams(1, 1,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            PixelFormat.TRANSLUCENT)
-        lp.gravity = Gravity.TOP or Gravity.START
-        lp.title = "SidePad awake"
-        lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
-        try { wm.addView(v, lp); screenHold = v; Log.i(TAG, "holding the screen awake for the session") }
-        catch (e: Exception) { Log.w(TAG, "screen hold", e) }
-    }
-
     private var linkBadge: View? = null
 
     /**
@@ -574,7 +530,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
 
 
-    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {}; holdScreenAwake(false) }
+    fun tearDown() { removeAll(); removeCatchers(); removePanel(); removeGuide(); showLinkBadge(null) {} }
 
     /** Whether the compositor can blur what is behind a window (needed for the frosted backdrop). */
     val blurSupported: Boolean get() = try { wm.isCrossWindowBlurEnabled } catch (_: Throwable) { false }
