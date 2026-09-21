@@ -92,3 +92,28 @@ needs Steam Input while this pad is read positionally.
 What remains open is whether an identity on the 8BitDo's path would work better than the Xbox
 one — which cannot be tested without claiming an 8BitDo's numbers, and would need their report
 layout, which does not match their own published descriptor.
+
+---
+
+## Outcome: claiming the Series pad, 2026-09-21
+
+The pad now claims `045e:0b13` version `0x0520` and sends that controller's own report map
+verbatim, every byte read off the user's controller.
+
+**It behaves exactly as a genuine Xbox controller does.** Games that work natively with a real
+one work with this. Games that need Steam Input with a real one need it here too. The face
+buttons landing in the wrong places — X acting as Y, Y as a shoulder, R1 as Start — is gone,
+because that was the model 1708 identity being read positionally by software holding no profile
+for it.
+
+So the remaining limitation is not this project's. It is what macOS does with any Microsoft
+controller: routed to `IOHIDEventDummyService` rather than Apple's GameController path, which is
+where an 8BitDo lands and why an 8BitDo needs no configuration anywhere.
+
+**What would still be worth trying, and what it costs.** Only an identity on that other path
+gives native support in the games that currently need Steam Input. That means claiming a
+controller Apple knows which is not Microsoft's — an 8BitDo, or possibly an Amazon Luna, whose
+layout is Xbox-style so button prompts would stay correct. Both need that controller's real
+report layout, and the 8BitDo's does not match its own published descriptor, so it would have to
+be read off the wire with PadScope. Neither is necessary now that parity with real hardware is
+reached.
