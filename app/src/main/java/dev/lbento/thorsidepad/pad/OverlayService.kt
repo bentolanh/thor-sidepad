@@ -840,13 +840,40 @@ class OverlayService : Service() {
         }, 1200)
     }
 
+    /**
+     * Home on the pad's own screen.
+     *
+     * Every other per-screen button here names the display it means: Back does on both screens,
+     * and so does Home on the top one. This was the exception — it pressed the Thor's physical
+     * Home key, which does not ask for a screen at all, it asks Mjolnir. Mjolnir's answer to one
+     * press is to send BOTH screens home, so the button did something nobody asked for and there
+     * was no setting on our side that could change it.
+     *
+     * Naming the display is what the other three already do. A secondary display is allowed to
+     * refuse a home intent, though, and this cannot be tried without a Thor in hand, so a refusal
+     * falls back to the old key press: still wrong, but no more wrong than before.
+     */
+    private fun homeOnPad() {
+        val display = overlay?.displayId ?: 0
+        val svc = Injector.current() ?: return
+        Thread {
+            val out = try {
+                svc.shell("am start --display $display -a android.intent.action.MAIN -c android.intent.category.HOME 2>&1")
+            } catch (e: Exception) { Log.w(TAG, "home on the pad's screen failed", e); "" }
+            if (out.contains("Error", true) || out.contains("Exception", true)) {
+                Log.i(TAG, "display $display would not take a home intent; falling back to the Thor's own key")
+                try { svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60) } catch (_: Exception) {}
+            }
+        }.start()
+    }
+
     /** Buttons that act on the pad or the device. Home/Back go through the shell user or the Thor's own key. */
     private fun onAction(code: Int) {
         val ov = overlay
         when (code) {
             dev.lbento.thorsidepad.inject.Action.SHIELD -> { prefs.shield = !prefs.shield; rebuildPad() }
             dev.lbento.thorsidepad.inject.Action.HOME_TOP -> shellAsync("am start --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME")
-            dev.lbento.thorsidepad.inject.Action.HOME_2ND -> Injector.current()?.let { svc -> try { svc.pressKeyOn(prefs.physicalPath, Key.HOME, 60) } catch (_: Exception) {} }
+            dev.lbento.thorsidepad.inject.Action.HOME_2ND -> homeOnPad()
             dev.lbento.thorsidepad.inject.Action.BACK_TOP -> shellAsync("input -d 0 keyevent 4")
             dev.lbento.thorsidepad.inject.Action.BACK_2ND -> shellAsync("input -d ${ov?.displayId ?: 0} keyevent 4")
             dev.lbento.thorsidepad.inject.Action.MEDIA_PREV -> mediaKey("previous")
