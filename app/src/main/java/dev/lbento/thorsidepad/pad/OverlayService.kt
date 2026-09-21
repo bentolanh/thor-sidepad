@@ -290,13 +290,21 @@ class OverlayService : Service() {
      * Lists the gamepad nodes and re-resolves the chosen controller by name, since a node number
      * changes when the Thor switches controller style or a Bluetooth pad reconnects.
      */
+    /** Devices SidePad itself created. They are real to the kernel and meaningless as targets. */
+    private fun isOurDevice(name: String) = name.contains("SidePad")
+
     private fun refreshTargets(svc: IInjector) {
         try {
             val devs = JSONObject(svc.probe()).getJSONArray("devices")
             val found = ArrayList<TargetChoice>()
             for (i in 0 until devs.length()) {
                 val d = devs.getJSONObject(i)
-                if (d.optBoolean("gamepad", false)) found.add(TargetChoice(d.getString("name"), d.getString("path")))
+                val name = d.getString("name")
+                // Our own virtual pad is in this list because from the kernel's side it is a
+                // controller like any other. It is not somewhere to send presses, though —
+                // writing into it would be writing into ourselves — and it was being offered as
+                // if it were, which reads as a controller that does nothing.
+                if (d.optBoolean("gamepad", false) && !isOurDevice(name)) found.add(TargetChoice(name, d.getString("path")))
             }
             targets = found
             // The Thor's own pad keeps its identity across style changes even though its name changes.

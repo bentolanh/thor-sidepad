@@ -139,7 +139,10 @@ class CalibrateActivity : Activity() {
             val found = ArrayList<String>()
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                if (o.optBoolean("gamepad", false)) found.add(o.getString("path"))
+                // Not our own devices: a calibration taught against the pad we created would
+                // be teaching it about itself.
+                if (o.optBoolean("gamepad", false) && !o.optString("name").contains("SidePad"))
+                    found.add(o.getString("path"))
             }
             if (found.isEmpty()) { state("No input devices that look like controls."); return }
             paths = found
