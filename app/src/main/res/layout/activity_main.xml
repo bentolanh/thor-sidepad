@@ -54,6 +54,9 @@
         <Switch android:id="@+id/bubbleSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Floating button to show and hide the pad" />
         <TextView style="@style/StepHelp" android:text="For a handheld with one screen, where every edge swipe belongs to Android and there is no spare gesture to reach the pad with. Drag the button anywhere; tap it to show or hide the pad, hold it to open the panel." />
+        <Switch android:id="@+id/forgetSwitch" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Forget the machine when it disconnects" />
+        <TextView style="@style/StepHelp" android:text="On a Mac a pairing survives a disconnection but the controller does not — macOS files a handheld as a phone and takes the phone route back, which carries no gamepad. The pairing then looks fine and the pad does nothing. This throws our side away as the link drops, so both ends agree it is gone and the next session starts from a fresh pairing, which always works. You still have to forget it on the machine itself; no controller can make a host forget. Leave this off for machines where reconnecting does work." />
         <Button android:id="@+id/btnCalibrate" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Teach the pad your controls" />
         <TextView style="@style/StepHelp" android:text="Only needed if a button does nothing when the pad is forwarding to another machine. Some handhelds put Start and Select on a separate input device, which the pad cannot find on its own." />
