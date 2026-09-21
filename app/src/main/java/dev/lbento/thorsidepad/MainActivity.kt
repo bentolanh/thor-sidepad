@@ -119,12 +119,6 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        val forget = findViewById<Switch>(R.id.forgetSwitch)
-        forget.isChecked = prefs.forgetOnDisconnect
-        forget.setOnCheckedChangeListener { _, on ->
-            prefs.forgetOnDisconnect = on
-            OverlayService.send(this, OverlayService.ACTION_START)
-        }
 
         findViewById<android.widget.Button>(R.id.btnCalibrate).setOnClickListener {
             startActivity(android.content.Intent(this, CalibrateActivity::class.java))

@@ -52,8 +52,6 @@ class BleSink(
     private val rumble: Boolean = true,
     /** Send buttons counted straight through, for a host that does not know the identity. */
     private val plainButtons: Boolean = false,
-    /** Throw this side of the bond away when a machine lets go. See Prefs.forgetOnDisconnect. */
-    private val forgetOnDisconnect: Boolean = false,
 ) : PadTransport {
 
     /**
@@ -728,19 +726,27 @@ class BleSink(
                     //
                     // Not instantly, though: a machine needs a moment to put the old device away,
                     // and the 358ms it used to take was not enough.
-                    // A bond that cannot be reconnected is worse than none: it looks like a
-                    // working pairing and behaves like a broken pad. Letting go of it here means
-                    // the two sides agree the machine is gone, and the next session starts from
-                    // a fresh pairing, which is the one thing that has always worked.
-                    if (forgetOnDisconnect) {
-                        val addr = device.address
-                        ticker.schedule({
-                            if (host == null && forgetMachine(addr)) {
-                                Log.i(TAG, "let go of $addr; it will have to be paired again")
-                                onState("Pair again to use the pad")
-                            }
-                        }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
-                    }
+                    // Let go of the machine as it lets go of us.
+                    //
+                    // A pairing that cannot be reconnected is worse than none: it looks like a
+                    // working pairing and behaves like a broken pad. macOS files a handheld as a
+                    // Mobile Phone, because the Class of Device comes from the Classic radio, so
+                    // every reconnection takes the phone route — Classic, SDP, no HID, stop. The
+                    // pairing survives and the controller does not. That is not fixable from
+                    // here: it was traced to the handheld having a Classic radio at all, which a
+                    // real controller does not (2026-09-21).
+                    //
+                    // So pairing again is how this pad reconnects, everywhere, deliberately.
+                    // A host where reconnection would have worked loses a little convenience;
+                    // everyone gets one rule instead of behaviour that depends on which machine
+                    // is at the other end and which switch was found.
+                    val addr = device.address
+                    ticker.schedule({
+                        if (host == null && forgetMachine(addr)) {
+                            Log.i(TAG, "let go of $addr; it will have to be paired again")
+                            onState("Pair again to use the pad")
+                        }
+                    }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
                     ticker.schedule({ resumeAdvertising() }, QUIET_AFTER_MS, TimeUnit.MILLISECONDS)
                     onState("Not connected")
                 }

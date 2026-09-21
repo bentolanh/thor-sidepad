@@ -170,7 +170,7 @@ class OverlayService : Service() {
         (btSink as? BleSink)?.let { return it }
         if (btSink != null) return null
         return try {
-            BleSink(this, bleIdentity(), linkNote(), prefs.rumble, prefs.plainButtons, prefs.forgetOnDisconnect).also { s ->
+            BleSink(this, bleIdentity(), linkNote(), prefs.rumble, prefs.plainButtons).also { s ->
                 btSink = s
                 s.open { err -> if (err.isNotEmpty()) main.post { toast(err) } }
             }
@@ -461,7 +461,7 @@ class OverlayService : Service() {
                     val bt = btSink ?: if (prefs.btTransport != Prefs.TRANSPORT_CLASSIC) {
                         // A Low Energy pad does not dial a host; it makes itself findable and the
                         // host comes to it. So there is no address to open with.
-                        BleSink(this, bleIdentity(), note, prefs.rumble, prefs.plainButtons, prefs.forgetOnDisconnect).also { s ->
+                        BleSink(this, bleIdentity(), note, prefs.rumble, prefs.plainButtons).also { s ->
                             btSink = s
                             s.open { err -> if (err.isNotEmpty()) main.post { toast(err) } }
                         }
