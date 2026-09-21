@@ -180,6 +180,56 @@ class PadOverlay(private val app: Context, val displayId: Int) {
 
     private var bubble: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+    private var dismissView: View? = null
+
+    private val dp get() = ctx.resources.displayMetrics.density
+    private val dismissSizePx get() = (72 * dp).toInt()
+    private val dismissLiftPx get() = (72 * dp).toInt()
+
+    /**
+     * The target a bubble is dragged onto to throw it away, shown only while a bubble is moving
+     * and only when throwing it away is allowed. It sits bottom-centre, where a thumb already is.
+     */
+    private fun showDismissTarget() {
+        if (dismissView != null) return
+        val size = dismissSizePx
+        val tv = TextView(themed).apply {
+            text = "\u2715"
+            setTextColor(Color.WHITE)
+            textSize = 24f
+            gravity = Gravity.CENTER
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(0xB3202020.toInt())
+                setStroke((2 * dp).toInt(), 0x66FFFFFF)
+            }
+        }
+        val lp = WindowManager.LayoutParams(size, size,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, baseFlags(), PixelFormat.TRANSLUCENT)
+        lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        lp.y = dismissLiftPx
+        lp.title = "SidePad dismiss"
+        lp.windowAnimations = dev.lbento.thorsidepad.R.style.NoWindowAnimation
+        try { wm.addView(tv, lp); dismissView = tv } catch (e: Exception) { Log.w(TAG, "dismiss target", e) }
+    }
+
+    private fun removeDismissTarget() {
+        dismissView?.let { try { wm.removeViewImmediate(it) } catch (_: Exception) {} }
+        dismissView = null
+    }
+
+    /** True when the bubble's centre has reached the target. Generous: it is a thrown gesture. */
+    private fun overDismiss(cx: Float, cy: Float): Boolean {
+        val v = dismissView ?: return false
+        val size = dismissSizePx
+        val tx = width / 2f
+        val ty = height - dismissLiftPx - size / 2f
+        val near = kotlin.math.hypot(cx - tx, cy - ty) < size
+        v.alpha = if (near) 1f else 0.75f
+        v.scaleX = if (near) 1.15f else 1f
+        v.scaleY = v.scaleX
+        return near
+    }
 
     /**
      * A floating button that shows and hides the pad.
@@ -188,7 +238,8 @@ class PadOverlay(private val app: Context, val displayId: Int) {
      * and this is the way back. It is deliberately small and half-transparent — it sits on top of
      * whatever is playing, so it has to be findable without being in the way.
      */
-    fun showBubble(x: Int, y: Int, onMoved: (Int, Int) -> Unit, onLongPress: () -> Unit, onTap: () -> Unit) {
+    fun showBubble(x: Int, y: Int, onMoved: (Int, Int) -> Unit, onLongPress: () -> Unit, onTap: () -> Unit,
+                   canDismiss: () -> Boolean = { true }, onDismiss: () -> Unit = {}) {
         if (bubble != null) return
         val d = themed.resources.displayMetrics.density
         val size = (52 * d).toInt()
@@ -226,15 +277,28 @@ class PadOverlay(private val app: Context, val displayId: Int) {
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX; val dy = e.rawY - downY
-                    if (!dragged && kotlin.math.hypot(dx, dy) > slop) { dragged = true; v.removeCallbacks(hold) }
+                    if (!dragged && kotlin.math.hypot(dx, dy) > slop) {
+                        dragged = true; v.removeCallbacks(hold)
+                        // Only offered when it can actually be taken. With the shield up the
+                        // whole screen is ours and this button is the only way out of it, so
+                        // there is no target to drag onto and nothing to discover.
+                        if (canDismiss()) showDismissTarget()
+                    }
                     if (dragged) {
                         lp.x = startX + dx.toInt(); lp.y = startY + dy.toInt()
                         try { wm.updateViewLayout(v, lp) } catch (_: Exception) {}
+                        overDismiss(lp.x + size / 2f, lp.y + size / 2f)
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                     v.removeCallbacks(hold)
-                    if (dragged) onMoved(lp.x, lp.y) else if (!held) onTap()
+                    val thrownAway = dragged && overDismiss(lp.x + size / 2f, lp.y + size / 2f)
+                    removeDismissTarget()
+                    when {
+                        thrownAway -> { v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS); onDismiss() }
+                        dragged -> onMoved(lp.x, lp.y)
+                        !held -> onTap()
+                    }
                 }
             }
             true
@@ -245,6 +309,7 @@ class PadOverlay(private val app: Context, val displayId: Int) {
     fun removeBubble() {
         bubble?.let { v -> try { wm.removeView(v) } catch (_: Exception) {} }
         bubble = null; bubbleParams = null
+        removeDismissTarget()
     }
 
     /**
@@ -366,15 +431,26 @@ class PadOverlay(private val app: Context, val displayId: Int) {
         h.sheet.translationY = -panelHeight.toFloat()
         h.scrim.alpha = 0f
         wm.addView(wrap, lp); panel = wrap; panelUpdate = h.update; panelSheet = h.sheet; panelScrim = h.scrim
+        // Past the end of the list the drag stops being a scroll and becomes the panel leaving,
+        // the way the notification shade does it. A finger that has run out of list is asking for
+        // something, and until now it got nothing.
+        (h.sheet as? PanelScrollView)?.let { sv ->
+            sv.dismissAfterPx = panelHeight * 0.18f
+            sv.onDismissDrag = { dy -> moveSheet(dy) }
+            sv.onDismissEnd = { away -> if (away) removePanel(animated = true) else settlePanel(open = true) }
+        }
         if (!dragged) settlePanel(open = true)
     }
 
     /** Finger progress while pulling the shade down: [dy] pixels from where the pull began. */
-    fun dragPanel(dy: Float) {
+    fun dragPanel(dy: Float) = moveSheet(dy - panelHeight)
+
+    /** Puts the sheet at [y] (0 fully open, -panelHeight gone) and matches the scrim to it. */
+    private fun moveSheet(y: Float) {
         val sheet = panelSheet ?: return
-        val y = (dy - panelHeight).coerceIn(-panelHeight.toFloat(), 0f)
-        sheet.translationY = y
-        panelScrim?.alpha = (1f + y / panelHeight).coerceIn(0f, 1f)
+        val c = y.coerceIn(-panelHeight.toFloat(), 0f)
+        sheet.translationY = c
+        panelScrim?.alpha = (1f + c / panelHeight).coerceIn(0f, 1f)
     }
 
     /** Finger lifted: settle open, or spring back up and go away. */

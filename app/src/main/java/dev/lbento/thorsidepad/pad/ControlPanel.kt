@@ -338,7 +338,7 @@ object ControlPanel {
         }
         render()
 
-        val scroll = ScrollView(themed).apply { addView(card) }
+        val scroll = PanelScrollView(themed).apply { addView(card) }
         root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx, Gravity.TOP))
         return Handle(root, scrim, scroll) { s -> state = s; render() }
     }

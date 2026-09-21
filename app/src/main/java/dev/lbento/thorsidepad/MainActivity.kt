@@ -24,7 +24,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import dev.lbento.thorsidepad.inject.Injector
 import dev.lbento.thorsidepad.pad.OverlayService
-import dev.lbento.thorsidepad.pad.PadOverlay
 import dev.lbento.thorsidepad.pad.PresetStore
 import rikka.shizuku.Shizuku
 
@@ -111,22 +110,12 @@ class MainActivity : AppCompatActivity() {
         boot.setOnCheckedChangeListener { _, on -> prefs.startAtBoot = on }
 
         val bubble = findViewById<Switch>(R.id.bubbleSwitch)
-        // With one screen the edges belong to Android and there is no gesture left that reaches
-        // the panel, so the button is the only way in. A switch that can strand the player is not
-        // a choice worth offering; it is shown on and fixed, with the reason on the switch itself.
-        if (PadOverlay.isSingleScreen(this)) {
-            prefs.bubble = true
-            bubble.isChecked = true
-            bubble.isEnabled = false
-            bubble.text = "Floating button \u2014 always on, this device has one screen"
-        } else {
-            bubble.isChecked = prefs.bubble
-            bubble.setOnCheckedChangeListener { _, on ->
-                prefs.bubble = on
-                // START puts the button up or takes it down straight away, rather than at the next
-                // time something else happens to ask.
-                OverlayService.send(this, OverlayService.ACTION_START)
-            }
+        bubble.isChecked = prefs.bubble
+        bubble.setOnCheckedChangeListener { _, on ->
+            prefs.bubble = on
+            // START puts the button up or takes it down straight away, rather than at the next
+            // time something else happens to ask.
+            OverlayService.send(this, OverlayService.ACTION_START)
         }
 
 

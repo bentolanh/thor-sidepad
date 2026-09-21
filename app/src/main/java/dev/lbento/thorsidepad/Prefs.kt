@@ -102,6 +102,17 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("bubble", false)
         set(v) = sp.edit().putBoolean("bubble", v).apply()
 
+    /**
+     * Whether the one-time default for [bubble] has been applied.
+     *
+     * A single-screen handheld has no edge gestures left, so the button is the only thing on the
+     * pad's own surface that reaches the panel, and it is offered there to begin with. Only once:
+     * after that the player's choice stands, including having thrown it away.
+     */
+    var bubbleDefaulted: Boolean
+        get() = sp.getBoolean("bubbleDefaulted", false)
+        set(v) = sp.edit().putBoolean("bubbleDefaulted", v).apply()
+
     var bubbleX: Int
         get() = sp.getInt("bubbleX", 0)
         set(v) = sp.edit().putInt("bubbleX", v).apply()

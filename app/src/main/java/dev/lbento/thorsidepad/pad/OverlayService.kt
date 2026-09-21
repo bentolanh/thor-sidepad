@@ -809,15 +809,32 @@ class OverlayService : Service() {
      */
     private fun syncBubble() {
         val ov = overlay ?: return
-        // On a single-screen device the bubble is not a convenience, it is the only way in: the
-        // edges there belong to Android, so nothing else on the pad's own surface reaches the
-        // panel. It is therefore not the player's to switch off, and the setting screen says so
-        // rather than offering a switch that would strand them.
-        if (!prefs.bubble && !ov.singleScreen) { ov.removeBubble(); return }
+        // Offered by default on a machine with one screen, where there are no edge gestures left
+        // and this is the only thing on the pad's own surface that reaches the panel. Once only:
+        // after that the choice is the player's, including having thrown it away.
+        if (!prefs.bubbleDefaulted) {
+            prefs.bubbleDefaulted = true
+            if (ov.singleScreen) prefs.bubble = true
+        }
+        if (!prefs.bubble) { ov.removeBubble(); return }
         ov.showBubble(prefs.bubbleX, prefs.bubbleY,
             onMoved = { x, y -> prefs.bubbleX = x; prefs.bubbleY = y },
             onLongPress = { showPanel() },
-            onTap = { toggle() })
+            onTap = { toggle() },
+            // With the shield up this button is the only way out of a screen that is entirely
+            // ours, so it cannot be thrown away. Anywhere else Android is still reachable and
+            // there is no reason to refuse.
+            canDismiss = { !(visible && prefs.shield) },
+            onDismiss = {
+                // Thrown away while the pad is up in islands mode, the pad goes with it: the
+                // button is the pad's handle, and leaving the pad behind with no handle would be
+                // the same trap the shield case avoids.
+                val takePadToo = visible && !prefs.shield
+                prefs.bubble = false
+                ov.removeBubble()
+                if (takePadToo) hide()
+                Log.i(TAG, "bubble thrown away" + if (takePadToo) "; pad went with it" else "")
+            })
     }
 
     /**
