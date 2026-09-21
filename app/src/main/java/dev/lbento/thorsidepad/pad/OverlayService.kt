@@ -513,9 +513,21 @@ class OverlayService : Service() {
      * Lets a Low Energy pad go, but only when it should: the destination is no longer a machine,
      * or the radio underneath has been changed. Hiding the pad is not a reason.
      */
+    /**
+     * Takes the Low Energy pad down, but only when it is genuinely finished with.
+     *
+     * Not when the presses are simply going somewhere else for a while. Playing on the handheld
+     * and then pointing the pad back at the machine used to cost a pairing: switching destination
+     * closed the server, and a rebuilt server is one a bonded host keeps the old layout for and
+     * will not look at again. The same reasoning that leaves it standing when the pad is hidden
+     * applies here — measured on 2026-09-21, hiding and showing keeps a working controller,
+     * while anything that rebuilds the server does not.
+     *
+     * So it lives as long as the service does, and comes down only when the player stops the pad
+     * or moves off this radio entirely.
+     */
     private fun releaseBleIfIdle() {
-        val stillWanted = prefs.targetMode == Prefs.MODE_BT &&
-            prefs.btTransport == Prefs.TRANSPORT_LE && !userStopped
+        val stillWanted = prefs.btTransport == Prefs.TRANSPORT_LE && !userStopped
         if (stillWanted) return
         btSink?.close(); btSink = null
     }
