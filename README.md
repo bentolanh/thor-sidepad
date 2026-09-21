@@ -199,6 +199,13 @@ touch screen, expect the following:
   as disabled on the pad.
 - The frosted backdrop needs a device that can blur behind windows; otherwise it falls back
   to a heavy dim.
+- Keeping the handheld awake while you play works anywhere Shizuku does. It reports each press
+  to Android as the activity it is, through a call the shell user is allowed to make on any
+  Android build — nothing about it is particular to these handhelds.
+- Whether a dark screen stops the controller, though, is the handheld's own business. The Thor
+  and the Odin 2 Mini both build their gamepad in software and it stops when their display does,
+  so on those two the screen has to stay on while you play. A device with a real controller node
+  may well keep working with the screen off.
 
 ## Built with Claude Code
 
