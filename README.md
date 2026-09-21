@@ -113,16 +113,18 @@ Everything happens on the bottom screen.
 ## Pairing with a computer, console or phone
 
 The pad is a Bluetooth Low Energy gamepad, so anything that accepts one should accept this. It
-has been tried on macOS, iPadOS, Android, SteamOS and Windows 11. Three take it as it comes;
-two hide it until a setting is changed.
+has been tried on macOS, iOS, iPadOS, Android, SteamOS and Windows 11. Four take it as it
+comes; two hide it until a setting is changed.
 
 Whichever you are pairing from, **the pad is only on the air while it is findable**. Make it
 findable from the panel and scan during that window. Outside it the pad is silent on purpose,
 and a host scanning then hears nothing at all — which looks exactly like a device that does not
 work, and was the first wrong answer on three of these platforms.
 
-**macOS, iPadOS and Android** need nothing special. Pair from the machine while the pad is
-findable.
+**macOS, iOS, iPadOS and Android** need nothing special. Pair from the machine while the pad
+is findable. On an iPhone the pad also carries through Steam Link into a streamed session, which
+is a harder test than a local one: the buttons have to survive being handed to another machine's
+game.
 
 **SteamOS** hides it by default. In Game Mode: Settings → Bluetooth, turn on **Show all
 devices**. The pad then appears and pairs from that screen, and Steam reads its battery level,
