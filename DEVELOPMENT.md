@@ -1312,11 +1312,20 @@ There is no evidence it reverts mid-session. One mid-session change was seen all
 nearly four minutes in — and it went to 7.5 ms, which is better. An earlier version of this note
 claimed it could move back; that was wrong.
 
-**And there is no evidence that 30 ms itself costs anything.** The 8BitDo is also given 30 ms at
-times (`current 30.00 ms latency(0) appearanceValue(0x3c4) updated`) and plays correctly. Every
-measurement of harm at 30 ms here was taken while the pad was also overfilling the stack, and the
-one session measured at 15 ms before the pacing fix was still reported as jittery. The consistent
-explanation is that the overloading was the fault at both intervals.
+**The 30 ms interval is an observation, not a diagnosis.** It is written down because it is a
+difference we can see and a plausible cause, and for no stronger reason than that. There is no
+isolated evidence that it has ever cost us anything:
+
+- The 8BitDo Ultimate 2 Wireless is given the same 30 ms at times
+  (`current 30.00 ms latency(0) appearanceValue(0x3c4) updated`) and plays correctly. It is on the
+  same band, the same host, the same radio.
+- Every measurement of harm taken here at 30 ms was taken while the pad was also overfilling the
+  stack, so the two cannot be separated in any of them.
+- The one session measured at 15 ms before the pacing fix was still reported as jittery.
+
+The consistent explanation for everything actually observed is the overloading, at both intervals.
+Nobody should treat 30 ms as the cause without an experiment that isolates it — which would mean
+measuring a paced build at 30 ms, and that has never been done.
 
 What that leaves untested: at a 30 ms link the 15 ms floor in [BleSink.awaitSlot] is still twice
 too fast, so bursting should return. Nobody has seen that happen. The delivery-gap counter is how
