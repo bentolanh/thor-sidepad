@@ -682,7 +682,7 @@ class BleSink(
             Log.i(TAG, "asked ${device.address} for 7.5-15ms directly: $ok")
             if (ok) return
         } catch (e: Exception) {
-            Log.i(TAG, "cannot name the interval (${e.javaClass.simpleName}); asking by priority instead")
+            Log.i(TAG, "cannot name the interval (${e.javaClass.simpleName}); the machine's spacing stands")
         }
         // There was a second way to ask, and it was worse than not asking.
         //
