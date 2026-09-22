@@ -144,6 +144,7 @@ class BleSink(
     private val sendLock = Any()
     @Volatile private var inFlight = false
     /** The last frame handed to the radio, and the one-shot that says it again if nothing follows. */
+    /** The last frame the radio accepted. Kept for [dropped] accounting, never re-sent: see [scheduleSettle]. */
     @Volatile private var lastFrame: ByteArray? = null
     private var settle: ScheduledFuture<*>? = null
     private var sleeper: ScheduledFuture<*>? = null
@@ -1071,14 +1072,30 @@ class BleSink(
      * link is idle by then — and it is the only thing standing between a dropped final frame and
      * a controller that appears to have jammed.
      */
+    /**
+     * Says the pad's state once more after it goes quiet, in case the last report was thrown away.
+     *
+     * What it says is the pad as it is now, read when the timer fires. It used to say [lastFrame],
+     * the last frame the radio accepted — which is the one thing it must never say. A frame is
+     * only lost when the radio refuses it, and a refused frame never becomes lastFrame, so the
+     * insurance re-sent the state from before the loss. When the lost frame was a stick returning
+     * to centre, this took a host that was merely holding a stale position and told it, ninety
+     * milliseconds later, that the stick really was still held over.
+     *
+     * Reported 2026-09-22: a character that keeps walking after the stick is let go, in Eastward
+     * and in Trails in the Sky, worse the longer a session ran — each dropped centring frame
+     * confirmed rather than corrected. Hades 2 was fine, which fits: a generous deadzone hides a
+     * small residue that a game without one integrates.
+     */
     private fun scheduleSettle() {
         settle?.cancel(false)
-        val frame = lastFrame ?: return
         settle = try {
             ticker.schedule({
                 if (subscribed && host != null) {
                     synchronized(lock) {
-                        if (queue.isEmpty() && !draining) { draining = true; queue.addLast(frame); pool.execute(::drain) }
+                        if (queue.isEmpty() && !draining) {
+                            draining = true; queue.addLast(shape.snapshot()); pool.execute(::drain)
+                        }
                     }
                 }
             }, SETTLE_MS, TimeUnit.MILLISECONDS)
@@ -1123,6 +1140,9 @@ class BleSink(
         // question "is anything actually being dropped" has an answer.
         val n = dropped.incrementAndGet()
         if (n == 1 || n % 25 == 0) Log.w(TAG, "report dropped, $n so far (the radio would not take it)")
+        // Something has to carry the real state across a loss. Without this the pad is silent
+        // until the next press, and a stick that was let go stays held on the host until then.
+        scheduleSettle()
     }
 
     /**
