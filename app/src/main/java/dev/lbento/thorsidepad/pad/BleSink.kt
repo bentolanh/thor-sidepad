@@ -683,22 +683,19 @@ class BleSink(
         } catch (e: Exception) {
             Log.i(TAG, "cannot name the interval (${e.javaClass.simpleName}); asking by priority instead")
         }
-        try {
-            val g = device.connectGatt(ctx, false, object : android.bluetooth.BluetoothGattCallback() {
-                override fun onConnectionStateChange(gatt: android.bluetooth.BluetoothGatt, status: Int, state: Int) {
-                    if (state != BluetoothProfile.STATE_CONNECTED) return
-                    val ok = try {
-                        gatt.requestConnectionPriority(android.bluetooth.BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                    } catch (_: Exception) { false }
-                    Log.i(TAG, "asked ${device.address} for a high-priority link: $ok")
-                }
-            }, BluetoothDevice.TRANSPORT_LE)
-            // Held only long enough for the request to go out. Closing it does not take the link
-            // down: the machine opened that, and this was a second client riding on it.
-            ticker.schedule({ try { g?.close() } catch (_: Exception) {} }, 4, TimeUnit.SECONDS)
-        } catch (e: Exception) {
-            Log.w(TAG, "could not ask for a faster link", e)
-        }
+        // There was a second way to ask, and it was worse than not asking.
+        //
+        // A client connection opened over the machine's own link, asking for high priority, then
+        // closed once the request had gone out. The request was accepted — "asked for a
+        // high-priority link: true" — and changed nothing: the machine stayed on interval 24,
+        // thirty milliseconds, exactly as before. Closing that client did take the link down,
+        // which the comment claimed it would not. Measured 2026-09-22: connect, five seconds,
+        // disconnect with reason 0x13 — remote user terminated, this side hanging up — then
+        // reconnect and round again, about twelve times a minute, which is what it looks like in
+        // Steam when a controller will not stay still.
+        //
+        // So it is gone. Asking for a faster link is still worth doing; riding a second client
+        // connection is not the way.
     }
 
     private fun createBondWith(device: BluetoothDevice) {
