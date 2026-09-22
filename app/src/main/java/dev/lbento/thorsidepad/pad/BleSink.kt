@@ -700,36 +700,55 @@ class BleSink(
     }
 
     /**
-     * How evenly reports actually reach the air, which is a different question from how many.
+     * Watches for the two ways the pad can get ahead of the radio, and is silent otherwise.
      *
      * A controller with its own firmware emits one report per rendezvous, so the host sees a stick
-     * sampled at even spacing. This sends when an event arrives and the radio takes it when it
-     * can, so the spacing is whatever congestion leaves behind — and a position stream delivered
-     * in bursts and gaps reads as a jumpy stick even when every value in it is right. Reported
-     * 2026-09-22 against RPCS3's gamepad tester: ours jittery, an official controller smooth.
+     * sampled at even spacing. This sends when an event arrives, and before the floor existed the
+     * spacing was whatever congestion left behind — a position stream delivered in bursts and gaps,
+     * which reads as a jumpy stick even when every value in it is right. Reported 2026-09-22
+     * against RPCS3's gamepad tester: ours jittery, an official controller smooth.
      *
-     * Counts the gap between accepted notifications into buckets and says so once every two
-     * hundred. Even delivery puts nearly everything in one bucket; bursts and gaps spread out.
+     * Both ways of getting ahead have an exact zero as their healthy value, so this is a test
+     * rather than a judgement about the shape of a distribution, and it says nothing at all while
+     * both are zero.
+     *
+     * A gap under [PACE_MS] cannot happen while [awaitSlot] is doing its job, because the floor is
+     * held on the clock — so anything below it means the floor is not being applied.
+     *
+     * A refusal is the stack saying it is full, and it is the early warning the drop counter is
+     * too late to give: [deliver] retries eight times, so a report is only counted lost once all
+     * eight have failed, while the first refusal already means reports are arriving faster than
+     * the radio can send them. That is the case a gap cannot catch. When macOS leaves the link at
+     * thirty milliseconds the fifteen here is twice too fast, every gap still looks healthy, and
+     * the stack quietly fills. Measured 2026-09-22: about three refusals a second before the floor
+     * existed, none after.
      */
     @Volatile private var lastSentAt = 0L
     private var lastPace = 0L
-    private val pace = IntArray(6)
-    private var paceCount = 0
-    private fun notePace() {
+    private var worstGap = Int.MAX_VALUE
+    private var refusals = 0
+    private var saidAt = 0L
+    private fun notePace(refused: Boolean = false) {
         val now = android.os.SystemClock.elapsedRealtimeNanos() / 1_000_000
-        val prev = lastPace
-        lastPace = now
-        if (prev == 0L) return
-        val gap = (now - prev).toInt()
-        val b = when {
-            gap < 8 -> 0; gap < 16 -> 1; gap < 32 -> 2; gap < 64 -> 3; gap < 128 -> 4; else -> 5
+        if (refused) {
+            refusals++
+        } else {
+            val prev = lastPace
+            lastPace = now
+            if (prev != 0L) {
+                val gap = (now - prev).toInt()
+                if (gap < PACE_MS && gap < worstGap) worstGap = gap
+            }
         }
-        pace[b]++
-        if (++paceCount % 200 == 0) {
-            Log.i(TAG, "delivery gaps ms  <8:${pace[0]} <16:${pace[1]} <32:${pace[2]} " +
-                       "<64:${pace[3]} <128:${pace[4]} 128+:${pace[5]}")
-            java.util.Arrays.fill(pace, 0)
-        }
+        if (refusals == 0 && worstGap >= PACE_MS) return
+        // Once every ten seconds at most. A fault that is happening is still happening, and a log
+        // that repeats it many times a second is how the evidence for everything else gets lost.
+        if (now - saidAt < 10_000) return
+        saidAt = now
+        val gapNote = if (worstGap < PACE_MS) "closest delivery ${worstGap}ms against a ${PACE_MS}ms floor"
+                      else "spacing held"
+        Log.w(TAG, "running ahead of the radio: $refusals refusals, $gapNote")
+        refusals = 0; worstGap = Int.MAX_VALUE
     }
 
     private fun createBondWith(device: BluetoothDevice) {
@@ -1192,6 +1211,7 @@ class BleSink(
             // radio longer than two milliseconds to breathe: retrying that hard is how a refusal
             // turns into a burst the moment it stops refusing.
             inFlight = false
+            notePace(refused = true)
             tries++
             try { Thread.sleep(REFUSED_BACKOFF_MS) } catch (_: InterruptedException) { return }
         }
