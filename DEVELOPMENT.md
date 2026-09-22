@@ -1260,10 +1260,53 @@ the Shizuku-spawned injector survives and has to be killed separately. And a mea
 controller connected to the handheld measures the rate reports *arrive* over its own link, not the
 rate the controller's firmware emits.
 
+### What actually fixed it: never run ahead of the radio
+
+Found by measuring delivery *evenness* rather than rate, which is the measurement nobody had
+taken. During a stick sweep, with the link at 15 ms:
+
+```
+delivery gaps ms  <8:94  <16:57  <32:32  <64:7  <128:7  128+:3
+```
+
+Ninety-four reports handed to the stack less than eight milliseconds apart, into a link carrying
+one per fifteen. Nothing was lost — `notifyCharacteristicChanged` accepted them all — but
+accepting is not sending. They queued in the stack's twenty slots and reached the host late and
+in bunches. RPCS3's tester drew our stick path in steps where an official controller drew a line.
+
+The acknowledgement cannot pace this: the callback fires on acceptance, not transmission, and
+returns almost at once. So the spacing comes from the clock — fifteen milliseconds since the last
+report the stack took, then send, with nothing blocking on anything. `collapse()` runs after the
+wait, so what goes out is the newest position rather than the one that was current when the wait
+began, and a quiet pad never waits, because its last report was long ago.
+
+After (`b98de26`), same sweep:
+
+```
+delivery gaps ms  <8:0  <16:1  <32:146  <64:13  <128:40  128+:0
+congestion events: 0        (was about three a second)
+reports dropped:   0
+```
+
+Reported as feeling "as good as the official control", both sticks.
+
+### Why one stick could feel worse than the other
+
+It cannot be the transport. All four axes travel in the same sixteen-byte report, so anything that
+delays or discards one discards both. The asymmetry is either usage — a camera stick shows
+decimation that a movement stick hides — or host mapping, since our right stick sits on `Z`/`Rz`
+where generic HID convention often expects triggers. The descriptor matches the genuine Xbox
+controller byte for byte, so the second is unlikely, but it is testable: move the right stick and
+watch whether a trigger readout moves with it.
+
 ### Still open
 
-The mechanism that varies within a session is the connection interval oscillating between 30 and
-15 ms, and the only known reason macOS refuses our preference is an appearance value we cannot
-set. Whether the oscillation is what the hand feels has not been demonstrated — `linkwatch` is
-recording so a bad stretch can be looked up by wall clock rather than guessed at.
+**The interval is not ours.** Every connection opens at 30 ms, macOS refuses our preference for a
+second or two — twenty-one times in one two-second stretch — and then usually applies 15 ms. It
+sometimes settles at 30 instead, and can move back. So the first seconds after connecting are
+always the worst, by design, and the good case depends on a negotiation we do not control. The
+reason is the appearance value above, and it stays out of reach.
+
+`linkwatch.log` records parameter changes, congestion and drops in five-second buckets, so a bad
+stretch can be looked up by wall clock rather than guessed at.
 
