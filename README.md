@@ -116,6 +116,17 @@ The pad is a Bluetooth Low Energy gamepad, so anything that accepts one should a
 has been tried on macOS, iOS, iPadOS, Android, SteamOS and Windows 11. Four take it as it
 comes; two hide it until a setting is changed.
 
+**Pair afresh each time, rather than reconnecting.** A paired controller normally reconnects when
+you switch it on, and this one does not. The reason is the handheld rather than the app: it has a
+Bluetooth Classic radio and announces through it what it really is, so a host reconnecting takes
+the route it uses for a phone — sweeps for services, finds no controller, stops. The pairing
+survives and the gamepad does not, which is worse than no pairing at all, because everything looks
+connected. So the pad lets go of a machine as the machine lets go of it, and making it findable
+again is how you come back. Forget it on the machine's side too if it is still listed there.
+
+This is not something a future version can fix. It was traced to the handheld having a Classic
+radio at all, which a real controller does not.
+
 Whichever you are pairing from, **the pad is only on the air while it is findable**. Make it
 findable from the panel and scan during that window. Outside it the pad is silent on purpose,
 and a host scanning then hears nothing at all — which looks exactly like a device that does not
