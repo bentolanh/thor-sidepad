@@ -131,7 +131,8 @@ class BleSink(
     private val subscriptions = ctx.getSharedPreferences("sidepad_ble", Context.MODE_PRIVATE)
 
     private val lock = Any()
-    private val queue = ArrayDeque<ByteArray>()
+    /** Whether the pad has changed since the radio last took a report. The state itself lives in the shape. */
+    private var pending = false
     private var draining = false
     private val pool = Executors.newSingleThreadExecutor()
     private val ticker = Executors.newSingleThreadScheduledExecutor()
@@ -1026,11 +1027,35 @@ class BleSink(
 
     // ---- sending, which is the Classic sink's arrangement because it was learned the hard way ---
 
+    /**
+     * Marks the pad as having something new to say. What that is gets read at the last moment.
+     *
+     * This used to push a copy of the report onto a queue. That is the difference between this
+     * pad and a controller with its own firmware, and it is what a stick that overshoots is made
+     * of. A controller samples its sticks and sends one report per rendezvous, because its output
+     * rate and the radio's capacity are the same number by construction. This reads the handheld's
+     * controller through the kernel, and the kernel's rate has nothing to do with Bluetooth: every
+     * sync from the driver became another frame, several times more than thirty milliseconds
+     * between rendezvous can carry. The surplus sat in a queue, and by the time each frame reached
+     * the air the stick had already moved on from the position it described.
+     *
+     * Measured 2026-09-22 while a stick was swept: the radio reported itself full about three
+     * times a second, every single time recovered by retrying, and nothing was dropped. So this
+     * was never loss. It was a backlog of positions that were true when they were made and stale
+     * when they arrived — the extreme of a sweep arriving after the stick had come back.
+     *
+     * An 8BitDo on the same Mac negotiates the same thirty milliseconds and plays correctly, which
+     * is what says the interval was never the fault.
+     *
+     * So: no queue and no copies. One report may be in the air at a time, and when the radio is
+     * ready the pad is read as it is at that instant. Late positions cannot exist, because a
+     * position is never written down until it is being sent.
+     */
     private fun send(): Int {
         if (!subscribed || host == null) return -1
         settle?.cancel(false)
         synchronized(lock) {
-            queue.addLast(shape.snapshot())
+            pending = true
             if (!draining) { draining = true; pool.execute(::drain) }
         }
         return 1
@@ -1038,54 +1063,40 @@ class BleSink(
 
     private fun drain() {
         while (true) {
-            // Wait for the radio before offering it anything else. This is the whole of the fix:
-            // the queue collapses while we wait, so what finally goes out is the newest state
-            // rather than a backlog. Pushing regardless is what filled the radio's twenty-packet
-            // queue, after which the stack stopped queueing reports and started discarding them —
-            // "cannot send, already congested ... failed to write data to L2CAP" — which is a
-            // stick that moves in steps, a press that never arrives, and a button that never
-            // comes up because the frame releasing it was the one thrown away.
+            // Wait for the radio before offering it anything else. Pushing regardless is what
+            // filled the radio's twenty-packet queue, after which the stack stopped queueing
+            // reports and started discarding them — "cannot send, already congested ... failed to
+            // write data to L2CAP" — which is a stick that moves in steps, a press that never
+            // arrives, and a button that never comes up because the frame releasing it was the
+            // one thrown away.
             if (!awaitIdle()) {
                 // Far longer than any report should take. Assume the acknowledgement itself was
                 // lost rather than going quiet forever.
                 synchronized(sendLock) { inFlight = false }
             }
-            var next: ByteArray? = null
             synchronized(lock) {
-                collapse()
-                next = queue.removeFirstOrNull()
-                if (next == null) draining = false
+                if (!pending) { draining = false; scheduleSettle(); return }
+                pending = false
             }
-            val frame = next
-            if (frame == null) { scheduleSettle(); return }
-            deliver(frame)
+            // Read here, not when the event arrived. Everything that happened while the radio was
+            // busy is already in the shape, so this is the pad as it is now.
+            deliver(shape.snapshot())
         }
     }
 
     /**
-     * Says the last thing again, once, shortly after everything goes quiet.
-     *
-     * A notification is not acknowledged by the machine, only by our own radio, so a packet lost
-     * over the air leaves the host holding whatever it last heard. In the middle of a movement
-     * that corrects itself on the next report; at the end of one there is no next report, and a
-     * button stays down or a stick stays pushed. One repeat after the quiet costs nothing — the
-     * link is idle by then — and it is the only thing standing between a dropped final frame and
-     * a controller that appears to have jammed.
-     */
-    /**
      * Says the pad's state once more after it goes quiet, in case the last report was thrown away.
      *
-     * What it says is the pad as it is now, read when the timer fires. It used to say [lastFrame],
-     * the last frame the radio accepted — which is the one thing it must never say. A frame is
-     * only lost when the radio refuses it, and a refused frame never becomes lastFrame, so the
-     * insurance re-sent the state from before the loss. When the lost frame was a stick returning
-     * to centre, this took a host that was merely holding a stale position and told it, ninety
-     * milliseconds later, that the stick really was still held over.
+     * A notification is acknowledged by our own radio, never by the machine, so a packet lost over
+     * the air leaves the host holding whatever it last heard. Mid-movement the next report corrects
+     * it; at the end of one there is no next report, and a button stays down or a stick stays
+     * pushed.
      *
-     * Reported 2026-09-22: a character that keeps walking after the stick is let go, in Eastward
-     * and in Trails in the Sky, worse the longer a session ran — each dropped centring frame
-     * confirmed rather than corrected. Hades 2 was fine, which fits: a generous deadzone hides a
-     * small residue that a game without one integrates.
+     * What it says is the pad as it is now, read when the timer fires. It used to repeat the last
+     * frame the radio had accepted — which is the one thing it must never say, because a frame is
+     * only lost when the radio refuses it and a refused frame never becomes that. The insurance
+     * re-sent the state from before the loss, so a host merely holding a stale position was told,
+     * ninety milliseconds later, that the stick really was still held over.
      */
     private fun scheduleSettle() {
         settle?.cancel(false)
@@ -1093,24 +1104,11 @@ class BleSink(
             ticker.schedule({
                 if (subscribed && host != null) {
                     synchronized(lock) {
-                        if (queue.isEmpty() && !draining) {
-                            draining = true; queue.addLast(shape.snapshot()); pool.execute(::drain)
-                        }
+                        if (!pending && !draining) { draining = true; pending = true; pool.execute(::drain) }
                     }
                 }
             }, SETTLE_MS, TimeUnit.MILLISECONDS)
         } catch (_: Exception) { null }
-    }
-
-    /** Drops frames the radio no longer needs. A press is never what gets dropped. */
-    private fun collapse() {
-        while (queue.size > 1) {
-            val a = queue[0]; val b = queue[1]
-            // Which bytes those are depends on the shape: the buttons and hat sit at the front of
-            // one layout and the back of the other.
-            for (i in shape.discreteBytes) if (a[i] != b[i]) return
-            queue.removeFirst()
-        }
     }
 
     private fun deliver(frame: ByteArray) {
