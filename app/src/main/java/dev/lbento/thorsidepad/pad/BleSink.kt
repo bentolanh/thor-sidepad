@@ -699,6 +699,38 @@ class BleSink(
         // connection is not the way.
     }
 
+    /**
+     * How evenly reports actually reach the air, which is a different question from how many.
+     *
+     * A controller with its own firmware emits one report per rendezvous, so the host sees a stick
+     * sampled at even spacing. This sends when an event arrives and the radio takes it when it
+     * can, so the spacing is whatever congestion leaves behind — and a position stream delivered
+     * in bursts and gaps reads as a jumpy stick even when every value in it is right. Reported
+     * 2026-09-22 against RPCS3's gamepad tester: ours jittery, an official controller smooth.
+     *
+     * Counts the gap between accepted notifications into buckets and says so once every two
+     * hundred. Even delivery puts nearly everything in one bucket; bursts and gaps spread out.
+     */
+    private var lastPace = 0L
+    private val pace = IntArray(6)
+    private var paceCount = 0
+    private fun notePace() {
+        val now = android.os.SystemClock.elapsedRealtimeNanos() / 1_000_000
+        val prev = lastPace
+        lastPace = now
+        if (prev == 0L) return
+        val gap = (now - prev).toInt()
+        val b = when {
+            gap < 8 -> 0; gap < 16 -> 1; gap < 32 -> 2; gap < 64 -> 3; gap < 128 -> 4; else -> 5
+        }
+        pace[b]++
+        if (++paceCount % 200 == 0) {
+            Log.i(TAG, "delivery gaps ms  <8:${pace[0]} <16:${pace[1]} <32:${pace[2]} " +
+                       "<64:${pace[3]} <128:${pace[4]} 128+:${pace[5]}")
+            java.util.Arrays.fill(pace, 0)
+        }
+    }
+
     private fun createBondWith(device: BluetoothDevice) {
         try {
             Log.i(TAG, "asking ${device.address} to pair over Low Energy")
@@ -1126,7 +1158,7 @@ class BleSink(
                 @Suppress("DEPRECATION")
                 srv.notifyCharacteristicChanged(d, c, false)
             } catch (e: Exception) { inFlight = false; Log.w(TAG, "notify failed", e); return }
-            if (taken) { lastFrame = frame; return }
+            if (taken) { lastFrame = frame; notePace(); return }
             // The stack refused it outright, which is its own kind of back-pressure. Give the
             // radio longer than two milliseconds to breathe: retrying that hard is how a refusal
             // turns into a burst the moment it stops refusing.
