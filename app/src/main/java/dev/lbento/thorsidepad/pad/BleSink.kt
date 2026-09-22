@@ -711,6 +711,7 @@ class BleSink(
      * Counts the gap between accepted notifications into buckets and says so once every two
      * hundred. Even delivery puts nearly everything in one bucket; bursts and gaps spread out.
      */
+    @Volatile private var lastSentAt = 0L
     private var lastPace = 0L
     private val pace = IntArray(6)
     private var paceCount = 0
@@ -1082,6 +1083,7 @@ class BleSink(
                 // lost rather than going quiet forever.
                 synchronized(sendLock) { inFlight = false }
             }
+            awaitSlot()
             var next: ByteArray? = null
             synchronized(lock) {
                 collapse()
@@ -1135,6 +1137,33 @@ class BleSink(
     }
 
     /** Drops frames the radio no longer needs. A press is never what gets dropped. */
+    /**
+     * Holds back until the radio could plausibly have sent the last one.
+     *
+     * The acknowledgement cannot be used for this. `notifyCharacteristicChanged` answering true
+     * means the stack accepted the report, not that it reached the air, and the callback comes
+     * back almost at once — so waiting on it lets the pad run far ahead of the radio. Measured
+     * 2026-09-22 during a stick sweep: ninety-four reports handed over less than eight
+     * milliseconds apart into a link carrying one per fifteen. They are not lost; they queue, and
+     * the host is given a stream that is late and bunched, which is what a stick that jumps looks
+     * like from the other end.
+     *
+     * So the spacing comes from the clock instead. The link's interval is not readable from an
+     * app — macOS opens every connection at thirty milliseconds and usually settles ours at
+     * fifteen a second or two later — so fifteen is the floor, which is right when it converges
+     * and still four times better than free-running when it does not.
+     *
+     * Nothing is lost by waiting. [collapse] runs after this, so what goes out is the newest
+     * position rather than the one that was current when the wait began, and a quiet pad pays
+     * nothing: if the last report was long ago there is no wait at all.
+     */
+    private fun awaitSlot() {
+        val due = lastSentAt + PACE_MS * 1_000_000L
+        val left = due - System.nanoTime()
+        if (left <= 0) return
+        try { Thread.sleep(left / 1_000_000L, (left % 1_000_000L).toInt()) } catch (_: InterruptedException) {}
+    }
+
     private fun collapse() {
         while (queue.size > 1) {
             val a = queue[0]; val b = queue[1]
@@ -1158,7 +1187,7 @@ class BleSink(
                 @Suppress("DEPRECATION")
                 srv.notifyCharacteristicChanged(d, c, false)
             } catch (e: Exception) { inFlight = false; Log.w(TAG, "notify failed", e); return }
-            if (taken) { lastFrame = frame; notePace(); return }
+            if (taken) { lastFrame = frame; lastSentAt = System.nanoTime(); notePace(); return }
             // The stack refused it outright, which is its own kind of back-pressure. Give the
             // radio longer than two milliseconds to breathe: retrying that hard is how a refusal
             // turns into a burst the moment it stops refusing.
@@ -1305,6 +1334,15 @@ class BleSink(
         const val REFUSED_BACKOFF_MS = 6L
         /** Quiet after which the last state is said once more, in case its frame went missing. */
         const val SETTLE_MS = 90L
+
+        /**
+         * The shortest gap allowed between two reports reaching the stack, in milliseconds.
+         *
+         * One per connection interval is what a controller with its own firmware sends, and the
+         * interval here is fifteen milliseconds whenever macOS settles the link, which it usually
+         * does a second or two after connecting. See [awaitSlot].
+         */
+        const val PACE_MS = 15L
         /**
          * How many times to repeat a report after something changes.
          *
