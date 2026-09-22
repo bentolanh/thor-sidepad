@@ -1290,6 +1290,37 @@ reports dropped:   0
 
 Reported as feeling "as good as the official control", both sticks.
 
+### Is this a Mac problem or everyone's?
+
+The mechanism is universal. The queue that overflows is **ours** — the handheld's own L2CAP
+transmit queue, twenty slots deep, on the peripheral side:
+
+```
+xmit_hold_q.count: 20 / buff_quota: 20
+attp_send_msg_to_l2cap: failed to write
+```
+
+It fills whenever the pad generates faster than the current link drains, and nothing about that
+depends on the host.
+
+What depends on the host is whether the pad ever gets ahead in the first place, and that is the
+connection interval, which the central chooses. At roughly 37 reports a second during a sweep, a
+host granting 7.5–11.25 ms carries 89–133 a second and the queue never fills. macOS at 30 ms
+carries about 33 — below what the pad produces — so it fills continuously. Of everything measured,
+macOS has the longest interval and is the only host where the fault appeared.
+
+That matches the only cross-platform evidence there is: a game played on every platform except
+Windows, 2026-09-22, with nothing standing out the way it did on the Mac. That is one person's
+impression rather than a measurement — no interval was read on any host but this Mac, and the
+2026-09-21 platform matrix tested pairing and buttons rather than stick feel — but it is
+consistent, and Windows remains untested for this.
+
+So the fifteen-millisecond floor is conservative elsewhere rather than wrong: on a host granting
+7.5 ms it sends at 66 a second where 133 were available, which costs nothing anyone has noticed.
+It would be wrong on a host granting *longer* than 15 ms, which is what the refusal counter in
+[BleSink.notePace] exists to catch. Making the floor adapt to observed refusals would remove the
+constant entirely; nothing yet demands it.
+
 ### Why one stick could feel worse than the other
 
 It cannot be the transport. All four axes travel in the same sixteen-byte report, so anything that
