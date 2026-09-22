@@ -1301,11 +1301,28 @@ watch whether a trigger readout moves with it.
 
 ### Still open
 
-**The interval is not ours.** Every connection opens at 30 ms, macOS refuses our preference for a
-second or two — twenty-one times in one two-second stretch — and then usually applies 15 ms. It
-sometimes settles at 30 instead, and can move back. So the first seconds after connecting are
-always the worst, by design, and the good case depends on a negotiation we do not control. The
-reason is the appearance value above, and it stays out of reach.
+**The interval is not ours, and it is settled early.** Every connection opens at 30 ms — that is
+the `interval 24` in every Connection Complete line, for every Low Energy device on this Mac, mice
+and keyboards included. macOS then refuses our preference for a second or two (twenty-one times in
+one two-second stretch) and either applies 15 ms or leaves it. Laid out against connections across
+2026-09-22, **every** decision landed within one to three seconds of a connection, and about half
+the sessions had nothing applied at all and stayed at 30.
+
+There is no evidence it reverts mid-session. One mid-session change was seen all day — 11:35:36,
+nearly four minutes in — and it went to 7.5 ms, which is better. An earlier version of this note
+claimed it could move back; that was wrong.
+
+**And there is no evidence that 30 ms itself costs anything.** The 8BitDo is also given 30 ms at
+times (`current 30.00 ms latency(0) appearanceValue(0x3c4) updated`) and plays correctly. Every
+measurement of harm at 30 ms here was taken while the pad was also overfilling the stack, and the
+one session measured at 15 ms before the pacing fix was still reported as jittery. The consistent
+explanation is that the overloading was the fault at both intervals.
+
+What that leaves untested: at a 30 ms link the 15 ms floor in [BleSink.awaitSlot] is still twice
+too fast, so bursting should return. Nobody has seen that happen. The delivery-gap counter is how
+it would show up — gaps below the floor, and congestion climbing off zero.
+
+The reason macOS argues with us at all is the appearance value above, and that stays out of reach.
 
 `linkwatch.log` records parameter changes, congestion and drops in five-second buckets, so a bad
 stretch can be looked up by wall clock rather than guessed at.
