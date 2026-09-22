@@ -16,6 +16,25 @@ import dev.lbento.thorsidepad.inject.Abs
  * business, which keeps the layout engine, the profiles and the controller forwarder from ever
  * needing to know which one is in use.
  */
+/**
+ * A copy of [report] with every button that went down since the last call folded in, and the
+ * record of those cleared.
+ *
+ * Folding in rather than replacing: a button still held reads as down from the report itself, and
+ * one already released reads as down this once and up on the next report — which is a press the
+ * host can see, made out of an event it would otherwise have missed entirely. The next report is
+ * guaranteed: the release is an event of its own, and failing that the settle says the state again
+ * shortly after everything goes quiet.
+ */
+internal fun withLatch(report: ByteArray, latch: ByteArray, buttonBytes: IntArray): ByteArray {
+    val out = report.copyOf()
+    for (i in buttonBytes) {
+        out[i] = (out[i].toInt() or latch[i].toInt()).toByte()
+        latch[i] = 0
+    }
+    return out
+}
+
 interface ReportShape {
     val descriptor: ByteArray
 
@@ -37,6 +56,22 @@ interface ReportShape {
     val caps: Caps
     /** Bytes a player taps rather than sweeps; a frame carrying a change to one is never dropped. */
     val discreteBytes: IntArray
+
+    /**
+     * The bytes that are nothing but button bits, so a press can be held until it has been said.
+     *
+     * A stick is a quantity and a report is a snapshot of it: read it late and you get a slightly
+     * old position, which the next report corrects. A button is an event in time, and a snapshot
+     * can miss one entirely — pressed and released inside the thirty milliseconds between two
+     * reports, and as far as the host is concerned it never happened.
+     *
+     * Controller firmware does not have this problem because it latches: it remembers that a
+     * button went down since the last report and says so, even if it is already back up. This is
+     * that. Only whole-bitfield bytes belong here — a hat is a direction rather than a set of
+     * bits, and holding old values into it would name a direction nobody pressed.
+     */
+    val buttonBytes: IntArray get() = intArrayOf()
+
     fun setKey(code: Int, down: Boolean)
     fun setAbs(code: Int, value: Int)
     fun snapshot(): ByteArray
@@ -78,7 +113,11 @@ class StandardShape : ReportShape {
 
     override val descriptor: ByteArray get() = BluetoothSink.reportDescriptor()
     override val discreteBytes = intArrayOf(0, 1, 8)
+    override val buttonBytes = intArrayOf(0, 1)   // byte 8 is the hat, which is a direction
     override val caps get() = CAPS
+
+    /** Buttons that went down since the last snapshot; see [ReportShape.buttonBytes]. */
+    private val latch = ByteArray(9)
 
     companion object {
         /**
@@ -108,6 +147,7 @@ class StandardShape : ReportShape {
         synchronized(report) {
             report[i] = if (down) (report[i].toInt() or mask).toByte()
                         else (report[i].toInt() and mask.inv()).toByte()
+            if (down) latch[i] = (latch[i].toInt() or mask).toByte()
         }
     }
 
@@ -138,7 +178,7 @@ class StandardShape : ReportShape {
         report[8] = ((report[8].toInt() and 0xF0) or dir).toByte()
     }
 
-    override fun snapshot(): ByteArray = synchronized(report) { report.copyOf() }
+    override fun snapshot(): ByteArray = synchronized(report) { withLatch(report, latch, buttonBytes) }
 }
 
 /**
@@ -178,6 +218,10 @@ class XboxShape(
 
     override val descriptor = if (rumble) SERIES else SERIES_NO_RUMBLE
     override val discreteBytes = intArrayOf(12, 13, 14, 15)
+    override val buttonBytes = intArrayOf(13, 14, 15)   // byte 12 is the hat, which is a direction
+
+    /** Buttons that went down since the last snapshot; see [ReportShape.buttonBytes]. */
+    private val latch = ByteArray(16)
 
     /**
      * Sixteen bits an axis and ten a trigger, which is what this report holds and what the
@@ -219,6 +263,7 @@ class XboxShape(
         synchronized(report) {
             report[i] = if (down) (report[i].toInt() or mask).toByte()
                         else (report[i].toInt() and mask.inv()).toByte()
+            if (down) latch[i] = (latch[i].toInt() or mask).toByte()
         }
     }
 
@@ -269,7 +314,7 @@ class XboxShape(
         report[12] = ((report[12].toInt() and 0xF0) or dir).toByte()
     }
 
-    override fun snapshot(): ByteArray = synchronized(report) { report.copyOf() }
+    override fun snapshot(): ByteArray = synchronized(report) { withLatch(report, latch, buttonBytes) }
 
     /** The real controller sends no second report, so neither does this. */
     override fun systemSnapshot(): ByteArray? = null
