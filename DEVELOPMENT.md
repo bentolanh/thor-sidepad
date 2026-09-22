@@ -1108,46 +1108,162 @@ pairing behaviour, the reconnect story — was over Low Energy. Classic has been
 the panel for a while, and macOS files the handheld as a phone over it, which is the mess that
 cost 2026-09-20. None of that is inherited; it would need its own pass.
 
-## Open for 2026-09-22: stick lag, precision, and whether stale entries actually cost something
+## 2026-09-22: a day on stick lag, and what it eliminated
 
-Three things left standing at the end of 2026-09-21, in the order worth doing.
+The symptom, in the words that finally made it tractable: the stick overshoots what was meant,
+and it is **intermittent inside a single session** — right for a while, then wrong, on the same
+build, the same pairing, the same game. That last part is the most useful fact of the day. It
+rules out everything fixed at build time before any measurement is taken.
 
-### The Mac is not the difference
+What follows is mostly negative results. They cost a lot to get and they are worth more than the
+theories they killed, because each one is a place nobody needs to look again.
 
-Measured rather than assumed, by comparing the session where sticks were good against the one
-where they were not:
+### The one difference between us and a controller that works
 
-| | gamecontrollerd | hid pads |
-|---|---|---|
-| 09-20 23:28–23:46, Eastward, sticks good | 0.88–1.12 s/min | 4 |
-| 09-21 23:01–23:49, laggy | 1.10–1.34 s/min | 4, briefly 6 |
+Three controllers were connected to the same Mac at once and compared: ours, an 8BitDo Ultimate 2
+Wireless, and a genuine Xbox Wireless Controller. macOS logs its Low Energy HID decisions, and
+they read:
 
-Same daemon cost, same pad count, no driver flood either time. Whatever changed is on the
-handheld or in this code. That is a negative result and it rules out a whole branch.
+```
+LE Connection Interval(30.00 ms) Latency(0) appearanceValue(0x0)   of Device(Odin2Mini)
+    is not preferred. Adjust HID Sniff Interval.                               ×26
+don't allow LE Connection(default) Parameter Override by Peer, appearanceValue(0x0)   ×18
 
-Use those numbers as the baseline for any retest: `gccpu.log` for the Mac, `padlag.log` for the
-handheld's outbound queue.
+LE HID [8BitDo Ultimate 2 Wireless] current 15.00 ms latency(0) appearanceValue(0x3c4) updated
+LE HID [Xbox Wireless Controller]   ... appearanceValue(0x3c4)
+```
 
-### Sticks have eight bits, and claim sixteen
+`0x03C4` is the Bluetooth SIG appearance for a gamepad — category 15 (Human Interface Device),
+subcategory 4. Both working controllers publish it. We publish `0x0`. macOS reads that value when
+it decides whether to honour a peripheral's connection-parameter preference, and for `0x0` it
+prints, in as many words, that it will not.
 
-`ControllerForwarder` scales a stick from the controller's ±32767 into ±127, because the target
-range comes from `BluetoothSink.CAPS` — the Classic sink's caps. `XboxShape.stick()` then
-stretches ±127 back out to 0…65535. So the pad claims 16-bit axes and delivers 255 positions,
-and a game with a deadzone has very few of those left.
+This was already known and written down in `BleSink.addServices` on 2026-09-20, including the
+attempt to publish Generic Access ourselves and why it fails. It was re-derived from scratch today
+at considerable cost. **Read that comment before going near this again.**
 
-This predates the good session, so it is not what changed — but it is why sticks were never
-right, and why swapping report descriptors produced differences that looked like fixes. The
-change is to take the target range from the shape rather than from the Classic sink's caps, and
-it touches the on-screen pad and the Classic path too, so it wants doing carefully and measuring
-against the baseline above.
+What today added: the refusal is not absolute. macOS caches our preference (`cache device's
+preference CI is 15.00 ms`, thirty-two times) and does sometimes apply it — 15 ms seven times,
+7.5 ms once, 30 ms twice, across one afternoon. The link oscillates rather than sitting at 30 ms.
+That is the right shape for a fault that comes and goes inside a session, and it is the only
+mechanism found all day that varies on that timescale.
 
-### Are the stale Bluetooth entries really only cosmetic?
+### Everything that was ruled out, and how
 
-Concluded on 2026-09-21 that the spare rows are harmless — but that was about the **rows**: the
-Control Center cache and the System Settings list, which are display state and clear themselves.
-It was never a claim about accumulated bonds and HID records, which is a different question.
+**The HID descriptor, the identity, and the driver path.** Ours is byte-identical to the real Xbox
+controller as macOS sees it — same vendor `0x045E`, product `0x0B13`, version 1312, same 283-byte
+report descriptor, same report IDs, same input/output/feature sizes, same collections. Both are
+bound to the generic `IOHIDEventDummyService` rather than Apple's `AppleGCHIDEventDummyService`,
+which the 8BitDo gets. So that split is 8BitDo-versus-Xbox, not us-versus-real, and it is not a
+fault. Our HID presentation is indistinguishable from the genuine article.
 
-Worth testing, because the pad count reached six during an evening of repeated pairing and the
-handheld's link was at its worst that same evening. The test: clear every stale Odin entry on the
-Mac, re-pair once, and run the Eastward comparison against the numbers above. If the lag moves
-with the clean-up, they are not cosmetic and the advice in the README is wrong.
+**The connection interval, as a thing to fix.** The 8BitDo opens at `interval 24, LSTO 72` — the
+same 30 ms — on a Mac that opens *every* Low Energy link at 30 ms, mice and keyboards included,
+and it plays correctly. A number a working controller also lives with is not the fault.
+
+**Report rate.** Measured against the 8BitDo on the handheld's own evdev nodes: roughly 37
+syncs/sec from the Odin's controller and 26/sec from the 8BitDo, against a link carrying about 33.
+Comparable, not multiples. There was never a flood, so there was never a backlog to remove.
+
+**Both controllers are silent at rest** — zero events in six seconds untouched. Real hardware
+reports on change, not every interval. The event-driven design was right.
+
+**Anything fixed at build time**, by the intermittency argument above. The identity change to the
+Series pad is cleared directly: it was tested at 11:49 on 09-21 and reported as behaving exactly
+like real hardware.
+
+**The root route.** AYN's run-as-root helper (`/system/bin/pservice`, running as root with a
+`run_cmd` binder interface) is real but private to AYN's own app, and there is nothing behind it
+to turn: no `hci0` debugfs on Android (the stack is userspace Bluedroid, not BlueZ), and the GAP
+appearance lives in the stack's compiled attribute table rather than in `bt_config.conf`.
+
+### Two faults of our own, found and fixed
+
+**The settle said the wrong thing.** `scheduleSettle()` repeated `lastFrame`, which is only
+assigned when the radio *accepts* a frame. A refused frame never becomes `lastFrame`, so after a
+loss the insurance re-sent the state from before it — telling a host that was merely holding a
+stale stick position that the stick really was still held over. Now it reads the shape when the
+timer fires. Fixed in `b3dd13c`.
+
+**Sticks and triggers were quantised.** The shared `BluetoothSink.CAPS` forced every axis through
+±127 and every trigger through 0…127, then the Xbox shape stretched them back to 16 and 10 bits —
+255 of 65,535 stick positions and 128 of 1,024 trigger positions. Each shape now declares what its
+own report holds. Fixed in `907115f` and `92dfbf5`.
+
+Neither fixed the reported symptom. Both were real.
+
+### Three changes made today that were wrong, and why
+
+Recorded because the reasoning was plausible each time and the results were not.
+
+**Asking for a shorter interval by riding a client connection** (`af3b83c`, reverted in `ba1cc4e`).
+The request itself was correct and reached the Mac — the handheld logs
+`connectionParameterUpdate() params=1 interval=9/12`, which is 11.25–15 ms. Closing that client
+four seconds later took the machine's own link down with it: connect, five seconds, disconnect
+with reason `0x13`, about twelve times a minute. In Steam that is a controller that will not hold
+still, and the churn wedged `gamecontrollerd` badly enough to hang Eastward.
+
+**Pacing the sender to the radio** (`0805368`, reverted in `33a5c8d`). Removing the queue and
+reading the pad only when the radio was free should have removed stale positions. It made presses
+and stick movement both arrive late, because `awaitIdle()` blocks on the radio's acknowledgement
+before the next snapshot is even taken — the pipeline became serialised on the radio, where the
+old queue had work prepared and handed it over the instant a slot opened.
+
+**Latching button presses** (`eeba06f`, reverted with the above). Correct in principle, and
+necessary only because the pacing change had removed the protection `collapse()` already provided.
+
+The pattern in all three: a mechanism reasoned out, then built, then measured. The measurement
+should have come first every time.
+
+### Apple's connection-parameter rules, for reference
+
+From the Accessory Design Guidelines, verbatim — a request may be rejected if it does not comply
+with **all** of:
+
+```
+Interval Max * (Slave Latency + 1) ≤ 2 seconds
+Interval Min ≥ 20 ms
+Interval Min + 20 ms ≤ Interval Max
+Slave Latency ≤ 4
+connSupervisionTimeout ≤ 6 seconds
+Interval Max * (Slave Latency + 1) * 3 < connSupervisionTimeout
+```
+
+With a later addition: if Bluetooth Low Energy HID is one of the connected services, an interval
+down to 11.25 ms may be accepted. Also stated there: *"The Apple product will not read or use the
+parameters in the Peripheral Preferred Connection Parameters characteristic"* — so GAP `0x2A04` is
+not a route.
+
+Android's `CONNECTION_PRIORITY_HIGH` asks for 11.25–15 ms, which fails the third rule: the window
+must span at least 20 ms and that one spans 3.75. This is consistent with the eighteen
+`onServerConnUpdate status=59` refusals on the link. It is a real defect in what we ask for, and
+it is **not** the cause of the lag, because a controller that plays correctly shares the same
+30 ms.
+
+### Measuring this again
+
+Everything here came from four instruments; they exist because the evidence kept being destroyed.
+
+- `btpair.sh` → `~/Library/Logs/thor-sidepad/macpair.log`. The Mac's half. `log show` cannot read
+  this back afterwards without root and bluetoothd writes at debug level, so the only way to have
+  it is to be listening first. `log stream` needs no privilege.
+- `paircap.sh` → `pair-*.log`. The handheld's half: bond state machine, SMP, GATT.
+- `linkwatch.sh` → `linkwatch.log`. A five-second time series of parameter renegotiations,
+  congestion, dropped reports and disconnections. Nothing is cleared — the watcher that cleared
+  logcat destroyed the evidence for everything else on the device.
+- `padprops.py` in the session scratchpad. Every gamepad macOS holds, with descriptor, bound
+  service class and report sizes, for diffing one controller against another.
+
+Two traps worth knowing. `EVIOCGRAB` means nothing outside the app can watch the controller while
+forwarding is on — including `getevent` — and force-stopping the app does not release it, because
+the Shizuku-spawned injector survives and has to be killed separately. And a measurement of a
+controller connected to the handheld measures the rate reports *arrive* over its own link, not the
+rate the controller's firmware emits.
+
+### Still open
+
+The mechanism that varies within a session is the connection interval oscillating between 30 and
+15 ms, and the only known reason macOS refuses our preference is an appearance value we cannot
+set. Whether the oscillation is what the hand feels has not been demonstrated — `linkwatch` is
+recording so a bad stretch can be looked up by wall clock rather than guessed at.
+
