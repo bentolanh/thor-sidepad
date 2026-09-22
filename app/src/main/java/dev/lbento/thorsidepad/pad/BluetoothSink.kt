@@ -31,6 +31,9 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     @Volatile private var host: BluetoothDevice? = null
     @Volatile override var connected = false; private set
 
+    /** Classic sends the standard nine-byte report, whose sticks are a signed byte. */
+    override val caps: Caps = CAPS
+
     /** The live report: buttons, four stick axes, two triggers, and the hat in the low nibble. */
     private val report = ByteArray(9)
     private var hatX = 0

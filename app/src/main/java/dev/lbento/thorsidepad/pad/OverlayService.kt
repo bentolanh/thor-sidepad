@@ -533,7 +533,7 @@ class OverlayService : Service() {
                 val bt = if (prefs.anyToMachine) openMachineSink() else null
                 if (prefs.padTo == Prefs.TO_MACHINE) {
                     if (bt == null) { toast("Could not present a pad"); return@run }
-                    sink = bt; caps = BluetoothSink.CAPS
+                    sink = bt; caps = bt.caps
                 } else {
                     if (svc == null) { toast("Shizuku is not ready"); return@run }
                     val err = openTarget(svc)

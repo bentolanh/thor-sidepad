@@ -11,13 +11,25 @@ import dev.lbento.thorsidepad.inject.Abs
  * both sticks pinned to a corner. So a shape owns its descriptor and its report together, and
  * nothing may mix one with the other.
  *
- * Values arriving here are always in the pad's own terms: sticks −127 to 127, triggers 0 to 127,
- * hat as two −1/0/1 axes. Converting those to whatever a shape actually puts on the wire is the
- * shape's business, which keeps the layout engine, the profiles and the controller forwarder from
- * ever needing to know which one is in use.
+ * Values arriving here are in the terms [stickRange] declares, triggers 0 to 127, hat as two
+ * −1/0/1 axes. Converting those to whatever a shape actually puts on the wire is the shape's
+ * business, which keeps the layout engine, the profiles and the controller forwarder from ever
+ * needing to know which one is in use.
  */
 interface ReportShape {
     val descriptor: ByteArray
+
+    /**
+     * How finely this shape can carry a stick, in the units everything upstream works in.
+     *
+     * It used to be −127‥127 for every shape, because that is what the oldest one could hold.
+     * The Xbox report has sixteen bits per axis and the handheld's own sticks report −32767‥32767,
+     * so a byte in the middle threw away all but 255 of 65,535 positions and then expanded them
+     * back out again — a stick that claimed sixteen bits and moved in steps of 257. Declaring the
+     * range here lets each shape keep what it can actually carry, which is a single byte for the
+     * standard one and the whole range for Xbox.
+     */
+    val stickRange: IntArray get() = intArrayOf(-127, 127)
     /** Bytes a player taps rather than sweeps; a frame carrying a change to one is never dropped. */
     val discreteBytes: IntArray
     fun setKey(code: Int, down: Boolean)
@@ -141,6 +153,9 @@ class XboxShape(
 
     override val descriptor = if (rumble) SERIES else SERIES_NO_RUMBLE
     override val discreteBytes = intArrayOf(12, 13, 14, 15)
+    // Sixteen bits on the wire, so sixteen bits all the way up. The handheld's own sticks report
+    // exactly this range, which makes the whole path a shift rather than two scalings.
+    override val stickRange = intArrayOf(-32767, 32767)
 
     override fun handles(code: Int): Boolean =
         (if (plainButtons) BUTTONS_PLAIN else BUTTONS).containsKey(code)
@@ -185,11 +200,13 @@ class XboxShape(
         }
     }
 
-    /** −127‥127 into 0‥65535, so the middle of the stick is the middle of the range. */
-    private fun stick(v: Int): Int {
-        val c = v.coerceIn(-127, 127)
-        return ((c + 127) * 65535 / 254).coerceIn(0, 65535)
-    }
+    /**
+     * −32767‥32767 into 0‥65535, one position in for one position out.
+     *
+     * Centre lands on 32768, which is where an Xbox pad puts it and where a host's own deadzone
+     * is measured from. Nothing is scaled, so nothing is lost: the arithmetic is a shift.
+     */
+    private fun stick(v: Int): Int = (v + 32768).coerceIn(0, 65535)
 
     /** 0‥127 into the ten bits a trigger is given here. */
     private fun trigger(v: Int): Int = (v.coerceIn(0, 127) * 1023 / 127).coerceIn(0, 1023)

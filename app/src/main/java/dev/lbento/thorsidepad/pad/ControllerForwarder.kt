@@ -13,9 +13,11 @@ import org.json.JSONObject
  * This reads them from the kernel through the injector and feeds the same [BluetoothSink] the
  * virtual buttons use, so both work at once.
  *
- * Axis values have to be rescaled. A real stick reports whatever range its driver declares, often
- * tens of thousands wide, while the gamepad we advertise is a single signed byte. The ranges are
- * read from the device itself rather than assumed.
+ * Axis values have to be rescaled. A real stick reports whatever range its driver declares, and
+ * the gamepad we advertise has a range of its own — sixteen bits under the Xbox identity, a signed
+ * byte under the standard one. Both ends are read rather than assumed: the source from the device,
+ * the destination from the transport. Assuming the destination was a byte was what made a stick
+ * with 65,535 positions arrive with 255 of them.
  */
 class ControllerForwarder(
     private val sink: PadTransport,
@@ -94,7 +96,7 @@ class ControllerForwarder(
             val code = k.toIntOrNull() ?: return@forEach
             val r = abs.getJSONArray(k)
             val lo = r.getInt(0); val hi = r.getInt(1)
-            val target = BluetoothSink.CAPS.abs[canonicalOf(code)] ?: return@forEach
+            val target = sink.caps.abs[canonicalOf(code)] ?: return@forEach
             val tl = target[0]; val th = target[1]
             out[scalerKey(node, code)] = if (hi <= lo) { _ -> tl } else { v ->
                 val clamped = v.coerceIn(lo, hi)

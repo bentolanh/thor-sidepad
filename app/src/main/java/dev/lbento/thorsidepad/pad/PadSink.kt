@@ -30,6 +30,15 @@ interface PadSink {
 interface PadTransport : PadSink {
     /** Whether a machine is on the other end right now. */
     val connected: Boolean
+    /**
+     * What this destination accepts, in the engine's terms.
+     *
+     * Was a single constant shared by both radios and both identities, which was wrong as soon as
+     * they stopped agreeing: the Xbox report carries sixteen bits per stick and the standard one
+     * carries a signed byte. Asking the transport means the layout engine and the forwarder scale
+     * to what is actually going to be sent.
+     */
+    val caps: Caps
     /** Whether this pad has anywhere to put a button of that code. See ReportShape.handles. */
     fun handles(code: Int): Boolean
     /** Changes the state without sending. Used when a burst of events ends in a sync. */
