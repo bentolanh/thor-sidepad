@@ -309,14 +309,28 @@ class PadOverlay(private val app: Context, val displayId: Int) {
             }
             true
         }
-        v.alpha = bubbleOpacity
+        lp.alpha = bubbleOpacity
         try { wm.addView(v, lp); bubble = v; bubbleParams = lp } catch (e: Exception) { Log.w(TAG, "bubble", e) }
     }
 
-    /** Matches the button to the pad's transparency, with [BUBBLE_FLOOR] under it. */
+    /**
+     * Matches the button to the pad's transparency, with [BUBBLE_FLOOR] under it.
+     *
+     * Faded on the window rather than on the view. A view alpha below one makes the framework
+     * render that view into an offscreen buffer and hand SurfaceFlinger something it did not
+     * expect, and SurfaceFlinger says so — "Invalid device requested composition type change" —
+     * several times a second, for as long as the button is up. Measured on 2026-09-22: logcat
+     * held about a minute of history while that was running, which is less than it takes to
+     * reproduce anything. A window alpha is a property of the layer itself, so nothing is
+     * composited twice and nothing is logged.
+     */
     fun fadeBubble(opacity: Float) {
         bubbleOpacity = opacity.coerceAtLeast(BUBBLE_FLOOR)
-        bubble?.alpha = bubbleOpacity
+        val v = bubble ?: return
+        val lp = bubbleParams ?: return
+        if (lp.alpha == bubbleOpacity) return
+        lp.alpha = bubbleOpacity
+        try { wm.updateViewLayout(v, lp) } catch (_: Exception) {}
     }
 
     fun removeBubble() {

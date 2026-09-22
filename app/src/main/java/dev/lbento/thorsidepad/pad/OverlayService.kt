@@ -575,14 +575,20 @@ class OverlayService : Service() {
                         pointer = if (Injector.current() != null) pointerSink else null)
                     // The shield catches the edge pulls itself; islands mode still needs the strips.
                     if (prefs.shield) ov.removeCatchers() else ensureCatcher()
+                }
+                visible = true
+                prefs.padShown = true
                 // The floating button is not the catchers' business. It was only ever synced from
                 // inside ensureCatcher, which the shield skips — so turning the shield on quietly
                 // stopped the one thing that could put the button back, and the check that exists
                 // to prevent a locked screen never ran.
+                //
+                // After `visible`, not before. The check that keeps the button when the shield
+                // has the screen reads `visible`, and running it first meant reading false on the
+                // one path that matters — the pad going up. The button was then removed and
+                // nothing put it back: shield on, no way to the panel. Reproduced 2026-09-22 by
+                // starting the service with the button already dismissed.
                 syncBubble()
-                }
-                visible = true
-                prefs.padShown = true
                 refreshBubble()
                 main.postDelayed({ refreshLinkBadge() }, 1500)
                 updateNotification()
