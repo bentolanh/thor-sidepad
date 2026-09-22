@@ -20,16 +20,21 @@ interface ReportShape {
     val descriptor: ByteArray
 
     /**
-     * How finely this shape can carry a stick, in the units everything upstream works in.
+     * Everything this shape can carry, in the engine's terms: which buttons, and each axis with
+     * the range that shape's own report holds.
      *
-     * It used to be −127‥127 for every shape, because that is what the oldest one could hold.
-     * The Xbox report has sixteen bits per axis and the handheld's own sticks report −32767‥32767,
-     * so a byte in the middle threw away all but 255 of 65,535 positions and then expanded them
-     * back out again — a stick that claimed sixteen bits and moved in steps of 257. Declaring the
-     * range here lets each shape keep what it can actually carry, which is a single byte for the
-     * standard one and the whole range for Xbox.
+     * One constant used to serve both shapes, which was only ever true by accident. They promise
+     * different things — sixteen bits an axis against a signed byte, ten bits a trigger against
+     * seven, and different button maps — so a shared declaration had to be wrong for one of them.
+     * It was: the handheld's sticks report −32767‥32767 and the Xbox report carries all of it,
+     * but the shared byte in the middle left 255 of 65,535 positions and then expanded them back
+     * out to look like sixteen bits again.
+     *
+     * Nothing about one shape is shared with the other. A shape states what it holds and the
+     * transport passes that on, so the layout engine and the controller forwarder scale to what
+     * is actually going out.
      */
-    val stickRange: IntArray get() = intArrayOf(-127, 127)
+    val caps: Caps
     /** Bytes a player taps rather than sweeps; a frame carrying a change to one is never dropped. */
     val discreteBytes: IntArray
     fun setKey(code: Int, down: Boolean)
@@ -73,6 +78,26 @@ class StandardShape : ReportShape {
 
     override val descriptor: ByteArray get() = BluetoothSink.reportDescriptor()
     override val discreteBytes = intArrayOf(0, 1, 8)
+    override val caps get() = CAPS
+
+    companion object {
+        /**
+         * What the nine-byte report holds: a signed byte an axis, seven bits of trigger, a hat.
+         *
+         * The Classic transport sends this same report, so it reads this rather than keeping a
+         * second copy. That is one report described once, not two identities sharing a range.
+         */
+        val CAPS = Caps(
+            keys = BluetoothSink.BUTTON_CODES,
+            abs = mapOf(
+                Abs.X to intArrayOf(-127, 127), Abs.Y to intArrayOf(-127, 127),
+                Abs.Z to intArrayOf(-127, 127), Abs.RZ to intArrayOf(-127, 127),
+                Abs.BRAKE to intArrayOf(0, 127), Abs.GAS to intArrayOf(0, 127),
+                Abs.HAT0X to intArrayOf(-1, 1), Abs.HAT0Y to intArrayOf(-1, 1),
+            ),
+            virtual = true,
+        )
+    }
 
     override fun handles(code: Int): Boolean = BluetoothSink.buttonBit(code) != null
 
@@ -153,9 +178,21 @@ class XboxShape(
 
     override val descriptor = if (rumble) SERIES else SERIES_NO_RUMBLE
     override val discreteBytes = intArrayOf(12, 13, 14, 15)
-    // Sixteen bits on the wire, so sixteen bits all the way up. The handheld's own sticks report
-    // exactly this range, which makes the whole path a shift rather than two scalings.
-    override val stickRange = intArrayOf(-32767, 32767)
+
+    /**
+     * Sixteen bits an axis and ten a trigger, which is what this report holds and what the
+     * handheld's own controller reports. Both conversions below become shifts with nothing lost.
+     */
+    override val caps = Caps(
+        keys = (if (plainButtons) BUTTONS_PLAIN else BUTTONS).keys,
+        abs = mapOf(
+            Abs.X to intArrayOf(-32767, 32767), Abs.Y to intArrayOf(-32767, 32767),
+            Abs.Z to intArrayOf(-32767, 32767), Abs.RZ to intArrayOf(-32767, 32767),
+            Abs.BRAKE to intArrayOf(0, 1023), Abs.GAS to intArrayOf(0, 1023),
+            Abs.HAT0X to intArrayOf(-1, 1), Abs.HAT0Y to intArrayOf(-1, 1),
+        ),
+        virtual = true,
+    )
 
     override fun handles(code: Int): Boolean =
         (if (plainButtons) BUTTONS_PLAIN else BUTTONS).containsKey(code)
@@ -208,8 +245,8 @@ class XboxShape(
      */
     private fun stick(v: Int): Int = (v + 32768).coerceIn(0, 65535)
 
-    /** 0‥127 into the ten bits a trigger is given here. */
-    private fun trigger(v: Int): Int = (v.coerceIn(0, 127) * 1023 / 127).coerceIn(0, 1023)
+    /** The ten bits a trigger is given here, arriving as themselves. */
+    private fun trigger(v: Int): Int = v.coerceIn(0, 1023)
 
     private fun putShort(at: Int, v: Int) {
         report[at] = (v and 0xFF).toByte()

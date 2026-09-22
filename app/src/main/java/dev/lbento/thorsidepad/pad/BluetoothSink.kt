@@ -20,9 +20,9 @@ import java.util.concurrent.TimeUnit
  * Nothing here is privileged. Unlike the local destination, which needs Shizuku to reach the
  * kernel, being a Bluetooth peripheral is an ordinary app capability.
  *
- * The shape advertised is a plain gamepad: sixteen buttons, two sticks, two triggers and a hat.
- * [CAPS] describes the same shape in the terms the engine already speaks, so layouts, profiles and
- * everything else carry over untouched.
+ * The shape advertised is a plain gamepad: sixteen buttons, two sticks, two triggers and a hat —
+ * the same report [StandardShape] sends, so its declaration is what this reads rather than a
+ * second copy that could drift from it.
  */
 class BluetoothSink(private val ctx: Context, private val onState: (String) -> Unit = {}) : PadTransport {
 
@@ -31,8 +31,8 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
     @Volatile private var host: BluetoothDevice? = null
     @Volatile override var connected = false; private set
 
-    /** Classic sends the standard nine-byte report, whose sticks are a signed byte. */
-    override val caps: Caps = CAPS
+    /** Classic sends the standard nine-byte report, which is StandardShape's. */
+    override val caps: Caps get() = StandardShape.CAPS
 
     /** The live report: buttons, four stick axes, two triggers, and the hat in the low nibble. */
     private val report = ByteArray(9)
@@ -301,6 +301,9 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
             Btn.C to 13, Btn.Z to 14,      // the Thor's M1 and M2, after everything standard
         )
 
+        /** The codes the nine-byte report has a bit for; [StandardShape] states them as its caps. */
+        val BUTTON_CODES: Set<Int> get() = BUTTONS.keys
+
         /**
          * evdev axis to its byte in the report. The byte order is unchanged; what moved is which
          * HID usage each byte is declared as. A controller calls its right stick Z and Rz on this
@@ -310,22 +313,6 @@ class BluetoothSink(private val ctx: Context, private val onState: (String) -> U
             Abs.X to 2, Abs.Y to 3,        // left stick, X and Y
             Abs.Z to 4, Abs.RZ to 5,       // right stick, declared as Rx and Ry
             Abs.BRAKE to 6, Abs.GAS to 7,  // triggers, declared as Z and Rz
-        )
-
-        /**
-         * What this destination can express, in the engine's own terms. Deliberately the same shape
-         * as the local virtual pad: the D-pad is left out of the buttons so it plans onto the hat,
-         * and the triggers get their own axes so they do not fight the right stick.
-         */
-        val CAPS = Caps(
-            keys = BUTTONS.keys,
-            abs = mapOf(
-                Abs.X to intArrayOf(-127, 127), Abs.Y to intArrayOf(-127, 127),
-                Abs.Z to intArrayOf(-127, 127), Abs.RZ to intArrayOf(-127, 127),
-                Abs.BRAKE to intArrayOf(0, 127), Abs.GAS to intArrayOf(0, 127),
-                Abs.HAT0X to intArrayOf(-1, 1), Abs.HAT0Y to intArrayOf(-1, 1),
-            ),
-            virtual = true,
         )
 
         private val DESCRIPTOR = byteArrayOf(

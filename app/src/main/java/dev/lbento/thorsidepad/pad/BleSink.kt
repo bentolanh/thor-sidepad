@@ -115,13 +115,8 @@ class BleSink(
         // and, for the Series, in sending that controller's own map rather than the 1708's.
         if (identity == Identity.XBOX_SERIES) XboxShape(rumble, plainButtons) else StandardShape()
 
-    /** The shared shape, with the sticks widened to whatever this identity's report can hold. */
-    override val caps: Caps = BluetoothSink.CAPS.let { base ->
-        val r = shape.stickRange
-        Caps(base.keys, base.abs.mapValues { (code, range) ->
-            if (code == Abs.X || code == Abs.Y || code == Abs.Z || code == Abs.RZ) r else range
-        }, base.virtual)
-    }
+    /** Whatever this identity's own report holds; see ReportShape.caps. */
+    override val caps: Caps get() = shape.caps
 
     /**
      * Which bonded hosts have asked to be sent reports, by address.
