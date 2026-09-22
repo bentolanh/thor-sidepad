@@ -1,0 +1,61 @@
+# The day the pad first felt like real hardware
+#
+# Taken 2026-09-22 while a game was being played, after the pacing fix in b98de26, with the
+# founder reporting both sticks "as good as the official control". This is the reference: if the
+# pad ever feels worse than this, run tools/linkbench/linkbench.sh and compare.
+#
+# What each number means when it disagrees with this file:
+#
+#   interval other than 15.00 ms, or no line at all
+#       The link stayed at the 30 ms every connection opens at. About half the sessions on this
+#       day did. The pacing floor is then twice too fast and the counters below will say so.
+#
+#   refusals, dropped, congestion, link lost — anything above zero
+#       The pad is handing the radio more than it can send. That was the whole fault this day was
+#       spent finding. Zero is not "low", it is the healthy value.
+#
+#   more than two gamepads held by the host
+#       A synthetic shim per real pad is normal; duplicates mean gamecontrollerd is accumulating
+#       them, which is what wedges it and hangs games at launch. sudo killall gamecontrollerd.
+#
+#   gamecontrollerd not in state Ss
+#       State U is the wedge. Same remedy, and save your work first: that kill has crashed
+#       loginwindow on this machine.
+#
+#   Wi-Fi on a 2.4 GHz channel
+#       This reading was taken on 5 GHz, which keeps the Mac's own Wi-Fi out of Bluetooth's band.
+#       A 2.4 GHz channel here is a confound, not a fault.
+#
+# The disconnect count is cumulative over whatever macpair.log holds and is not comparable
+# between runs. Look at whether it grows *during* a session instead.
+
+# link benchmark  2026-09-22 16:45:47 +07
+
+== what is running
+   commit        6dc688b Write down why this looked like a Mac problem and is not one
+   installed     0.9.6
+   handheld      Odin2 Mini
+
+== the link, as the host describes it
+   LE HID "Odin2Mini" current 15.00 ms latency(0) updated
+   LE HID "Odin2Mini" current 15.00 ms latency(0) updated
+   LE HID "Odin2Mini" current 15.00 ms latency(0) updated
+   disconnects in the log      47
+
+== the pad getting ahead of the radio (all of these want to be zero)
+   refusals / short gaps       0
+   reports dropped             0
+   stack congestion events     0
+   link lost by the pad        0
+
+== what the host holds
+   gamepads seen by macOS:
+      Odin2Mini                      vid=1118   pid=2835   transport=Bluetooth Low Energy
+      GamePad-1                      vid=1118   pid=654    transport=Virtual
+      (real pad entries: 2)
+   gamecontrollerd             state Ss, up 05:23:27
+
+== the radio it shares the band with
+                 Channel: 149 (5GHz, 80MHz)
+                 Signal / Noise: -38 dBm / -88 dBm
+   awdl0                       RUNNING
