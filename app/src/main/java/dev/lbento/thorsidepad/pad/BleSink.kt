@@ -648,6 +648,59 @@ class BleSink(
      * the hint — it connected, read what was in the clear, and hung up forty seconds later without
      * ever trying. Asking first costs nothing when the host would have asked anyway.
      */
+    /**
+     * Asks the machine to talk to us more often than it offered.
+     *
+     * A Low Energy link only carries anything at a rendezvous the two radios agreed on, and the
+     * machine picks the spacing. macOS offered thirty milliseconds, measured 2026-09-22 —
+     * "interval 24, LSTO 72" — which is about thirty-three chances a second to report a stick,
+     * against the four to fifteen milliseconds a real controller runs at. The queue fills at that
+     * rate and reports are thrown away rather than sent late, which is what stick lag is.
+     *
+     * Nothing here had ever asked for anything, so thirty milliseconds was simply accepted. A
+     * peripheral cannot set the spacing — only the machine can — but it can ask, and both ways of
+     * asking are tried:
+     *
+     * The direct one names the numbers but is behind BLUETOOTH_PRIVILEGED, which is signature
+     * level, so it is expected to fail here and is attempted first only because it costs nothing.
+     * The second opens a client connection over the link that already exists and asks for high
+     * priority, which Android turns into the same request with its own numbers.
+     *
+     * Whether the machine agrees is the machine's business. Both outcomes are logged, because the
+     * interval it settles on is the number this was built to move.
+     */
+    private fun askForAFasterLink(device: BluetoothDevice) {
+        try {
+            val m = BluetoothDevice::class.java.getMethod("requestLeConnectionUpdate",
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            // Units of 1.25 ms: 6 = 7.5 ms, the shortest the specification allows, through 12 = 15 ms.
+            // No skipped rendezvous, and a five-second timeout instead of the 720 ms macOS chose,
+            // which is the specification's minimum and drops the link after 24 missed events.
+            val ok = m.invoke(device, 6, 12, 0, 500, 0, 0) as? Boolean ?: false
+            Log.i(TAG, "asked ${device.address} for 7.5-15ms directly: $ok")
+            if (ok) return
+        } catch (e: Exception) {
+            Log.i(TAG, "cannot name the interval (${e.javaClass.simpleName}); asking by priority instead")
+        }
+        try {
+            val g = device.connectGatt(ctx, false, object : android.bluetooth.BluetoothGattCallback() {
+                override fun onConnectionStateChange(gatt: android.bluetooth.BluetoothGatt, status: Int, state: Int) {
+                    if (state != BluetoothProfile.STATE_CONNECTED) return
+                    val ok = try {
+                        gatt.requestConnectionPriority(android.bluetooth.BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                    } catch (_: Exception) { false }
+                    Log.i(TAG, "asked ${device.address} for a high-priority link: $ok")
+                }
+            }, BluetoothDevice.TRANSPORT_LE)
+            // Held only long enough for the request to go out. Closing it does not take the link
+            // down: the machine opened that, and this was a second client riding on it.
+            ticker.schedule({ try { g?.close() } catch (_: Exception) {} }, 4, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not ask for a faster link", e)
+        }
+    }
+
     private fun createBondWith(device: BluetoothDevice) {
         try {
             Log.i(TAG, "asking ${device.address} to pair over Low Energy")
@@ -772,6 +825,7 @@ class BleSink(
                     // covers both; one that already exists is refused harmlessly.
                     createBondWith(device)
                 }
+                askForAFasterLink(device)
                 startHeartbeat()
                 announceLayoutIfChanged(device)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
